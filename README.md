@@ -16,7 +16,7 @@
 <br />
 
 <p align="center">
-  <a href="https://github.com/liuyuchen012/Internet-file-transfer">
+  <a href="https://github.com/liuyuchen012/daikai">
     <img src="icon.png" alt="Logo" width="80" height="80">
   </a>
 
@@ -24,7 +24,7 @@
   <p align="center">
     "使你更好都管理学生"
     <br />
-    <a href="https://github.com/liuyuchen012/Internet-file-transfer"><strong>探索本项目的文档 »</strong></a>
+    <a href="https://github.com/liuyuchen012/daikai"><strong>探索本项目的文档 »</strong></a>
     <br />
     <br />
     <a href="https://github.com/liuyuchen012/daikai/">查看Demo</a>
