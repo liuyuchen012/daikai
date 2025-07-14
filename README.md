@@ -27,11 +27,11 @@
     <a href="https://github.com/liuyuchen012/Internet-file-transfer"><strong>探索本项目的文档 »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/liuyuchen012/Internet-file-transfer">查看Demo</a>
+    <a href="https://github.com/liuyuchen012/daikai/">查看Demo</a>
     ·
-    <a href="https://github.com/liuyuchen012/Internet-file-transfer/issues">报告Bug</a>
+    <a href="https://github.com/liuyuchen012/daikai/issues">报告Bug</a>
     ·
-    <a href="https://github.com/liuyuchen012/Internet-file-transfer/issues">提出新特性</a>
+    <a href="https://github.com/liuyuchen012/daikai/issues">提出新特性</a>
   </p>
 
 </p>
