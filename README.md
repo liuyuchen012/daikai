@@ -73,6 +73,32 @@
 3
 ```
 
+## 常见错误
+-----
+### 错误1
+#### 错误信息
+>Unhandled exception in script
+>Failed to execute script 'app' due to unhandled exception:division by zero
+>Traceback (most recent call last):
+>File "app.py", line 316, in <module>File "app,py",
+>line 50,in initFile "app.py",
+>line 147, in create _widgetsFile "app,py",
+>line 246, in update_statsZeroDivisionError: division by zero
+#### 解决办法
+>报错是因为你删除了name.txt中的内容并保留了文件
+>向文件中添加内容或删除该文件即可解决
+-----
+### 错误2
+#### 错误信息
+>Unhandled exception in script
+>Failed to execute script 'app' due to unhandled exception:'config'
+>Traceback(most recent call last):
+>File "app,py", line 26, in <module>File "configparser,py",
+>line 979,in getitemKeyError: 'config
+-----
+### 更多
+>如发现更多BUG请向我们[报告](https://github.com/liuyuchen012/daikai/issues)我们会尽力解决
+
 <!-- links -->
 [your-project-path]:liuyuchen012/daikai
 [contributors-shield]: https://img.shields.io/github/contributors/shaojintian/Best_README_template.svg?style=flat-square
