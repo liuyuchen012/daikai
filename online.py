@@ -22,7 +22,7 @@ import show_ui
 from mode_sever_start import *   # 本地服务器模式（可选）
 
 # 全局变量
-version = '1.4online'
+version = 'v2.5.312'
 directory = os.path.dirname(__file__)
 conf = ConfigParser()
 conf.read('config.ini', encoding='UTF-8')
@@ -788,4 +788,5 @@ if __name__ == '__main__':
     window = tk.Tk()
     window.geometry("1431x800")
     app = AttendanceApp(window)
+
     window.mainloop()
