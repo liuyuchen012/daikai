@@ -1,16 +1,7 @@
 
 
-# 适用于Windows的多人打卡程序 V1.3离线版
-
-
-<!-- PROJECT SHIELDS -->
-
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
+# 适用于Windows的多人打卡程序  
+### 向中国版权保护中心申请名称 ： 大屏打卡
 
 <!-- PROJECT LOGO -->
 <br />
@@ -37,8 +28,12 @@
 </p>
 
 ### 应用图片
-![ima](01.png)
-![ima](02.png)
+
+> V1.3 Offline (Stop Suppost / 停止支持)
+> ![ima](01.png)
+> ![ima](02.png)
+
+> 
 
 ### 作者
 
@@ -50,7 +45,7 @@
 本人在班级担任电子教学管理员的职位，受数学老师使用Deepseek制作的打卡程序启发，制作了本程序。
 
 ### 程序介绍
-此版本为此项目上传的第一个离线版本，给班级大屏无法联网的班级使用。
+#### V1.3 为简易离线版本
 
 你可以使用config.ini配置文件配置你的班级信息。
 
@@ -64,6 +59,7 @@
   km=             //科目
   school=         //学校
 ```
+
 
 ## 如何添加学生信息？
 在name.txt中添加学生信息，格式如下：
@@ -99,17 +95,4 @@
 ### 更多
 >如发现更多BUG请向我们[报告](https://github.com/liuyuchen012/daikai/issues)我们会尽力解决
 
-<!-- links -->
-[your-project-path]:liuyuchen012/daikai
-[contributors-shield]: https://img.shields.io/github/contributors/shaojintian/Best_README_template.svg?style=flat-square
-[contributors-url]: https://github.com/shaojintian/Best_README_template/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/shaojintian/Best_README_template.svg?style=flat-square
-[forks-url]: https://github.com/shaojintian/Best_README_template/network/members
-[stars-shield]: https://img.shields.io/github/stars/shaojintian/Best_README_template.svg?style=flat-square
-[stars-url]: https://github.com/shaojintian/Best_README_template/stargazers
-[issues-shield]: https://img.shields.io/github/issues/shaojintian/Best_README_template.svg?style=flat-square
-[issues-url]: https://img.shields.io/github/issues/shaojintian/Best_README_template.svg
-[license-shield]: https://img.shields.io/github/license/shaojintian/Best_README_template.svg?style=flat-square
-[license-url]: https://github.com/shaojintian/Best_README_template/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/shaojintian
+
