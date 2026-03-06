@@ -2,6 +2,7 @@ import sqlite3
 import json
 import uuid
 import os
+import configparser
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
 from cryptography.hazmat.primitives import hashes
@@ -10,12 +11,53 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import base64
 from functools import wraps
 
-app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-in-production'
+version = '2.5.312'
 
-# ---------- 服务器密码与名称（可通过激活页面修改）----------
-SERVER_PASSWORD = os.environ.get('SERVER_PASSWORD', 'admin123')      # 默认密码
-SERVER_NAME = os.environ.get('SERVER_NAME', '默认控制台')            # 控制台名称
+# 配置文件路径
+CONFIG_FILE = 'server_config.ini'
+
+# 默认配置
+DEFAULT_CONFIG = {
+    'Server': {
+        'host': '0.0.0.0',
+        'port': '8393',
+        'debug': 'False',
+        'server_name': '默认控制台',
+        'admin_password': 'admin123'
+    }
+}
+
+def load_config():
+    """加载配置文件，如果不存在则创建默认配置"""
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE, encoding='utf-8')
+    else:
+        # 创建默认配置文件
+        for section, options in DEFAULT_CONFIG.items():
+            config[section] = options
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            config.write(f)
+        print(f"配置文件 {CONFIG_FILE} 不存在，已创建默认配置")
+    return config
+
+def get_config_value(section, key, fallback=None):
+    """获取配置值"""
+    config = load_config()
+    return config.get(section, key, fallback=fallback)
+
+# 加载配置
+config = load_config()
+
+app = Flask(__name__)
+app.secret_key = get_config_value('Server', 'secret_key', 'your-secret-key-change-in-production')
+
+# 从配置文件读取服务器设置
+SERVER_PASSWORD = get_config_value('Server', 'admin_password', 'admin123')
+SERVER_NAME = get_config_value('Server', 'server_name', '默认控制台')
+SERVER_HOST = get_config_value('Server', 'host', '0.0.0.0')
+SERVER_PORT = int(get_config_value('Server', 'port', '8393'))
+SERVER_DEBUG = get_config_value('Server', 'debug', 'False').lower() in ('true', 'yes', '1')
 
 # 密码验证装饰器（支持header或JSON中的password字段）
 def require_password(f):
@@ -380,19 +422,53 @@ def activate():
     if request.method == 'POST':
         new_pwd = request.form.get('password')
         new_name = request.form.get('server_name')
+        new_debug = request.form.get('debug_mode')
+        new_host = request.form.get('host')
+        new_port = request.form.get('port')
+
+        # 更新配置文件
+        config = load_config()
         if new_pwd:
+            config['Server']['admin_password'] = new_pwd
             SERVER_PASSWORD = new_pwd
         if new_name:
+            config['Server']['server_name'] = new_name
             SERVER_NAME = new_name
-        # 可选保存到环境变量或配置文件，此处仅内存生效
+        if new_debug:
+            config['Server']['debug'] = new_debug
+        if new_host:
+            config['Server']['host'] = new_host
+        if new_port:
+            config['Server']['port'] = new_port
+
+        # 保存配置文件
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            config.write(f)
+
         return redirect(url_for('index'))
+
+    # 读取当前配置
+    config = load_config()
+    current_debug = config.get('Server', 'debug', fallback='False')
+    current_host = config.get('Server', 'host', fallback='0.0.0.0')
+    current_port = config.get('Server', 'port', fallback='8393')
+
     form = f'''
     <h2>服务器激活设置</h2>
     <form method="post">
-        <label>服务器密码: <input type="text" name="password" value="{SERVER_PASSWORD}"></label><br>
-        <label>控制台名称: <input type="text" name="server_name" value="{SERVER_NAME}"></label><br>
-        <button type="submit" class="btn">保存</button>
+        <label>服务器密码: <input type="password" name="password" value="{SERVER_PASSWORD}"></label><br><br>
+        <label>控制台名称: <input type="text" name="server_name" value="{SERVER_NAME}"></label><br><br>
+        <label>服务器IP: <input type="text" name="host" value="{current_host}" placeholder="0.0.0.0"></label><br><br>
+        <label>端口号: <input type="number" name="port" value="{current_port}" min="1" max="65535"></label><br><br>
+        <label>Flask调试模式:
+            <select name="debug_mode">
+                <option value="True" {"selected" if current_debug.lower() == 'true' else ""}>开启</option>
+                <option value="False" {"selected" if current_debug.lower() != 'true' else ""}>关闭</option>
+            </select>
+        </label><br><br>
+        <button type="submit" class="btn">保存配置</button>
     </form>
+    <p style="color: #666; font-size: 12px;">注意：修改IP和端口后需要重启服务器才能生效</p>
     '''
     return render_page(form)
 
@@ -786,4 +862,41 @@ def api_web_cancel_punch():
     return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8393, debug=True)
+    print(fr'''
+      o__ __o     o                                   o           __o__                                             
+     /v     v\   <|>                                 <|>            |                                              
+    />       <\  / >                                 / \           / \                                             
+  o/             \o__ __o      o__  __o       __o__  \o/  o/       \o/   \o__ __o                                  
+ <|               |     v\    /v      |>     />  \    |  /v         |     |     |>                                 
+  \\             / \     <\  />      //    o/        / \/>         < >   / \   / \                                 
+    \         /  \o/     o/  \o    o/     <|         \o/\o          |    \o/   \o/                                 
+     o       o    |     <|    v\  /v __o   \\         |  v\         o     |     |                                  
+     <\__ __/>   / \    / \    <\/> __/>    _\o__</  / \  <\      __|>_  / \   / \                                 
+                                                                                                                    
+                                                                                                                    
+                                                                                                                    
+                                            o__ __o                                                                
+                                           /v     v\                                                               
+                                          />       <\                                                              
+                                         _\o____          o__  __o   \o__ __o    o      o     o__  __o   \o__ __o
+                                              \_\__o__   /v      |>   |     |>  <|>    <|>   /v      |>   |     |> 
+                                                    \   />      //   / \   < >  < >    < >  />      //   / \   < > 
+                                          \         /   \o    o/     \o/         \o    o/   \o    o/     \o/       
+                                           o       o     v\  /v __o   |           v\  /v     v\  /v __o   |        
+                                           <\__ __/>      <\/> __/>  / \           <\/>       <\/> __/>  / \       
+                                                                                                                   
+    @2026 - {str(int(datetime.today().strftime("%Y"))+1)} 刘宇晨 保留全部对该版本的权力                                                                                               
+    @2026 - {str(int(datetime.today().strftime("%Y"))+1)} Liu Yuchen reserves all rights to this version.
+    |  Version: Server v{version}
+    |  Developer: Liu Yuchen
+    ''')
+
+
+    print(f"服务器配置:")
+    print(f"  IP: {SERVER_HOST}")
+    print(f"  端口: {SERVER_PORT}")
+    print(f"  调试模式: {SERVER_DEBUG}")
+    print(f"  控制台名称: {SERVER_NAME}")
+    print(f"  管理员密码: {SERVER_PASSWORD}")
+    print(f"配置文件: {CONFIG_FILE}")
+    app.run(host=SERVER_HOST, port=SERVER_PORT, debug=SERVER_DEBUG)
