@@ -1,11 +1,9 @@
 # show_ui.py
 # 采用 old.py 的 UI 风格，移植管理员设置功能
 
+import ctypes
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from tkinter import font as tkFont
-import ctypes
-import time
 
 # 导入 online 中的函数（需避免循环导入，这里使用局部导入）
 # open_url_bz 和 check_version 将在需要时从 online 模块导入
@@ -55,13 +53,14 @@ def windowMove(widget, window):
             self.start_x = event.x_root
             self.start_y = event.y_root
 
-            # 获取窗口句柄和当前位置
+            # 获取窗口句柄和当前位置（使用兼容打包的方式）
             try:
-                self.hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-                rect = ctypes.wintypes.RECT()
-                ctypes.windll.user32.GetWindowRect(self.hwnd, ctypes.byref(rect))
-                self.window_x = rect.left
-                self.window_y = rect.top
+                self.hwnd = _get_hwnd(window)
+                if self.hwnd:
+                    rect = ctypes.wintypes.RECT()
+                    ctypes.windll.user32.GetWindowRect(self.hwnd, ctypes.byref(rect))
+                    self.window_x = rect.left
+                    self.window_y = rect.top
             except:
                 self.hwnd = None
 
@@ -115,10 +114,56 @@ def windowMove(widget, window):
 
 
 # ---------- 设置窗口样式（保留任务栏图标）----------
+def _get_hwnd(window):
+    """
+    可靠地获取 Tkinter 顶层窗口的 Win32 句柄。
+    兼容直接运行（有控制台）和 PyInstaller windowed（console=False）两种模式。
+
+    策略：
+      1. GetParent(winfo_id())  —— 直接运行时通常有效
+      2. 沿 GetParent 链向上找最顶层非零句柄
+      3. FindWindowW 通过窗口标题匹配  —— 打包为 windowed 时的兜底方案
+    """
+    try:
+        # 确保窗口已渲染，winfo_id() 才有效
+        window.update_idletasks()
+
+        child_hwnd = window.winfo_id()
+
+        # 策略1: 直接 GetParent
+        hwnd = ctypes.windll.user32.GetParent(child_hwnd)
+
+        # 策略2: 沿父链向上，找最顶层
+        if hwnd:
+            parent = ctypes.windll.user32.GetParent(hwnd)
+            while parent:
+                hwnd = parent
+                parent = ctypes.windll.user32.GetParent(hwnd)
+
+        # 策略3: GetParent 拿到 0，用 FindWindowW 按标题查找
+        if not hwnd:
+            title = window.title()
+            hwnd = ctypes.windll.user32.FindWindowW(None, title)
+
+        # 策略4: GetAncestor GA_ROOT = 2，找根窗口
+        if not hwnd:
+            hwnd = ctypes.windll.user32.GetAncestor(child_hwnd, 2)
+
+        return hwnd if hwnd else None
+    except Exception as e:
+        print(f"获取 hwnd 失败: {e}")
+        return None
+
+
 def setup_window_style(window):
     """移除系统标题栏，但保留 WS_THICKFRAME 以支持最大化"""
     try:
-        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        hwnd = _get_hwnd(window)
+
+        if not hwnd:
+            print("无法获取窗口句柄，回退到 overrideredirect")
+            window.overrideredirect(True)
+            return False
 
         # 获取当前样式
         style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
@@ -134,7 +179,7 @@ def setup_window_style(window):
         ctypes.windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
         ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
 
-        # 更新窗口位置 - 不使用 SWP_FRAMECHANGED，避免触发不必要的重绘
+        # 通知系统窗口样式已改变，触发重绘
         ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0,
                                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
 
@@ -226,7 +271,7 @@ def show_settings_remot(self, tk):
     from tkinter import ttk
     settings_window = tk.Toplevel(self.window)
     settings_window.title("远程服务器设置")
-    settings_window.geometry("450x320")
+    settings_window.geometry("450x270")
     settings_window.resizable(False, False)
     settings_window.transient(self.window)
     settings_window.grab_set()
@@ -238,21 +283,13 @@ def show_settings_remot(self, tk):
     main_frame = ttk.Frame(settings_window, padding="20")
     main_frame.pack(fill=tk.BOTH, expand=True)
 
-    # 客户端模式
+    # 客户端模式（始终启用，不可更改）
     online_frame = ttk.Frame(main_frame)
     online_frame.pack(fill=tk.X, pady=(0, 15))
     ttk.Label(online_frame, text="客户端模式:").pack(side=tk.LEFT)
-    self.online_var = tk.BooleanVar(value=self.online_mode)
+    self.online_var = tk.BooleanVar(value=True)
     ttk.Checkbutton(online_frame, variable=self.online_var,
-                    command=lambda: setattr(self, 'online_mode', self.online_var.get())).pack(side=tk.LEFT, padx=10)
-
-    # 服务器模式
-    server_frame = ttk.Frame(main_frame)
-    server_frame.pack(fill=tk.X, pady=(0, 15))
-    ttk.Label(server_frame, text="服务器模式:").pack(side=tk.LEFT)
-    self.server_var = tk.BooleanVar(value=self.bd_online)
-    ttk.Checkbutton(server_frame, variable=self.server_var,
-                    command=lambda: setattr(self, 'bd_online', self.server_var.get())).pack(side=tk.LEFT, padx=10)
+                    state='disabled').pack(side=tk.LEFT, padx=10)
 
     # 服务器地址
     ip_frame = ttk.Frame(main_frame)
@@ -332,8 +369,13 @@ def create_custom_titlebar(self, tk):
     menu_container = tk.Frame(left_section, bg=titlebar_bg)
     menu_container.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0))
 
-    # 从 online 导入函数（避免循环导入）
-    from online import open_url_bz, check_version
+    # 从 online 导入函数（兼容直接运行和 PyInstaller 打包两种场景）
+    try:
+        from online import open_url_bz, check_version
+    except ImportError:
+        # 打包后模块名不再是 'online'，从 self 上获取（online.py 已在 create_menu 中绑定）
+        open_url_bz = getattr(self, 'open_url_bz', lambda: None)
+        check_version = getattr(self, 'check_version', lambda: None)
 
     menu_items = [
         ("文件", ["导出打卡数据", "导入打卡数据", "清空打卡记录", "退出"]),
@@ -561,7 +603,7 @@ def create_widgets(self, tk, ttk, school, nj, class_id, km, z, l):
 
     title_text = f'{school}{nj}年{class_id}班{km}打卡'
     if self.online_mode:
-        title_text += " (在线模式)"
+        title_text += " (客户端模式)"
     elif self.bd_online:
         title_text += " (服务器模式)"
     tk.Label(header_frame, text=title_text, font=("楷体", 16, 'bold'),
@@ -570,10 +612,15 @@ def create_widgets(self, tk, ttk, school, nj, class_id, km, z, l):
     status_frame = tk.Frame(header_frame, bg=self.bg_color)
     status_frame.pack(fill=tk.X, pady=(0, 10))
 
-    status_color = self.online_color if self.server_status == "在线" else self.offline_color
+    if self.server_status == "在线":
+        status_label_text = f"服务器状态: {self.server_status}"
+        status_color = self.online_color
+    else:
+        status_label_text = f"服务器状态: {self.server_status} (单机离线模式)"
+        status_color = self.offline_color
     self.online_status_label = tk.Label(
         status_frame,
-        text=f"服务器状态: {self.server_status}",
+        text=status_label_text,
         font=("楷体", 9),
         bg=self.bg_color,
         fg=status_color
@@ -832,7 +879,8 @@ def show_admin_settings(self, tk):
     settings_window.grab_set()
     settings_window.config(bg=self.bg_color)
 
-    title_font = tk.font.Font(family="楷体", size=14, weight='bold')
+    from tkinter import font as tkFont
+    title_font = tkFont.Font(family="楷体", size=14, weight='bold')
     tk.Label(settings_window, text="管理员设置", font=title_font,
              bg=self.bg_color, fg=self.fg_color).pack(pady=15)
 
