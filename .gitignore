@@ -1,0 +1,24 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.db
+
+## IDE
+.vs/
+.vscode/
+.idea/
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Specific
+config.json
+*.dat
+name.txt
+client_key.pem
+client_uuid.txt

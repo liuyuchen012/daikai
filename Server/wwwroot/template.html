@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{TITLE} - 打卡中央控制平台</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f3f3; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        h1 { color: #111; font-size: 24px; } h2, h3 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #4285f4; color: white; }
+        tr:hover { background-color: #f5f5f5; }
+        .btn { display: inline-block; padding: 8px 20px; background-color: #4285f4; color: white; text-decoration: none; border-radius: 6px; margin: 5px; cursor: pointer; border: none; font-size: 14px; }
+        .btn:hover { background-color: #3367d6; }
+        .btn-danger { background-color: #ea4335; }
+        .btn-danger:hover { background-color: #d33426; }
+        .status-online { color: #34a853; font-weight: bold; }
+        .status-offline { color: #ea4335; }
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 20px; }
+        .grid-item { background: white; border: 1px solid #ddd; padding: 14px; text-align: center; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; }
+        .grid-item.punched { background: #4285f4; color: white; border-color: #4285f4; }
+        .grid-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: white; margin: 10% auto; padding: 30px; width: 400px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+        .close { color: #999; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        ul { list-style: none; padding: 0; } ul li { padding: 6px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{TITLE} - 打卡中央控制平台</h1>
+        <div><a href="/" class="btn">主页</a></div>
+        <hr>
+        {CONTENT}
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="punchModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>网页操作</h3>
+            <p>学生: <span id="modalStudent"></span></p>
+            <p>当前状态: <span id="modalStatus"></span></p>
+            <label>管理员密码: <input type="password" id="adminPwd"></label><br><br>
+            <button id="confirmPunch" class="btn" style="display:none;">确认打卡</button>
+            <button id="confirmCancel" class="btn btn-danger" style="display:none;">确认取消打卡</button>
+        </div>
+    </div>
+
+    <script>
+        var modal = document.getElementById('modal');
+        var span = document.getElementsByClassName("close")[0];
+        span.onclick = function() { modal.style.display = "none"; };
+        window.onclick = function(event) { if (event.target == modal) modal.style.display = "none"; };
+
+        var punchModal = document.getElementById('punchModal');
+        var punchSpan = punchModal.getElementsByClassName("close")[0];
+        punchSpan.onclick = function() { punchModal.style.display = "none"; };
+        window.onclick = function(event) { if (event.target == punchModal) punchModal.style.display = "none"; };
+
+        var currentMachine = ''; var currentStudent = ''; var currentPunched = false;
+        function openPunchModal(machine, student, punched) {
+            currentMachine = machine; currentStudent = student; currentPunched = punched;
+            document.getElementById('modalStudent').innerText = student;
+            document.getElementById('modalStatus').innerText = punched ? '已打卡' : '未打卡';
+            document.getElementById('confirmPunch').style.display = punched ? 'none' : 'inline-block';
+            document.getElementById('confirmCancel').style.display = punched ? 'inline-block' : 'none';
+            punchModal.style.display = "block";
+        }
+
+        document.getElementById('confirmPunch').onclick = function() {
+            var pwd = document.getElementById('adminPwd').value;
+            fetch('/api/web_punch', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:currentMachine, student_name:currentStudent, password:pwd}) })
+            .then(r=>r.json()).then(d=>{ alert(d.status==='ok'?'打卡成功！':'打卡失败：'+d.error); location.reload(); }).catch(e=>{alert('请求失败');});
+        };
+
+        document.getElementById('confirmCancel').onclick = function() {
+            var pwd = document.getElementById('adminPwd').value;
+            fetch('/api/web_cancel_punch', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:currentMachine, student_name:currentStudent, password:pwd}) })
+            .then(r=>r.json()).then(d=>{ alert(d.status==='ok'?'取消成功！':'取消失败：'+d.error); location.reload(); }).catch(e=>{alert('请求失败');});
+        };
+
+        function openEditConfigModal(uuid, configJson) {
+            var c = JSON.parse(configJson);
+            var html = '<h3>编辑机器配置</h3><form id="editConfigForm">' +
+                '<label>学校: <input type="text" name="school" value="'+(c.school||'')+'"></label>' +
+                '<label>年级: <input type="text" name="nj" value="'+(c.nj||'')+'"></label>' +
+                '<label>班级: <input type="text" name="class_id" value="'+(c.classId||c.class_id||'')+'"></label>' +
+                '<label>科目: <input type="text" name="km" value="'+(c.km||'')+'"></label>' +
+                '<label>行数: <input type="number" name="z" value="'+(c.z||6)+'"></label>' +
+                '<label>列数: <input type="number" name="l" value="'+(c.l||6)+'"></label>' +
+                '<label>管理员密码: <input type="password" name="password" required></label><br>' +
+                '<button type="submit" class="btn">保存</button></form>';
+            document.getElementById('modal-body').innerHTML = html;
+            modal.style.display = "block";
+            document.getElementById('editConfigForm').onsubmit = function(e) {
+                e.preventDefault(); var fd = new FormData(e.target);
+                fetch('/api/update_machine_config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:uuid, config:{school:fd.get('school'), nj:fd.get('nj'), class_id:fd.get('class_id'), km:fd.get('km'), z:parseInt(fd.get('z')), l:parseInt(fd.get('l'))}, password:fd.get('password')}) })
+                .then(r=>r.json()).then(d=>{ if(d.status==='ok'){alert('配置更新成功');location.reload();}else{alert('更新失败：'+d.error);} modal.style.display="none";}).catch(e=>{alert('请求失败');modal.style.display="none";});
+            };
+        }
+
+        function openClearDataModal(uuid) {
+            var html = '<h3>清除打卡数据</h3><p>确定要清除该机器的所有打卡记录吗？此操作不可撤销！</p>' +
+                '<form id="clearDataForm"><label>管理员密码: <input type="password" name="password" required></label><br>' +
+                '<button type="submit" class="btn btn-danger">确认清除</button>' +
+                '<button type="button" class="btn" onclick="modal.style.display=\'none\'">取消</button></form>';
+            document.getElementById('modal-body').innerHTML = html;
+            modal.style.display = "block";
+            document.getElementById('clearDataForm').onsubmit = function(e) {
+                e.preventDefault();
+                fetch('/api/clear_attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:uuid, password:e.target.password.value}) })
+                .then(r=>r.json()).then(d=>{ if(d.status==='ok'){alert('清除成功');location.reload();}else{alert('清除失败：'+d.error);} modal.style.display="none";}).catch(e=>{alert('请求失败');modal.style.display="none";});
+            };
+        }
+    </script>
+</body>
+</html>

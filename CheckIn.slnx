@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Client/">
+    <Project Path="Client/CheckIn.Client.csproj" />
+  </Folder>
+  <Folder Name="/Server/">
+    <Project Path="Server/CheckIn.Server.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/CheckIn.Shared.csproj" />
+  </Folder>
+</Solution>
