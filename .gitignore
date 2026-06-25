@@ -17,8 +17,9 @@ Thumbs.db
 .DS_Store
 
 ## Specific
-config.json
+release/
 *.dat
 name.txt
+config.json
 client_key.pem
 client_uuid.txt

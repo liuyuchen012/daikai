@@ -3,7 +3,7 @@
 > 课堂签到打卡系统 — .NET 重制版（原 Python Tkinter + Flask）
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![Platform](https://img.shields.io/badge/platform-Windows|Linux-blue)
 ![License](https://img.shields.io/badge/license-GPL%20v3-green)
 
 ---
@@ -14,7 +14,6 @@
 
 *主界面：左侧排名面板 + 右侧学生打卡网格*
 
-> 💡 如需真实截图，运行客户端后手工截屏保存到 `screenshots/` 目录（PNG格式，文件名与上方 SVG 一致即可自动替换）
 
 ---
 
@@ -32,6 +31,18 @@
 
 ---
 
+## 🖥️ 跨平台支持
+
+| 平台 | 桌面客户端 | 服务器 | 说明 |
+|------|-----------|--------|------|
+| **Windows** | ✅ WPF 桌面应用 | ✅ ASP.NET Core | 完整功能 |
+| **Linux** | ❌ WPF 不支持 | ✅ 单文件 exe | 🌐 通过浏览器管理 |
+| **macOS** | ❌ WPF 不支持 | ✅ 可交叉编译 | 🌐 通过浏览器管理 |
+
+> 💡 **Linux 用户启动服务器后**，在浏览器打开 `http://localhost:5000` 即可完成所有打卡管理操作，无需桌面客户端。
+
+---
+
 ## 🏗️ 项目结构
 
 ```
@@ -42,12 +53,11 @@ check-in-net/
 ├── Server/                   # ASP.NET Core Web API 服务器
 │   ├── Program.cs            # Minimal API (13 个端点)
 │   ├── Data/AppDbContext.cs  # EF Core + SQLite
-│   └── wwwroot/template.html # Web 管理页面
-└── Client/                   # WPF 桌面客户端
+│   └── wwwroot/template.html # Web 管理面板
+└── Client/                   # WPF 桌面客户端 (仅 Windows)
     ├── MainWindow.xaml       # 现代化 GUI
     ├── ViewModels/           # MVVM 视图模型
-    ├── Services/             # RSA 签名通信服务
-    ├── Models/               # 客户端数据模型
+    ├── Services/             # RSA 签名通信
     └── ModernDialog.cs       # 现代化对话框
 ```
 
@@ -55,27 +65,36 @@ check-in-net/
 
 ## 🚀 快速开始
 
-### 1️⃣ 启动服务器
+### Windows
 
+**启动服务器：**
 ```bash
 cd Server
-dotnet run
+CheckIn.Server.exe
+# 浏览器打开 http://localhost:5000
 ```
 
-服务器默认运行在 `http://0.0.0.0:5000`
-
-浏览器打开 `http://<本机IP>:5000` 即可看到 Web 管理面板。
-
-### 2️⃣ 启动客户端
-
+**启动客户端：**
 ```bash
 cd Client
-dotnet run
+CheckIn.Client.exe
 ```
 
-首次运行自动生成 `name.txt`（学生名单）、`attendance.dat`（打卡记录）、`config.json`（配置）。
+### Linux
 
-### 3️⃣ 配置远程连接
+```bash
+chmod +x CheckIn.Server
+./CheckIn.Server --urls "http://0.0.0.0:5000"
+# 浏览器打开 http://localhost:5000
+```
+
+或使用附带的启动脚本：
+```bash
+chmod +x start-server.sh
+./start-server.sh
+```
+
+### 配置远程连接
 
 菜单 → **远程** → **远程服务器设置**
 
@@ -122,15 +141,26 @@ dotnet run
 | 桌面客户端 | WPF (.NET 10.0) |
 | 服务器 | ASP.NET Core Minimal API |
 | 数据库 | SQLite (EF Core) |
-| 通信 | HTTP + RSA 签名认证 |
+| 通信 | HTTP + RSA-2048 签名认证 |
 | GUI 风格 | 原生 WPF + Windows 11 圆角 |
-| 数据格式 | JSON / CSV |
+| 数据格式 | JSON / CSV / SQLite |
 
 ---
 
 ## 🔐 通信安全
 
 客户端与服务器之间使用 RSA-2048 签名验证，每次数据同步都会验证数字签名，确保数据完整性和来源可信。
+
+---
+
+## 📦 下载
+
+从 [GitHub Releases](https://github.com/liuyuchen012/check-in/releases) 下载最新版本：
+
+| 安装包 | 平台 | 说明 |
+|--------|------|------|
+| `CheckIn-v2.6-win-x64.zip` | Windows | 客户端 + 服务器 + Web 面板 |
+| `CheckIn-v2.6-linux-x64.tar.gz` | Linux | 服务器 + 启动脚本 + Web 面板 |
 
 ---
 
