@@ -10,7 +10,7 @@
 ![Language](https://img.shields.io/badge/language-C%23-178600)
 ![PRs](https://img.shields.io/badge/PRs-welcome-orange)
 
-![主界面](screenshots/app_ui.svg)
+![主界面](screenshots/01.png)
 
 </div>
 
@@ -64,7 +64,7 @@
 > 标签栏位于标题栏下方，激活标签高亮为白色。
 > 底部状态栏显示系统状态和操作提示。
 
-![主界面客户端](screenshots/app_ui.svg)
+![主界面客户端](screenshots/01.png)
 
 ### 2️⃣ Web 管理面板 — 设备总览
 
@@ -72,16 +72,13 @@
 >
 > 首页按设备 UUID 分组展示，每行显示「文件夹图标 + 设备名称、在线/离线徽章、任务数、最后在线时间、操作按钮」
 
-![Web管理面板](screenshots/web_panel.svg)
+![Web管理面板](screenshots/02.png)
 
 ### 3️⃣ 任务详情与多任务管理
 
-> **左半（720px）**：Web 端的任务详情页 — 面包屑导航 + 统计卡片（总人数/已打卡/未打卡）+ 打卡排名表格 + 学生打卡网格（支持远程打卡）
->
-> **右半（300px）**：客户端右键菜单预览（重命名/属性/打开/删除）+ 重命名对话框
 
-![任务管理](screenshots/task_management.svg)
-
+![任务管理](screenshots/3.png)
+![任务详情](screenshots/4.png)
 ---
 
 ## 🏗️ 项目架构
@@ -521,7 +518,8 @@ dotnet publish Server -c Release -r linux-x64 --self-contained
 # macOS
 dotnet publish Server -c Release -r osx-arm64 --self-contained
 ```
-
+---
+## ⚠️注：本项目部分内容由AI完成，经过人工审阅
 ---
 
 ## ❓ 常见问题

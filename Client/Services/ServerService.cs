@@ -21,6 +21,7 @@ public class ServerService
     private string? _clientUuid;
     private string? _publicKeyPem;
     private string _taskId = "default";
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>客户端唯一标识符（UUID）</summary>
     public string? ClientUuid => _clientUuid;
@@ -151,7 +152,7 @@ public class ServerService
             if (!res.IsSuccessStatusCode) return null;
             var json = await res.Content.ReadFromJsonAsync<JsonElement>();
             var dataEl = json.GetProperty("data");
-            return JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(dataEl.GetRawText());
+            return JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(dataEl.GetRawText(), _jsonOptions);
         }
         catch { return null; }
     }
@@ -183,7 +184,7 @@ public class ServerService
             if (!res.IsSuccessStatusCode) return null;
             var json = await res.Content.ReadFromJsonAsync<JsonElement>();
             var configEl = json.GetProperty("config");
-            return JsonSerializer.Deserialize<ClientConfig>(configEl.GetRawText());
+            return JsonSerializer.Deserialize<ClientConfig>(configEl.GetRawText(), _jsonOptions);
         }
         catch { return null; }
     }
