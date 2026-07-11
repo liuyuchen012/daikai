@@ -8,6 +8,10 @@ using CheckIn.Shared.Models;
 
 namespace CheckIn.Client.Services;
 
+/// <summary>
+/// 远程服务器通信服务，负责客户端与 SignWave 集控平台的交互
+/// 功能包括：客户端注册、RSA 签名认证、数据同步与加载、配置同步
+/// </summary>
 public class ServerService
 {
     private readonly HttpClient _http;
@@ -16,9 +20,16 @@ public class ServerService
     private RSA? _rsa;
     private string? _clientUuid;
     private string? _publicKeyPem;
+    private string _taskId = "default";
 
+    /// <summary>客户端唯一标识符（UUID）</summary>
     public string? ClientUuid => _clientUuid;
+    /// <summary>当前任务 ID，用于区分同一设备的不同打卡任务</summary>
+    public string TaskId { get => _taskId; set => _taskId = value ?? "default"; }
 
+    /// <summary>
+    /// 初始化服务器连接参数（地址、端口、密码）
+    /// </summary>
     public void Initialize(string ip, int port, string password)
     {
         _baseUrl = $"http://{ip}:{port}";
@@ -27,12 +38,18 @@ public class ServerService
         _http.DefaultRequestHeaders.Add("X-Server-Password", password);
     }
 
+    /// <summary>
+    /// 构造函数：初始化 HttpClient 并加载或创建 RSA 密钥对
+    /// </summary>
     public ServerService()
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         LoadOrCreateKeys();
     }
 
+    /// <summary>
+    /// 加载已有的 RSA 密钥对和 UUID，如果不存在则创建新的并持久化到磁盘
+    /// </summary>
     private void LoadOrCreateKeys()
     {
         var keyFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "client_key.pem");
@@ -40,6 +57,7 @@ public class ServerService
 
         if (File.Exists(keyFile) && File.Exists(uuidFile))
         {
+            // 从磁盘加载已有的密钥和UUID
             _rsa = RSA.Create();
             var keyPem = File.ReadAllText(keyFile);
             _rsa.ImportFromPem(keyPem);
@@ -47,6 +65,7 @@ public class ServerService
         }
         else
         {
+            // 生成新的 RSA 2048 密钥对和 UUID
             _rsa = RSA.Create(2048);
             var privKey = _rsa.ExportRSAPrivateKey();
             var pem = PemEncoding.Write("RSA PRIVATE KEY", privKey);
@@ -57,6 +76,9 @@ public class ServerService
         _publicKeyPem = _rsa.ExportSubjectPublicKeyInfoPem();
     }
 
+    /// <summary>
+    /// 使用 RSA 私钥对消息进行 SHA256 签名，返回 Base64 编码的签名
+    /// </summary>
     private string Sign(string message)
     {
         if (_rsa == null) throw new InvalidOperationException("RSA not initialized");
@@ -64,11 +86,14 @@ public class ServerService
         return Convert.ToBase64String(sig);
     }
 
+    /// <summary>
+    /// 向服务器注册客户端，发送公钥、设备名称和任务 ID
+    /// </summary>
     public async Task<bool> RegisterAsync(string machineName)
     {
         try
         {
-            var body = new { public_key = _publicKeyPem, name = machineName, password = _password };
+            var body = new { public_key = _publicKeyPem, name = machineName, password = _password, task_id = _taskId };
             var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/register", body);
             if (!res.IsSuccessStatusCode) return false;
             var json = await res.Content.ReadFromJsonAsync<JsonElement>();
@@ -83,6 +108,9 @@ public class ServerService
         catch { return false; }
     }
 
+    /// <summary>
+    /// 检查当前客户端在服务器上的在线状态
+    /// </summary>
     public async Task<bool> CheckStatusAsync()
     {
         try
@@ -96,23 +124,29 @@ public class ServerService
         catch { return false; }
     }
 
+    /// <summary>
+    /// 将本地打卡数据同步到服务器（含 RSA 签名验证）
+    /// </summary>
     public async Task SyncDataAsync(Dictionary<string, StudentAttendance> data)
     {
         try
         {
             var dataStr = JsonSerializer.Serialize(data);
-            var body = new { uuid = _clientUuid, signature = Sign(dataStr), data = dataStr, password = _password };
+            var body = new { uuid = _clientUuid, task_id = _taskId, signature = Sign(dataStr), data = dataStr, password = _password };
             await _http.PostAsJsonAsync($"{_baseUrl}/api/sync_data", body);
         }
         catch { }
     }
 
+    /// <summary>
+    /// 从服务器加载最新打卡数据（通过 challenge-签名机制验证身份）
+    /// </summary>
     public async Task<Dictionary<string, StudentAttendance>?> LoadDataAsync()
     {
         try
         {
             var challenge = DateTime.Now.Ticks.ToString();
-            var body = new { uuid = _clientUuid, signature = Sign(challenge), challenge = challenge, password = _password };
+            var body = new { uuid = _clientUuid, task_id = _taskId, signature = Sign(challenge), challenge = challenge, password = _password };
             var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/load_data", body);
             if (!res.IsSuccessStatusCode) return null;
             var json = await res.Content.ReadFromJsonAsync<JsonElement>();
@@ -122,6 +156,9 @@ public class ServerService
         catch { return null; }
     }
 
+    /// <summary>
+    /// 将客户端配置（学校、课程、行列数）同步到服务器
+    /// </summary>
     public async Task SyncConfigAsync(ClientConfig config)
     {
         try
@@ -133,6 +170,9 @@ public class ServerService
         catch { }
     }
 
+    /// <summary>
+    /// 从服务器加载客户端配置
+    /// </summary>
     public async Task<ClientConfig?> LoadConfigAsync()
     {
         try

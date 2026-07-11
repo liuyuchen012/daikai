@@ -6,8 +6,18 @@ using System.Windows.Media;
 
 namespace CheckIn.Client;
 
+/// <summary>
+/// 现代化对话框工具类，提供自定义无边框、圆角、带阴影的确认框和提示框
+/// 所有对话框窗口均享有 DWM 圆角效果
+/// </summary>
 public static class ModernDialog
 {
+    /// <summary>
+    /// 显示确认对话框（含确定/取消按钮），返回用户选择
+    /// </summary>
+    /// <param name="message">提示消息内容</param>
+    /// <param name="title">对话框标题</param>
+    /// <returns>用户点击"确定"返回 true，否则 false</returns>
     public static bool Confirm(string message, string title = "确认")
     {
         var result = false;
@@ -63,6 +73,11 @@ public static class ModernDialog
         return result;
     }
 
+    /// <summary>
+    /// 显示提示对话框（仅含确定按钮）
+    /// </summary>
+    /// <param name="message">提示消息内容</param>
+    /// <param name="title">对话框标题</param>
     public static void Alert(string message, string title = "提示")
     {
         var win = CreateWindow(title, 380, 170);
@@ -113,6 +128,9 @@ public static class ModernDialog
         win.ShowDialog();
     }
 
+    /// <summary>
+    /// 创建统一样式的无边框对话框窗口，支持 DWM 圆角
+    /// </summary>
     private static Window CreateWindow(string title, int w, int h)
     {
         var win = new Window
@@ -133,6 +151,9 @@ public static class ModernDialog
         return win;
     }
 
+    /// <summary>
+    /// 创建统一样式的圆角按钮，含悬停透明度效果
+    /// </summary>
     private static Button NewBtn(string text, Brush bg, Brush fg)
     {
         var btn = new Button
@@ -158,8 +179,14 @@ public static class ModernDialog
     }
 }
 
+/// <summary>
+/// 原生 Win32 API 封装，用于调用 DWM（桌面窗口管理器）设置窗口属性
+/// </summary>
 internal static class NativeMethods
 {
+    /// <summary>
+    /// 设置 DWM 窗口属性（如圆角效果）
+    /// </summary>
     [System.Runtime.InteropServices.DllImport("dwmapi.dll", PreserveSig = true)]
     internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 }

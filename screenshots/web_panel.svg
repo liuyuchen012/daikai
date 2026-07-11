@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" width="100%" height="100%">
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="12" flood-opacity="0.2"/></filter>
+    <filter id="card-shadow"><feDropShadow dx="0" dy="2" stdDeviation="6" flood-opacity="0.12"/></filter>
+    <linearGradient id="sidebar-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4285f4"/>
+      <stop offset="100%" stop-color="#34a853"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="800" rx="10" fill="white" filter="url(#shadow)"/>
+
+  <!-- Browser title bar -->
+  <rect x="0" y="0" width="1400" height="36" rx="10" fill="#f1f3f4"/>
+  <rect x="0" y="18" width="1400" height="18" fill="#f1f3f4"/>
+
+  <!-- Tabs -->
+  <rect x="10" y="6" width="170" height="28" rx="5" fill="white"/>
+  <text x="20" y="25" fill="#4285f4" font-size="12" font-weight="bold" font-family="Segoe UI">🌐 SignWave 集控平台</text>
+
+  <!-- URL bar -->
+  <rect x="190" y="8" width="420" height="22" rx="11" fill="white" stroke="#dadce0" stroke-width="1"/>
+  <text x="210" y="23" fill="#333" font-size="11" font-family="Segoe UI">🔒 http://192.168.1.100:5000</text>
+
+  <!-- Window controls -->
+  <circle cx="1350" cy="12" r="6" fill="#ea4335"/>
+  <circle cx="1368" cy="12" r="6" fill="#fbbc05"/>
+  <circle cx="1386" cy="12" r="6" fill="#34a853"/>
+
+  <!-- ============ SIDEBAR ============ -->
+  <rect x="0" y="36" width="240" height="764" fill="url(#sidebar-bg)"/>
+
+  <!-- Sidebar brand -->
+  <rect x="0" y="36" width="240" height="72" fill="transparent"/>
+  <text x="20" y="72" fill="url(#brand-grad)" font-size="22" font-weight="700" font-family="Segoe UI" letter-spacing="0.5">SignWave</text>
+  <text x="20" y="92" fill="rgba(255,255,255,0.4)" font-size="12" font-family="Segoe UI">集控管理平台</text>
+  <line x1="20" y1="108" x2="220" y2="108" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+  <!-- Nav: 设备总览 (active) -->
+  <rect x="12" y="126" width="216" height="40" rx="8" fill="rgba(66,133,244,0.25)"/>
+  <!-- Home icon -->
+  <polyline points="36,146 52,134 68,146" fill="none" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="36" y="146" width="16" height="12" rx="2" fill="none" stroke="white" stroke-width="2"/>
+  <text x="74" y="152" fill="white" font-size="14" font-family="Segoe UI">设备总览</text>
+
+  <!-- Footer -->
+  <line x1="20" y1="710" x2="220" y2="710" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <!-- Logout icon -->
+  <polyline points="36,732 52,724 68,732" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="52" y1="724" x2="52" y2="742" stroke="rgba(255,255,255,0.65)" stroke-width="2"/>
+  <text x="74" y="738" fill="rgba(255,255,255,0.65)" font-size="14" font-family="Segoe UI">退出登录</text>
+  <text x="20" y="770" fill="rgba(255,255,255,0.3)" font-size="12" font-family="Segoe UI">SignWave v2.5 · 2026</text>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <!-- Page header: 设备总览 -->
+  <text x="270" y="82" fill="#1a1a2e" font-size="22" font-weight="600" font-family="Segoe UI">设备总览</text>
+
+  <!-- Stats row -->
+  <g font-family="Segoe UI">
+    <!-- 设备总数 -->
+    <rect x="270" y="100" width="220" height="90" rx="12" fill="white" filter="url(#card-shadow)"/>
+    <text x="290" y="126" fill="#6b7280" font-size="13">设备总数</text>
+    <text x="290" y="172" fill="#1a1a2e" font-size="28" font-weight="700">3</text>
+
+    <!-- 在线设备 -->
+    <rect x="510" y="100" width="220" height="90" rx="12" fill="white" filter="url(#card-shadow)"/>
+    <text x="530" y="126" fill="#6b7280" font-size="13">在线设备</text>
+    <text x="530" y="172" fill="#34a853" font-size="28" font-weight="700">2</text>
+
+    <!-- 离线设备 -->
+    <rect x="750" y="100" width="220" height="90" rx="12" fill="white" filter="url(#card-shadow)"/>
+    <text x="770" y="126" fill="#6b7280" font-size="13">离线设备</text>
+    <text x="770" y="172" fill="#ea4335" font-size="28" font-weight="700">1</text>
+  </g>
+
+  <!-- Card: 已注册设备 -->
+  <rect x="270" y="210" width="1100" height="500" rx="12" fill="white" filter="url(#card-shadow)"/>
+  <rect x="294" y="210" width="4" height="18" rx="2" fill="#4285f4"/>
+  <text x="306" y="224" fill="#1a1a2e" font-size="16" font-weight="600" font-family="Segoe UI">已注册设备</text>
+
+  <!-- Table header -->
+  <rect x="294" y="240" width="1052" height="44" rx="6" fill="#f9fafb"/>
+  <text x="310" y="268" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">设备名称</text>
+  <text x="540" y="268" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">状态</text>
+  <text x="660" y="268" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">任务数</text>
+  <text x="780" y="268" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">最后在线</text>
+  <text x="1000" y="268" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">操作</text>
+
+  <line x1="294" y1="284" x2="1346" y2="284" stroke="#e5e7eb" stroke-width="2"/>
+
+  <!-- Device row 1 - 在线 -->
+  <rect x="294" y="284" width="1052" height="52" fill="transparent"/>
+  <text x="316" y="316" fill="#333" font-size="14" font-weight="500" font-family="Segoe UI">📁 辅导班电脑</text>
+  <!-- Badge 在线 -->
+  <rect x="540" y="300" width="60" height="22" rx="11" fill="#ecfdf5"/>
+  <circle cx="556" cy="311" r="3.5" fill="#34a853"/>
+  <text x="564" y="315" fill="#065f46" font-size="12" font-weight="600" font-family="Segoe UI">在线</text>
+
+  <text x="660" y="316" fill="#333" font-size="14" font-family="Segoe UI">3 个任务</text>
+  <text x="780" y="316" fill="#333" font-size="14" font-family="Segoe UI">2026-06-27 19:28</text>
+
+  <!-- View button -->
+  <rect x="1040" y="296" width="56" height="26" rx="6" fill="#4285f4"/>
+  <text x="1068" y="313" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">查看</text>
+  <!-- Delete button -->
+  <rect x="1104" y="296" width="56" height="26" rx="6" fill="#ea4335"/>
+  <text x="1132" y="313" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">删除</text>
+
+  <line x1="294" y1="336" x2="1346" y2="336" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Device row 2 - 在线 -->
+  <rect x="294" y="336" width="1052" height="52" fill="transparent"/>
+  <text x="316" y="368" fill="#333" font-size="14" font-weight="500" font-family="Segoe UI">📁 学校教室</text>
+  <rect x="540" y="352" width="60" height="22" rx="11" fill="#ecfdf5"/>
+  <circle cx="556" cy="363" r="3.5" fill="#34a853"/>
+  <text x="564" y="367" fill="#065f46" font-size="12" font-weight="600" font-family="Segoe UI">在线</text>
+  <text x="660" y="368" fill="#333" font-size="14" font-family="Segoe UI">1 个任务</text>
+  <text x="780" y="368" fill="#333" font-size="14" font-family="Segoe UI">2026-06-27 19:10</text>
+  <rect x="1040" y="348" width="56" height="26" rx="6" fill="#4285f4"/>
+  <text x="1068" y="365" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">查看</text>
+  <rect x="1104" y="348" width="56" height="26" rx="6" fill="#ea4335"/>
+  <text x="1132" y="365" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">删除</text>
+
+  <line x1="294" y1="388" x2="1346" y2="388" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Device row 3 - 离线 -->
+  <rect x="294" y="388" width="1052" height="52" fill="transparent"/>
+  <text x="316" y="420" fill="#333" font-size="14" font-weight="500" font-family="Segoe UI">📁 办公室</text>
+  <!-- Badge 离线 -->
+  <rect x="540" y="404" width="60" height="22" rx="11" fill="#fef2f2"/>
+  <circle cx="556" cy="415" r="3.5" fill="#ea4335"/>
+  <text x="564" y="419" fill="#991b1b" font-size="12" font-weight="600" font-family="Segoe UI">离线</text>
+  <text x="660" y="420" fill="#333" font-size="14" font-family="Segoe UI">0 个任务</text>
+  <text x="780" y="420" fill="#333" font-size="14" font-family="Segoe UI">2026-06-27 12:00:00</text>
+  <rect x="1040" y="400" width="56" height="26" rx="6" fill="#4285f4"/>
+  <text x="1068" y="417" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">查看</text>
+  <rect x="1104" y="400" width="56" height="26" rx="6" fill="#ea4335"/>
+  <text x="1132" y="417" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">删除</text>
+
+  <!-- Device card area with hover effect indicator -->
+  <text x="316" y="480" fill="#aaa" font-size="12" font-family="Segoe UI">点击设备行进入任务详情页</text>
+</svg>

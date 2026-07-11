@@ -1,123 +1,196 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 820" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1530 850" width="100%" height="100%">
   <defs>
-    <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="12" flood-opacity="0.25"/></filter>
+    <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="24" flood-opacity="0.3"/></filter>
+    <filter id="card-shadow"><feDropShadow dx="0" dy="1" stdDeviation="4" flood-opacity="0.15"/></filter>
     <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#4285f4"/>
       <stop offset="100%" stop-color="#5a9cff"/>
     </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="1420" height="820" rx="12" fill="white" filter="url(#shadow)"/>
+  <!-- Window outer border with shadow -->
+  <rect x="0" y="0" width="1530" height="850" rx="12" fill="white" filter="url(#shadow)"/>
 
-  <!-- Title Bar -->
-  <rect x="0" y="0" width="1420" height="48" rx="12" fill="url(#header)"/>
-  <rect x="0" y="24" width="1420" height="24" fill="url(#header)"/>
+  <!-- ============ LEFT SIDEBAR (Grid.Column=0, Width=200) ============ -->
+  <!-- Border background #f5f5f5, CornerRadius=12,0,0,12 -->
+  <rect x="0" y="0" width="200" height="850" rx="12" fill="#f5f5f5"/>
 
-  <!-- Title bar content -->
-  <circle cx="24" cy="24" r="6" fill="white" opacity="0.9"/>
-  <text x="40" y="28" fill="white" font-size="14" font-weight="bold" font-family="Segoe UI">打卡系统</text>
+  <!-- Sidebar Row 0: Title row (Height=48) with #4285f4 background, CornerRadius=12,0,0,0 -->
+  <rect x="0" y="0" width="200" height="48" rx="12" fill="#4285f4"/>
 
-  <!-- Menu items -->
-  <text x="120" y="28" fill="white" font-size="13" font-family="Segoe UI" opacity="0.9">文件</text>
-  <text x="170" y="28" fill="white" font-size="13" font-family="Segoe UI" opacity="0.9">远程</text>
-  <text x="220" y="28" fill="white" font-size="13" font-family="Segoe UI" opacity="0.9">设置</text>
-  <text x="270" y="28" fill="white" font-size="13" font-family="Segoe UI" opacity="0.9">帮助</text>
+  <!-- Sidebar Title content: Ellipse + "SignWave" -->
+  <ellipse cx="22" cy="24" rx="5" ry="5" fill="white" opacity="0.9"/>
+  <text x="36" y="29" fill="white" font-size="13" font-weight="SemiBold" font-family="Segoe UI">SignWave</text>
+
+  <!-- Sidebar Row 1: TreeView with padding 8,8,8,0 -->
+  <!-- Folder node 1 -->
+  <rect x="8" y="56" width="184" height="32" fill="#e8e8e8" rx="4"/>
+  <text x="24" y="76" fill="#666" font-size="13" font-family="Segoe UI" font-weight="SemiBold">🖿 辅导班（授课）</text>
+
+  <!-- Sub items -->
+  <rect x="8" y="92" width="184" height="28" fill="#e8f0fe" rx="4"/>
+  <text x="32" y="110" fill="#4285f4" font-size="13" font-family="Segoe UI">🗎 数学打卡</text>
+  <rect x="152" y="94" width="36" height="18" rx="9" fill="#34a853"/>
+  <text x="158" y="107" fill="white" font-size="9" font-family="Segoe UI">在线</text>
+
+  <rect x="8" y="124" width="184" height="28" fill="transparent" rx="4"/>
+  <text x="32" y="142" fill="#444" font-size="13" font-family="Segoe UI">🗎 英语打卡</text>
+  <rect x="152" y="126" width="36" height="18" rx="9" fill="#34a853"/>
+  <text x="158" y="139" fill="white" font-size="9" font-family="Segoe UI">在线</text>
+
+  <rect x="8" y="156" width="184" height="28" fill="transparent" rx="4"/>
+  <text x="32" y="174" fill="#444" font-size="13" font-family="Segoe UI">🗎 语文打卡</text>
+  <rect x="152" y="158" width="36" height="18" rx="9" fill="#ea4335"/>
+  <text x="158" y="171" fill="white" font-size="9" font-family="Segoe UI">离线</text>
+
+  <!-- Folder node 2 -->
+  <rect x="8" y="196" width="184" height="32" fill="#e8e8e8" rx="4"/>
+  <text x="24" y="216" fill="#666" font-size="13" font-family="Segoe UI" font-weight="SemiBold">🖿 学校（签到）</text>
+
+  <rect x="8" y="232" width="184" height="28" fill="transparent" rx="4"/>
+  <text x="32" y="250" fill="#444" font-size="13" font-family="Segoe UI">🗎 四年级一班</text>
+  <rect x="152" y="234" width="36" height="18" rx="9" fill="#34a853"/>
+  <text x="158" y="247" fill="white" font-size="9" font-family="Segoe UI">在线</text>
+
+  <!-- Right-click context menu indicator -->
+  <rect x="8" y="276" width="184" height="1" fill="#e0e0e0"/>
+  <text x="16" y="294" fill="#999" font-size="11" font-family="Segoe UI">右键菜单可用</text>
+
+  <!-- ============ RIGHT SIDE ============ -->
+  <!-- Row 0: Title bar (Height=48) background #4285f4 -->
+  <rect x="200" y="0" width="1330" height="48" fill="#4285f4"/>
+
+  <!-- Menu buttons: 文件/远程/设置/帮助 -->
+  <text x="216" y="30" fill="white" font-size="13" font-family="Segoe UI">文件</text>
+  <text x="264" y="30" fill="white" font-size="13" font-family="Segoe UI">远程</text>
+  <text x="312" y="30" fill="white" font-size="13" font-family="Segoe UI">设置</text>
+  <text x="360" y="30" fill="white" font-size="13" font-family="Segoe UI">帮助</text>
 
   <!-- Window controls -->
-  <text x="1390" y="28" fill="white" font-size="14" font-family="Segoe UI" opacity="0.9">✕</text>
-  <text x="1370" y="28" fill="white" font-size="14" font-family="Segoe UI" opacity="0.9">☐</text>
-  <text x="1350" y="28" fill="white" font-size="14" font-family="Segoe UI" opacity="0.9">─</text>
+  <text x="1490" y="30" fill="white" font-size="16" font-family="Segoe UI">─</text>
+  <text x="1520" y="30" fill="white" font-size="14" font-family="Segoe UI">☐</text>
+  <text x="1540" y="30" fill="white" font-size="16" font-family="Segoe UI">✕</text>
 
-  <!-- Left Panel - Ranking -->
-  <rect x="20" y="65" width="300" height="690" rx="8" fill="#f8f9fa"/>
-  <text x="36" y="92" fill="#333" font-size="16" font-weight="bold" font-family="Segoe UI">打卡排名</text>
-  <text x="36" y="110" fill="#888" font-size="12" font-family="Segoe UI">最早打卡</text>
+  <!-- Row 1: Tab bar (Height=36) background #f0f0f0, border-bottom #e0e0e0 -->
+  <rect x="200" y="48" width="1330" height="36" fill="#f0f0f0"/>
+  <line x1="200" y1="83" x2="1530" y2="83" stroke="#e0e0e0" stroke-width="1"/>
 
-  <!-- Rank items -->
+  <!-- Active tab -->
+  <rect x="208" y="52" width="130" height="31" rx="4" fill="white"/>
+  <text x="220" y="72" fill="#4285f4" font-size="12" font-weight="bold" font-family="Segoe UI">🗎 数学打卡</text>
+  <text x="326" y="72" fill="#999" font-size="11" font-family="Segoe UI">✕</text>
+
+  <!-- Inactive tab -->
+  <rect x="342" y="54" width="120" height="28" rx="4" fill="transparent"/>
+  <text x="354" y="72" fill="#555" font-size="12" font-family="Segoe UI">🗎 英语打卡</text>
+  <text x="450" y="72" fill="#bbb" font-size="10" font-family="Segoe UI">✕</text>
+
+  <!-- + button -->
+  <rect x="480" y="54" width="36" height="28" rx="4" fill="transparent"/>
+  <text x="496" y="72" fill="#666" font-size="18" font-weight="Light" font-family="Segoe UI" text-anchor="middle">+</text>
+
+  <!-- ============ Row 2: TabContentTemplate ============ -->
+  <!-- Outer Grid: Margin=20,12,20,8 -->
+  <!-- Left column (320px): Ranking panel -->
+  <rect x="220" y="96" width="320" height="694" rx="8" fill="#f8f9fa"/>
+
+  <!-- Ranking header -->
+  <text x="232" y="126" fill="#333" font-size="16" font-weight="SemiBold" font-family="Segoe UI">打卡排名</text>
+  <text x="232" y="146" fill="#888" font-size="12" font-family="Segoe UI">最早打卡</text>
+
+  <!-- Rank items - ListView style -->
   <g font-family="Segoe UI">
-    <!-- 1st -->
-    <text x="36" y="140" fill="#FFD700" font-size="14" font-weight="bold">1</text>
-    <text x="60" y="140" fill="#333" font-size="13">张三</text>
-    <text x="250" y="140" fill="#888" font-size="12">07:58</text>
+    <!-- 1 -->
+    <rect x="232" y="158" width="296" height="30" rx="4"/>
+    <text x="240" y="178" fill="#ffd700" font-size="13" font-weight="bold">1 🥇</text>
+    <text x="266" y="178" fill="#333" font-size="13">张三</text>
+    <text x="460" y="178" fill="#888" font-size="12">07:58</text>
 
-    <!-- 2nd -->
-    <text x="36" y="168" fill="#C0C0C0" font-size="14" font-weight="bold">2</text>
-    <text x="60" y="168" fill="#333" font-size="13">李四</text>
-    <text x="250" y="168" fill="#888" font-size="12">08:02</text>
+    <!-- 2 -->
+    <rect x="232" y="190" width="296" height="30" rx="4"/>
+    <text x="240" y="210" fill="#c0c0c0" font-size="13" font-weight="bold">2 🥈</text>
+    <text x="266" y="210" fill="#333" font-size="13">李四</text>
+    <text x="460" y="210" fill="#888" font-size="12">08:02</text>
 
-    <!-- 3rd -->
-    <text x="36" y="196" fill="#CD7F32" font-size="14" font-weight="bold">3</text>
-    <text x="60" y="196" fill="#333" font-size="13">王五</text>
-    <text x="250" y="196" fill="#888" font-size="12">08:05</text>
+    <!-- 3 -->
+    <rect x="232" y="222" width="296" height="30" rx="4"/>
+    <text x="240" y="242" fill="#cd7f32" font-size="13" font-weight="bold">3 🥉</text>
+    <text x="266" y="242" fill="#333" font-size="13">王五</text>
+    <text x="460" y="242" fill="#888" font-size="12">08:05</text>
 
-    <text x="36" y="224" fill="#333" font-size="14">4</text>
-    <text x="60" y="224" fill="#333" font-size="13">赵六</text>
-    <text x="250" y="224" fill="#888" font-size="12">08:10</text>
+    <!-- 4 -->
+    <rect x="232" y="254" width="296" height="30" rx="4"/>
+    <text x="248" y="274" fill="#555" font-size="13">4</text>
+    <text x="266" y="274" fill="#333" font-size="13">赵六</text>
+    <text x="460" y="274" fill="#888" font-size="12">08:10</text>
+
+    <!-- 5 -->
+    <rect x="232" y="286" width="296" height="30" rx="4"/>
+    <text x="248" y="306" fill="#555" font-size="13">5</text>
+    <text x="266" y="306" fill="#333" font-size="13">陈七</text>
+    <text x="460" y="306" fill="#888" font-size="12">08:12</text>
   </g>
 
-  <!-- Right Panel Content -->
-  <!-- Status bar -->
-  <text x="336" y="90" fill="#666" font-size="13" font-family="Segoe UI">就绪</text>
-  <circle cx="1370" cy="87" r="4" fill="#34a853"/>
-  <text x="1380" y="92" fill="#777" font-size="12" font-family="Segoe UI">在线</text>
+  <!-- Right column (*): ScrollViewer with StackPanel -->
+  <!-- Status message row -->
+  <text x="556" y="124" fill="#666" font-size="13" font-family="Segoe UI">就绪</text>
+  <ellipse cx="1500" cy="120" rx="4" ry="4" fill="#34a853"/>
+  <text x="1508" y="125" fill="#777" font-size="12" font-family="Segoe UI">在线</text>
 
-  <!-- Stats bar -->
-  <rect x="336" y="105" width="1064" height="38" rx="8" fill="#e8f0fe"/>
-  <text x="350" y="130" fill="#4285f4" font-size="14" font-weight="bold" font-family="Segoe UI">总人数: 40  |  已打卡: 12  (30.0%)</text>
+  <!-- Stats border background #e8f0fe, padding 14,10 -->
+  <rect x="556" y="136" width="944" height="38" rx="8" fill="#e8f0fe"/>
+  <text x="570" y="160" fill="#4285f4" font-size="14" font-weight="Medium" font-family="Segoe UI">总人数: 40  |  已打卡: 12  (30.0%)</text>
 
-  <!-- Student Buttons Grid -->
-  <!-- Row 1 - checked-in students (blue) -->
-  <rect x="336" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="418" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">张三</text>
+  <!-- Student grid - UniformGrid with 6 cols -->
+  <!-- Row 1 - Checked in (Background #4285f4, Foreground White, BorderBrush #4285f4) -->
+  <rect x="560" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="634" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">张三</text>
 
-  <rect x="509" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="591" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">李四</text>
+  <rect x="714" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="788" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">李四</text>
 
-  <rect x="682" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="764" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">王五</text>
+  <rect x="868" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="942" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">王五</text>
 
-  <rect x="855" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="937" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">赵六</text>
+  <rect x="1022" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="1096" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">赵六</text>
 
-  <rect x="1028" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="1110" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">陈七</text>
+  <rect x="1176" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="1250" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">陈七</text>
 
-  <rect x="1201" y="160" width="165" height="52" rx="8" fill="#4285f4"/>
-  <text x="1283" y="192" fill="white" font-size="15" font-weight="bold" font-family="Segoe UI" text-anchor="middle">刘八</text>
+  <rect x="1330" y="188" width="148" height="52" rx="8" fill="#4285f4"/>
+  <text x="1404" y="219" fill="white" font-size="15" font-weight="Medium" font-family="Segoe UI" text-anchor="middle">刘八</text>
 
-  <!-- Remaining rows - unchecked (grey) -->
-  <g>
-    <rect x="336" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="418" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生9</text>
-    <rect x="509" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="591" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生10</text>
-    <rect x="682" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="764" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生11</text>
-    <rect x="855" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="937" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生12</text>
-    <rect x="1028" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="1110" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生13</text>
-    <rect x="1201" y="220" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="1283" y="252" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生14</text>
+  <!-- Row 2 - Unchecked (Background #e8e8e8, Foreground #333, BorderBrush #d0d0d0) -->
+  <rect x="560" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="634" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生9</text>
+  <rect x="714" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="788" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生10</text>
+  <rect x="868" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="942" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生11</text>
+  <rect x="1022" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1096" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生12</text>
+  <rect x="1176" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1250" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生13</text>
+  <rect x="1330" y="246" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1404" y="277" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生14</text>
 
-    <!-- Row 3 -->
-    <rect x="336" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="418" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生15</text>
-    <rect x="509" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="591" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生16</text>
-    <rect x="682" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="764" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生17</text>
-    <rect x="855" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="937" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生18</text>
-    <rect x="1028" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="1110" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生19</text>
-    <rect x="1201" y="280" width="165" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
-    <text x="1283" y="312" fill="#555" font-size="14" font-family="Segoe UI" text-anchor="middle">学生20</text>
-  </g>
+  <!-- Row 3 -->
+  <rect x="560" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="634" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生15</text>
+  <rect x="714" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="788" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生16</text>
+  <rect x="868" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="942" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生17</text>
+  <rect x="1022" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1096" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生18</text>
+  <rect x="1176" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1250" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生19</text>
+  <rect x="1330" y="304" width="148" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+  <text x="1404" y="335" fill="#333" font-size="14" font-family="Segoe UI" text-anchor="middle">学生20</text>
 
-  <!-- Status Bar -->
-  <rect x="0" y="790" width="1420" height="30" rx="0" fill="#f5f5f5"/>
-  <text x="16" y="808" fill="#888" font-size="11" font-family="Segoe UI">就绪</text>
-  <text x="1360" y="808" fill="#aaa" font-size="11" font-family="Segoe UI">右键点击已打卡学生可取消打卡</text>
+  <!-- Row 3 ============ Bottom: Status bar (Row 3, Height=28) background #f5f5f5 ============ -->
+  <rect x="200" y="822" width="1330" height="28" fill="#f5f5f5"/>
+  <text x="212" y="840" fill="#888" font-size="11" font-family="Segoe UI">就绪</text>
+  <text x="1460" y="840" fill="#aaa" font-size="11" font-family="Segoe UI">右键点击已打卡学生可取消打卡</text>
 </svg>

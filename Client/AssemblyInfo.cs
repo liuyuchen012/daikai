@@ -1,10 +1,12 @@
 using System.Windows;
 
+/// <summary>
+/// 程序集主题信息配置
+/// 指定 WPF 资源字典的查找位置：
+/// - None: 不在外部程序集中查找特定主题的资源字典
+/// - SourceAssembly: 在自身程序集中查找通用资源字典
+/// </summary>
 [assembly:ThemeInfo(
-    ResourceDictionaryLocation.None,            //where theme specific resource dictionaries are located
-                                                //(used if a resource is not found in the page,
-                                                // or application resource dictionaries)
-    ResourceDictionaryLocation.SourceAssembly   //where the generic resource dictionary is located
-                                                //(used if a resource is not found in the page,
-                                                // app, or any theme specific resource dictionaries)
+    ResourceDictionaryLocation.None,
+    ResourceDictionaryLocation.SourceAssembly
 )]

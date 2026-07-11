@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 750" width="100%" height="100%">
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="12" flood-opacity="0.2"/></filter>
+    <filter id="card-shadow"><feDropShadow dx="0" dy="2" stdDeviation="6" flood-opacity="0.12"/></filter>
+    <linearGradient id="menu-hover" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4285f4"/>
+      <stop offset="100%" stop-color="#5a9cff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ============ 场景1: 任务详情页 (/machine/{uuid}/task/{taskId}) ============ -->
+  <rect x="0" y="0" width="720" height="750" rx="10" fill="white" filter="url(#shadow)"/>
+
+  <!-- Breadcrumb -->
+  <text x="30" y="40" fill="#4285f4" font-size="13" font-family="Segoe UI" text-decoration="underline">设备总览</text>
+  <text x="130" y="40" fill="#999" font-size="13" font-family="Segoe UI">/</text>
+  <text x="145" y="40" fill="#4285f4" font-size="13" font-family="Segoe UI" text-decoration="underline">辅导班电脑</text>
+  <text x="245" y="40" fill="#999" font-size="13" font-family="Segoe UI">/</text>
+  <text x="260" y="40" fill="#333" font-size="13" font-weight="600" font-family="Segoe UI">数学打卡</text>
+
+  <!-- Page header -->
+  <text x="30" y="80" fill="#1a1a2e" font-size="22" font-weight="600" font-family="Segoe UI">数学打卡</text>
+
+  <!-- Clear data button -->
+  <rect x="600" y="62" width="90" height="30" rx="6" fill="#ea4335"/>
+  <text x="645" y="82" fill="white" font-size="12" font-weight="500" font-family="Segoe UI" text-anchor="middle">清除数据</text>
+
+  <!-- Stats row -->
+  <g font-family="Segoe UI">
+    <rect x="30" y="100" width="200" height="80" rx="10" fill="white" filter="url(#card-shadow)"/>
+    <text x="50" y="126" fill="#6b7280" font-size="12">总人数</text>
+    <text x="50" y="162" fill="#1a1a2e" font-size="24" font-weight="700">40</text>
+
+    <rect x="250" y="100" width="200" height="80" rx="10" fill="white" filter="url(#card-shadow)"/>
+    <text x="270" y="126" fill="#6b7280" font-size="12">已打卡</text>
+    <text x="270" y="162" fill="#34a853" font-size="24" font-weight="700">12</text>
+
+    <rect x="470" y="100" width="200" height="80" rx="10" fill="white" filter="url(#card-shadow)"/>
+    <text x="490" y="126" fill="#6b7280" font-size="12">未打卡</text>
+    <text x="490" y="162" fill="#ea4335" font-size="24" font-weight="700">28</text>
+  </g>
+
+  <!-- Two-column layout: 排名 + 打卡状态 -->
+  <rect x="30" y="200" width="330" height="500" rx="12" fill="white" filter="url(#card-shadow)"/>
+  <rect x="54" y="200" width="4" height="18" rx="2" fill="#4285f4"/>
+  <text x="66" y="214" fill="#1a1a2e" font-size="15" font-weight="600" font-family="Segoe UI">打卡排名</text>
+
+  <!-- Rank table header -->
+  <rect x="50" y="228" width="290" height="32" rx="4" fill="#f9fafb"/>
+  <text x="66" y="250" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">排名</text>
+  <text x="160" y="250" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">姓名</text>
+  <text x="270" y="250" fill="#6b7280" font-size="12" font-weight="600" font-family="Segoe UI">时间</text>
+  <line x1="50" y1="260" x2="340" y2="260" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Rank rows -->
+  <g font-family="Segoe UI">
+    <text x="60" y="286" fill="#FFD700" font-size="13" font-weight="bold">1 🥇</text>
+    <text x="160" y="286" fill="#333" font-size="13">张三</text>
+    <text x="270" y="286" fill="#888" font-size="12">07:58</text>
+    <line x1="50" y1="294" x2="340" y2="294" stroke="#e5e7eb" stroke-width="1"/>
+
+    <text x="60" y="316" fill="#C0C0C0" font-size="13" font-weight="bold">2 🥈</text>
+    <text x="160" y="316" fill="#333" font-size="13">李四</text>
+    <text x="270" y="316" fill="#888" font-size="12">08:02</text>
+    <line x1="50" y1="324" x2="340" y2="324" stroke="#e5e7eb" stroke-width="1"/>
+
+    <text x="60" y="346" fill="#CD7F32" font-size="13" font-weight="bold">3 🥉</text>
+    <text x="160" y="346" fill="#333" font-size="13">王五</text>
+    <text x="270" y="346" fill="#888" font-size="12">08:05</text>
+    <line x1="50" y1="354" x2="340" y2="354" stroke="#e5e7eb" stroke-width="1"/>
+
+    <text x="68" y="376" fill="#555" font-size="13">4</text>
+    <text x="160" y="376" fill="#333" font-size="13">赵六</text>
+    <text x="270" y="376" fill="#888" font-size="12">08:10</text>
+    <line x1="50" y1="384" x2="340" y2="384" stroke="#e5e7eb" stroke-width="1"/>
+  </g>
+
+  <!-- Grid: 打卡状态 -->
+  <rect x="380" y="200" width="310" height="500" rx="12" fill="white" filter="url(#card-shadow)"/>
+  <rect x="404" y="200" width="4" height="18" rx="2" fill="#4285f4"/>
+  <text x="416" y="214" fill="#1a1a2e" font-size="15" font-weight="600" font-family="Segoe UI">打卡状态</text>
+
+  <!-- Student grid -->
+  <g font-family="Segoe UI">
+    <rect x="400" y="232" width="82" height="52" rx="8" fill="url(#menu-hover)"/>
+    <text x="441" y="263" fill="white" font-size="13" font-weight="500" text-anchor="middle">张三</text>
+
+    <rect x="490" y="232" width="82" height="52" rx="8" fill="url(#menu-hover)"/>
+    <text x="531" y="263" fill="white" font-size="13" font-weight="500" text-anchor="middle">李四</text>
+
+    <rect x="580" y="232" width="82" height="52" rx="8" fill="url(#menu-hover)"/>
+    <text x="621" y="263" fill="white" font-size="13" font-weight="500" text-anchor="middle">王五</text>
+
+    <rect x="400" y="292" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="441" y="323" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生9</text>
+
+    <rect x="490" y="292" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="531" y="323" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生10</text>
+
+    <rect x="580" y="292" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="621" y="323" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生11</text>
+
+    <rect x="400" y="352" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="441" y="383" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生12</text>
+
+    <rect x="490" y="352" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="531" y="383" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生13</text>
+
+    <rect x="580" y="352" width="82" height="52" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="621" y="383" fill="#333" font-size="13" font-weight="500" text-anchor="middle">学生14</text>
+  </g>
+
+  <!-- ============ 场景2: 右键菜单弹出 (右侧偏移) ============ -->
+  <rect x="760" y="50" width="300" height="640" rx="12" fill="white" filter="url(#shadow)"/>
+
+  <!-- Context menu preview -->
+  <text x="780" y="86" fill="#333" font-size="15" font-weight="600" font-family="Segoe UI">右键菜单</text>
+  <line x1="780" y1="100" x2="1040" y2="100" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Menu items -->
+  <rect x="780" y="110" width="160" height="34" rx="6" fill="#f0f4ff"/>
+  <text x="810" y="132" fill="#4285f4" font-size="13" font-family="Segoe UI">📂 重命名任务</text>
+
+  <rect x="780" y="150" width="160" height="34" rx="6" fill="transparent"/>
+  <text x="810" y="172" fill="#333" font-size="13" font-family="Segoe UI">⚙ 属性设置</text>
+
+  <line x1="780" y1="192" x2="940" y2="192" stroke="#e0e0e0" stroke-width="1"/>
+
+  <rect x="780" y="198" width="160" height="34" rx="6" fill="transparent"/>
+  <text x="810" y="220" fill="#333" font-size="13" font-family="Segoe UI">📄 打开任务</text>
+
+  <line x1="780" y1="240" x2="940" y2="240" stroke="#e0e0e0" stroke-width="1"/>
+
+  <rect x="780" y="246" width="160" height="34" rx="6" fill="transparent"/>
+  <text x="810" y="268" fill="#d32f2f" font-size="13" font-family="Segoe UI">🗑 删除任务</text>
+
+  <!-- Rename dialog -->
+  <rect x="770" y="320" width="280" height="260" rx="12" fill="white" filter="url(#shadow)"/>
+  <rect x="770" y="320" width="280" height="44" rx="12" fill="#f0f2f5"/>
+  <rect x="770" y="350" width="280" height="14" fill="#f0f2f5"/>
+  <text x="910" y="348" fill="#333" font-size="15" font-weight="600" font-family="Segoe UI" text-anchor="middle">✏️ 重命名任务</text>
+
+  <text x="795" y="398" fill="#6b7280" font-size="13" font-family="Segoe UI">任务名称：</text>
+  <rect x="800" y="410" width="220" height="30" rx="6" fill="white" stroke="#dadce0" stroke-width="1.5"/>
+  <text x="810" y="430" fill="#333" font-size="13" font-family="Segoe UI">数学打卡</text>
+
+  <!-- Buttons -->
+  <rect x="795" y="470" width="100" height="34" rx="6" fill="#e0e0e0"/>
+  <text x="845" y="492" fill="#555" font-size="13" font-family="Segoe UI" text-anchor="middle">✕ 取消</text>
+
+  <rect x="905" y="470" width="100" height="34" rx="6" fill="#4285f4"/>
+  <text x="955" y="492" fill="white" font-size="13" font-weight="600" font-family="Segoe UI" text-anchor="middle">✓ 保存</text>
+
+  <!-- Properties dialog hint -->
+  <text x="795" y="550" fill="#999" font-size="12" font-family="Segoe UI">属性设置包含：</text>
+  <text x="795" y="570" fill="#999" font-size="12" font-family="Segoe UI">任务名称 / 课程 / 按钮行数列数</text>
+
+  <!-- Device details page hint -->
+  <line x1="780" y1="600" x2="1040" y2="600" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="795" y="622" fill="#333" font-size="14" font-weight="600" font-family="Segoe UI">📁 设备详情页</text>
+  <text x="795" y="644" fill="#888" font-size="12" font-family="Segoe UI">点击设备后显示任务卡片</text>
+  <text x="795" y="664" fill="#888" font-size="12" font-family="Segoe UI">每张任务卡片显示统计信息</text>
+  <text x="795" y="684" fill="#888" font-size="12" font-family="Segoe UI">点击任务卡片查看打卡详情</text>
+</svg>

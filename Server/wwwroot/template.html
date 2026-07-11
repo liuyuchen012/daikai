@@ -1,125 +1,500 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>{TITLE} - 打卡中央控制平台</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignWave 集控平台</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f3f3; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-        h1 { color: #111; font-size: 24px; } h2, h3 { color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #4285f4; color: white; }
-        tr:hover { background-color: #f5f5f5; }
-        .btn { display: inline-block; padding: 8px 20px; background-color: #4285f4; color: white; text-decoration: none; border-radius: 6px; margin: 5px; cursor: pointer; border: none; font-size: 14px; }
-        .btn:hover { background-color: #3367d6; }
-        .btn-danger { background-color: #ea4335; }
-        .btn-danger:hover { background-color: #d33426; }
-        .status-online { color: #34a853; font-weight: bold; }
-        .status-offline { color: #ea4335; }
-        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 20px; }
-        .grid-item { background: white; border: 1px solid #ddd; padding: 14px; text-align: center; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; }
-        .grid-item.punched { background: #4285f4; color: white; border-color: #4285f4; }
-        .grid-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
-        .modal-content { background: white; margin: 10% auto; padding: 30px; width: 400px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
-        .close { color: #999; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .close:hover { color: black; }
-        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        ul { list-style: none; padding: 0; } ul li { padding: 6px 0; }
+        :root {
+            --primary: #4285f4;
+            --primary-dark: #3367d6;
+            --primary-light: #e8f0fe;
+            --success: #34a853;
+            --danger: #ea4335;
+            --warning: #fbbc04;
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --text: #1a1a2e;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .layout { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 0;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-brand {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .sidebar-brand h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .sidebar-brand p {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 4px;
+        }
+        .sidebar-nav { padding: 16px 12px; flex: 1; }
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: rgba(255,255,255,0.65);
+            text-decoration: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: rgba(66,133,244,0.15);
+            color: white;
+        }
+        .sidebar-nav a.active { background: rgba(66,133,244,0.25); }
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            font-size: 12px;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* Main */
+        .main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+        .page-header {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .page-header h2 { font-size: 22px; font-weight: 600; color: var(--text); }
+        .breadcrumb { font-size: 13px; color: var(--text-secondary); }
+        .breadcrumb a { color: var(--primary); text-decoration: none; }
+
+        /* Cards */
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            transition: box-shadow 0.2s;
+        }
+        .card:hover { box-shadow: var(--shadow-lg); }
+        .card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card h3::before {
+            content: '';
+            width: 4px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        /* Stats row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+        .stat-card .label { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); }
+        .stat-card.online .value { color: var(--success); }
+        .stat-card.offline .value { color: var(--danger); }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            background: #f9fafb;
+            border-bottom: 2px solid var(--border);
+        }
+        tbody td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        tbody tr { transition: background 0.15s; }
+        tbody tr:hover { background: #f9fafb; }
+        tbody tr:last-child td { border-bottom: none; }
+
+        /* Status badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+        .badge-online { background: #ecfdf5; color: #065f46; }
+        .badge-online::before { background: var(--success); }
+        .badge-offline { background: #fef2f2; color: #991b1b; }
+        .badge-offline::before { background: var(--danger); }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(66,133,244,0.3); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #d33426; box-shadow: 0 4px 12px rgba(234,67,53,0.3); }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-ghost:hover { background: var(--primary-light); }
+
+        /* Grid items (student buttons) */
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .grid-item {
+            background: #f9fafb;
+            border: 1.5px solid var(--border);
+            padding: 14px 8px;
+            text-align: center;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .grid-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-color: var(--primary);
+        }
+        .grid-item.punched {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            color: white;
+            border-color: transparent;
+        }
+        .grid-item.punched:hover { opacity: 0.9; }
+
+        /* Config list */
+        .config-list { list-style: none; }
+        .config-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .config-list li:last-child { border-bottom: none; }
+        .config-list .label { color: var(--text-secondary); }
+        .config-list .value { font-weight: 500; color: var(--text); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: white;
+            margin: 12% auto;
+            padding: 28px;
+            width: 440px;
+            max-width: 90vw;
+            border-radius: var(--radius);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            animation: modalIn 0.2s ease-out;
+        }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-box h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .modal-close {
+            float: right;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover { color: #333; }
+
+        /* Form */
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(66,133,244,0.1); }
+        .form-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 200;
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            animation: toastIn 0.3s ease-out;
+            box-shadow: var(--shadow-lg);
+        }
+        .toast-success { background: var(--success); }
+        .toast-error { background: var(--danger); }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .sidebar-brand h1, .sidebar-brand p, .sidebar-nav a span, .sidebar-footer { display: none; }
+            .sidebar-nav a { justify-content: center; padding: 12px; }
+            .main { padding: 16px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{TITLE} - 打卡中央控制平台</h1>
-        <div><a href="/" class="btn">主页</a></div>
-        <hr>
-        {CONTENT}
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h1>SignWave</h1>
+                <p>集控管理平台</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="{NAV_HOME}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>设备总览</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/logout" style="display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,0.65);text-decoration:none;border-radius:var(--radius-sm);font-size:14px;transition:all 0.2s;margin-bottom:8px;" onmouseover="this.style.background='rgba(234,67,53,0.15)';this.style.color='white'" onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,0.65)'">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span>退出登录</span>
+                </a>
+                <div style="padding:0 14px;opacity:0.5;">SignWave v2.5 · 2026</div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            {CONTENT}
+        </main>
     </div>
 
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
+    <!-- Generic Modal -->
+    <div id="modal" class="modal-overlay">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('modal')">&times;</span>
             <div id="modal-body"></div>
         </div>
     </div>
 
-    <div id="punchModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>网页操作</h3>
-            <p>学生: <span id="modalStudent"></span></p>
-            <p>当前状态: <span id="modalStatus"></span></p>
-            <label>管理员密码: <input type="password" id="adminPwd"></label><br><br>
-            <button id="confirmPunch" class="btn" style="display:none;">确认打卡</button>
-            <button id="confirmCancel" class="btn btn-danger" style="display:none;">确认取消打卡</button>
+    <!-- Punch Modal -->
+    <div id="punchModal" class="modal-overlay">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('punchModal')">&times;</span>
+            <h3>学生打卡操作</h3>
+            <div style="margin:16px 0;">
+                <p style="font-size:15px;margin-bottom:8px;">学生：<strong id="modalStudent"></strong></p>
+                <p style="font-size:14px;color:var(--text-secondary);">当前状态：<span id="modalStatus" style="font-weight:600;"></span></p>
+            </div>
+            <div class="form-group">
+                <label>管理员密码</label>
+                <input type="password" id="adminPwd" placeholder="请输入管理员密码">
+            </div>
+            <div class="form-actions">
+                <button id="confirmPunch" class="btn" style="display:none;" onclick="doPunch()">确认打卡</button>
+                <button id="confirmCancel" class="btn btn-danger" style="display:none;" onclick="doCancel()">取消打卡</button>
+                <button class="btn btn-ghost" onclick="closeModal('punchModal')">取消</button>
+            </div>
         </div>
     </div>
 
     <script>
-        var modal = document.getElementById('modal');
-        var span = document.getElementsByClassName("close")[0];
-        span.onclick = function() { modal.style.display = "none"; };
-        window.onclick = function(event) { if (event.target == modal) modal.style.display = "none"; };
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        window.onclick = function(e) {
+            if (e.target.classList.contains('modal-overlay')) e.target.style.display = 'none';
+        };
 
-        var punchModal = document.getElementById('punchModal');
-        var punchSpan = punchModal.getElementsByClassName("close")[0];
-        punchSpan.onclick = function() { punchModal.style.display = "none"; };
-        window.onclick = function(event) { if (event.target == punchModal) punchModal.style.display = "none"; };
+        function showToast(msg, type) {
+            var t = document.createElement('div');
+            t.className = 'toast toast-' + (type || 'success');
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
 
-        var currentMachine = ''; var currentStudent = ''; var currentPunched = false;
+        var currentMachine = '', currentStudent = '', currentPunched = false;
+
         function openPunchModal(machine, student, punched) {
             currentMachine = machine; currentStudent = student; currentPunched = punched;
             document.getElementById('modalStudent').innerText = student;
-            document.getElementById('modalStatus').innerText = punched ? '已打卡' : '未打卡';
-            document.getElementById('confirmPunch').style.display = punched ? 'none' : 'inline-block';
-            document.getElementById('confirmCancel').style.display = punched ? 'inline-block' : 'none';
-            punchModal.style.display = "block";
+            var statusEl = document.getElementById('modalStatus');
+            statusEl.innerText = punched ? '已打卡' : '未打卡';
+            statusEl.style.color = punched ? 'var(--success)' : 'var(--text-secondary)';
+            document.getElementById('confirmPunch').style.display = punched ? 'none' : 'inline-flex';
+            document.getElementById('confirmCancel').style.display = punched ? 'inline-flex' : 'none';
+            document.getElementById('adminPwd').value = '';
+            document.getElementById('punchModal').style.display = 'block';
         }
 
-        document.getElementById('confirmPunch').onclick = function() {
-            var pwd = document.getElementById('adminPwd').value;
-            fetch('/api/web_punch', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:currentMachine, student_name:currentStudent, password:pwd}) })
-            .then(r=>r.json()).then(d=>{ alert(d.status==='ok'?'打卡成功！':'打卡失败：'+d.error); location.reload(); }).catch(e=>{alert('请求失败');});
-        };
+        function apiCall(url, data, successMsg) {
+            fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.status === 'ok') { showToast(successMsg, 'success'); setTimeout(() => location.reload(), 800); }
+                    else { showToast('操作失败: ' + d.error, 'error'); }
+                })
+                .catch(() => showToast('网络请求失败', 'error'));
+        }
 
-        document.getElementById('confirmCancel').onclick = function() {
+        function doPunch() {
             var pwd = document.getElementById('adminPwd').value;
-            fetch('/api/web_cancel_punch', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:currentMachine, student_name:currentStudent, password:pwd}) })
-            .then(r=>r.json()).then(d=>{ alert(d.status==='ok'?'取消成功！':'取消失败：'+d.error); location.reload(); }).catch(e=>{alert('请求失败');});
-        };
+            if (!pwd) { showToast('请输入密码', 'error'); return; }
+            apiCall('/api/web_punch', { machine_uuid: currentMachine, student_name: currentStudent, password: pwd }, '打卡成功');
+        }
+
+        function doCancel() {
+            var pwd = document.getElementById('adminPwd').value;
+            if (!pwd) { showToast('请输入密码', 'error'); return; }
+            apiCall('/api/web_cancel_punch', { machine_uuid: currentMachine, student_name: currentStudent, password: pwd }, '取消打卡成功');
+        }
 
         function openEditConfigModal(uuid, configJson) {
             var c = JSON.parse(configJson);
-            var html = '<h3>编辑机器配置</h3><form id="editConfigForm">' +
-                '<label>学校: <input type="text" name="school" value="'+(c.school||'')+'"></label>' +
-                '<label>年级: <input type="text" name="nj" value="'+(c.nj||'')+'"></label>' +
-                '<label>班级: <input type="text" name="class_id" value="'+(c.classId||c.class_id||'')+'"></label>' +
-                '<label>科目: <input type="text" name="km" value="'+(c.km||'')+'"></label>' +
-                '<label>行数: <input type="number" name="z" value="'+(c.z||6)+'"></label>' +
-                '<label>列数: <input type="number" name="l" value="'+(c.l||6)+'"></label>' +
-                '<label>管理员密码: <input type="password" name="password" required></label><br>' +
-                '<button type="submit" class="btn">保存</button></form>';
+            var html = '<h3>编辑设备配置</h3>' +
+                '<form id="editConfigForm">' +
+                '<div class="form-group"><label>任务名称</label><input name="school" value="'+(c.school||'')+'"></div>' +
+                '<div class="form-group"><label>年级</label><input name="nj" value="'+(c.nj||'')+'"></div>' +
+                '<div class="form-group"><label>班级</label><input name="class_id" value="'+(c.classId||c.class_id||'')+'"></div>' +
+                '<div class="form-group"><label>科目</label><input name="km" value="'+(c.km||'')+'"></div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+                '<div class="form-group"><label>行数</label><input type="number" name="z" value="'+(c.z||6)+'"></div>' +
+                '<div class="form-group"><label>列数</label><input type="number" name="l" value="'+(c.l||6)+'"></div></div>' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-actions"><button type="submit" class="btn">保存配置</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
             document.getElementById('modal-body').innerHTML = html;
-            modal.style.display = "block";
+            document.getElementById('modal').style.display = 'block';
             document.getElementById('editConfigForm').onsubmit = function(e) {
-                e.preventDefault(); var fd = new FormData(e.target);
-                fetch('/api/update_machine_config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:uuid, config:{school:fd.get('school'), nj:fd.get('nj'), class_id:fd.get('class_id'), km:fd.get('km'), z:parseInt(fd.get('z')), l:parseInt(fd.get('l'))}, password:fd.get('password')}) })
-                .then(r=>r.json()).then(d=>{ if(d.status==='ok'){alert('配置更新成功');location.reload();}else{alert('更新失败：'+d.error);} modal.style.display="none";}).catch(e=>{alert('请求失败');modal.style.display="none";});
+                e.preventDefault();
+                var fd = new FormData(e.target);
+                apiCall('/api/update_machine_config', {
+                    machine_uuid: uuid,
+                    config: { school: fd.get('school'), nj: fd.get('nj'), class_id: fd.get('class_id'), km: fd.get('km'), z: parseInt(fd.get('z')), l: parseInt(fd.get('l')) },
+                    password: fd.get('password')
+                }, '配置更新成功');
             };
         }
 
         function openClearDataModal(uuid) {
-            var html = '<h3>清除打卡数据</h3><p>确定要清除该机器的所有打卡记录吗？此操作不可撤销！</p>' +
-                '<form id="clearDataForm"><label>管理员密码: <input type="password" name="password" required></label><br>' +
-                '<button type="submit" class="btn btn-danger">确认清除</button>' +
-                '<button type="button" class="btn" onclick="modal.style.display=\'none\'">取消</button></form>';
+            var html = '<h3>清除打卡数据</h3>' +
+                '<p style="color:var(--danger);margin:12px 0;font-size:14px;">确定要清除该设备的所有打卡记录吗？此操作不可撤销！</p>' +
+                '<form id="clearDataForm">' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-actions"><button type="submit" class="btn btn-danger">确认清除</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
             document.getElementById('modal-body').innerHTML = html;
-            modal.style.display = "block";
+            document.getElementById('modal').style.display = 'block';
             document.getElementById('clearDataForm').onsubmit = function(e) {
                 e.preventDefault();
-                fetch('/api/clear_attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({machine_uuid:uuid, password:e.target.password.value}) })
-                .then(r=>r.json()).then(d=>{ if(d.status==='ok'){alert('清除成功');location.reload();}else{alert('清除失败：'+d.error);} modal.style.display="none";}).catch(e=>{alert('请求失败');modal.style.display="none";});
+                apiCall('/api/clear_attendance', { machine_uuid: uuid, password: e.target.password.value }, '数据已清除');
+            };
+        }
+
+        function openDeleteMachineModal(uuid, name) {
+            var html = '<h3>删除设备</h3>' +
+                '<p style="color:var(--danger);margin:12px 0;font-size:14px;">确定要删除设备 <strong>' + name + '</strong> 吗？</p>' +
+                '<p style="color:var(--danger);font-size:13px;margin-bottom:12px;">该设备的所有打卡记录将被永久删除，此操作不可撤销！</p>' +
+                '<form id="deleteMachineForm">' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-actions"><button type="submit" class="btn btn-danger">确认删除</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
+            document.getElementById('modal-body').innerHTML = html;
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('deleteMachineForm').onsubmit = function(e) {
+                e.preventDefault();
+                fetch('/api/delete_machine', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ machine_uuid: uuid, password: e.target.password.value })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.status === 'ok') { showToast('设备已删除', 'success'); setTimeout(function() { window.location.href = '/'; }, 800); }
+                    else { showToast('删除失败: ' + d.error, 'error'); }
+                })
+                .catch(function() { showToast('网络请求失败', 'error'); });
             };
         }
     </script>
