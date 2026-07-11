@@ -68,7 +68,6 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     private string _globalServerIp = "";
     private int _globalServerPort = 5250;
     private string _globalServerPassword = "";
-    private string _globalVersion = "";
 
     /// <summary>学生数据集合（绑定到打卡按钮网格）</summary>
     public ObservableCollection<StudentModel> Students { get; } = new();
@@ -113,25 +112,25 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>标签栏显示名称（格式：任务名 - 课程名）</summary>
     public string TabDisplayName => string.IsNullOrEmpty(Config.Km) ? Config.Name : $"{Config.Name} - {Config.Km}";
 
-    // ---- 标签页级别的命令 ----
+    // ---- 标签页级别的命令（仅非后台模式初始化，使用 null! 抑制 CS8618） ----
     /// <summary>学生打卡命令</summary>
-    public ICommand CheckInCommand { get; }
+    public ICommand CheckInCommand { get; } = null!;
     /// <summary>取消学生打卡命令</summary>
-    public ICommand CancelCheckInCommand { get; }
+    public ICommand CancelCheckInCommand { get; } = null!;
     /// <summary>导出打卡数据命令</summary>
-    public ICommand ExportCommand { get; }
+    public ICommand ExportCommand { get; } = null!;
     /// <summary>导入打卡数据命令</summary>
-    public ICommand ImportCommand { get; }
+    public ICommand ImportCommand { get; } = null!;
     /// <summary>清空所有打卡记录命令</summary>
-    public ICommand ClearAllCommand { get; }
+    public ICommand ClearAllCommand { get; } = null!;
     /// <summary>打开任务设置命令</summary>
-    public ICommand ShowAdminSettingsCommand { get; }
+    public ICommand ShowAdminSettingsCommand { get; } = null!;
     /// <summary>检查服务器状态命令</summary>
-    public ICommand CheckServerStatusCommand { get; }
+    public ICommand CheckServerStatusCommand { get; } = null!;
     /// <summary>从服务器加载数据命令</summary>
-    public ICommand LoadFromServerCommand { get; }
+    public ICommand LoadFromServerCommand { get; } = null!;
     /// <summary>同步数据到服务器命令</summary>
-    public ICommand SyncToServerCommand { get; }
+    public ICommand SyncToServerCommand { get; } = null!;
 
     /// <summary>
     /// 创建后台运行实例（轻量级），仅建立服务器连接，不加载 UI 数据
@@ -165,7 +164,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
         _globalServerIp = globalConfig.ServerIp;
         _globalServerPort = globalConfig.ServerPort;
         _globalServerPassword = globalConfig.ServerPassword;
-        _globalVersion = globalConfig.Version;
+        // Version is now a compile-time constant in AppConfig
 
         LoadConfig();
 
@@ -244,7 +243,6 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
         _globalServerIp = ip;
         _globalServerPort = port;
         _globalServerPassword = password;
-        _globalVersion = version;
 
         // 如果之前离线且现在有服务器配置，重新连接
         if (wasOffline && Config.OnlineMode && !string.IsNullOrEmpty(ip) && _server == null)

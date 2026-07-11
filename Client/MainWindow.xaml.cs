@@ -38,6 +38,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // 从 SVG 生成圆形图标替换默认 ICO
+        var svgIcon = GenerateIconFromSvg();
+        if (svgIcon != null) Icon = svgIcon;
+
         _vm = new MainViewModel();
         DataContext = _vm;
         SourceInitialized += OnSourceInitialized;
@@ -50,9 +55,7 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>
-    /// 窗口资源初始化完成后调用 DWM API 设置圆角效果
-    /// </summary>
+    /// <summary>窗口资源初始化完成后调用 DWM API 设置圆角效果</summary>
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
@@ -61,6 +64,49 @@ public partial class MainWindow : Window
             int preference = DWMWCP_ROUND;
             DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
         }
+    }
+
+    /// <summary>从 SVG 圆形 Logo 生成 64x64 的应用图标（蓝色圆 + 白色对勾）</summary>
+    private static BitmapSource? GenerateIconFromSvg()
+    {
+        try
+        {
+            int size = 64;
+            double padding = 4;
+            double center = size / 2.0;
+            double radius = center - padding;
+
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                // 蓝色圆形背景
+                var bgBrush = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4));
+                dc.DrawEllipse(bgBrush, null, new Point(center, center), radius, radius);
+
+                // 白色对勾路径
+                var pen = new Pen(Brushes.White, 6)
+                {
+                    StartLineCap = PenLineCap.Round,
+                    EndLineCap = PenLineCap.Round,
+                    LineJoin = PenLineJoin.Round
+                };
+                var geo = new StreamGeometry();
+                using (var ctx = geo.Open())
+                {
+                    // 左上→中下→右下
+                    ctx.BeginFigure(new Point(center - radius * 0.48, center + radius * 0.05), false, false);
+                    ctx.LineTo(new Point(center - radius * 0.1, center + radius * 0.4), true, false);
+                    ctx.LineTo(new Point(center + radius * 0.5, center - radius * 0.35), true, false);
+                }
+                dc.DrawGeometry(null, pen, geo);
+            }
+
+            var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch { return null; }
     }
 
     // ---- 任务树选择 ----

@@ -83,7 +83,7 @@ public class MainViewModel : INotifyPropertyChanged
         get
         {
             var tabName = ActiveTab != null ? $" - {ActiveTab.TabDisplayName}" : "";
-            return $"SignWave{tabName} {Config.Version}  作者: 刘宇晨";
+            return $"SignWave{tabName} {AppConfig.Version}  作者: 刘宇晨";
         }
     }
 
@@ -213,7 +213,7 @@ public class MainViewModel : INotifyPropertyChanged
         // 如果是签到任务，重新初始化服务器连接以使用正确的 TaskId
         if (isSignIn && !string.IsNullOrEmpty(signInTaskId))
         {
-            tab.UpdateGlobalServerConfig(Config.ServerIp, Config.ServerPort, Config.ServerPassword, Config.Version);
+            tab.UpdateGlobalServerConfig(Config.ServerIp, Config.ServerPort, Config.ServerPassword, AppConfig.Version);
         }
         Tabs.Add(tab);
         ActiveTab = tab;
@@ -437,7 +437,7 @@ public class MainViewModel : INotifyPropertyChanged
                 Config.ServerPort = c.ServerPort;
                 Config.ServerPassword = c.ServerPassword;
                 Config.AdminPasswordHash = c.AdminPasswordHash;
-                Config.Version = c.Version;
+                // 版本号不从文件加载，始终使用编译时定义的版本
             }
         }
         catch { }
@@ -467,9 +467,9 @@ public class MainViewModel : INotifyPropertyChanged
             SaveGlobalConfig();
             // 同步到所有标签页和后台任务
             foreach (var tab in Tabs)
-                tab.UpdateGlobalServerConfig(vm.Ip, vm.Port, vm.Password, Config.Version);
+                tab.UpdateGlobalServerConfig(vm.Ip, vm.Port, vm.Password, AppConfig.Version);
             foreach (var bgTab in _backgroundTasks)
-                bgTab.UpdateGlobalServerConfig(vm.Ip, vm.Port, vm.Password, Config.Version);
+                bgTab.UpdateGlobalServerConfig(vm.Ip, vm.Port, vm.Password, AppConfig.Version);
             StatusMessage = "远程设置已保存";
         };
         ShowDialog("远程服务器设置", vm, CreateRemoteSettingsView);
@@ -541,9 +541,10 @@ public class MainViewModel : INotifyPropertyChanged
     // ---- 关于 ----
     private void ShowAbout()
     {
+        var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.svg");
         var aboutWin = new Window
         {
-            Title = "关于", Width = 360, Height = 240,
+            Title = "关于", Width = 360, Height = 320,
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false,
             Content = new System.Windows.Controls.StackPanel
@@ -551,8 +552,14 @@ public class MainViewModel : INotifyPropertyChanged
                 Margin = new Thickness(10),
                 Children =
                 {
-                    new System.Windows.Controls.TextBlock { Text = "SignWave", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,10) },
-                    new System.Windows.Controls.TextBlock { Text = $"版本: {Config.Version}", FontSize = 14, Margin = new Thickness(0,0,0,5) },
+                    new SharpVectors.Converters.SvgViewbox
+                    {
+                        Source = new Uri(logoPath),
+                        Width = 80, Height = 80,
+                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 10, 0, 10)
+                    },
+                    new System.Windows.Controls.TextBlock { Text = $"版本: {AppConfig.Version}", FontSize = 14, Margin = new Thickness(0,0,0,5) },
                     new System.Windows.Controls.TextBlock { Text = "开发者: 刘宇晨", FontSize = 14, Margin = new Thickness(0,0,0,5) },
                     new System.Windows.Controls.TextBlock { Text = "联系邮箱: liuyuchen032901@outlook.com", FontSize = 14, Margin = new Thickness(0,0,0,5) },
                     new System.Windows.Controls.TextBlock { Text = "© 2026 保留全部权利", FontSize = 12, Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(0,20,0,0) }
