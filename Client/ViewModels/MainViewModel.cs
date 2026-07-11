@@ -197,14 +197,24 @@ public class MainViewModel : INotifyPropertyChanged
     /// <summary>
     /// 添加新标签页：生成 8 位短 ID、创建 ViewModel、保存配置并刷新任务树
     /// </summary>
-    public void AddTab(string? name = null, string? km = null)
+    public void AddTab(string? name = null, string? km = null, bool isSignIn = false, string? signInTaskId = null)
     {
         var id = Guid.NewGuid().ToString("N")[..8];
         var tab = new TaskTabViewModel(id, _baseDir, Config);
         if (!string.IsNullOrEmpty(name)) tab.Config.Name = name;
         if (!string.IsNullOrEmpty(km)) tab.Config.Km = km;
+        if (isSignIn)
+        {
+            tab.Config.IsSignInTask = true;
+            tab.Config.SignInTaskId = signInTaskId;
+        }
         if (string.IsNullOrEmpty(tab.Config.Name)) tab.Config.Name = $"任务{Tabs.Count + 1}";
         tab.SaveConfig();
+        // 如果是签到任务，重新初始化服务器连接以使用正确的 TaskId
+        if (isSignIn && !string.IsNullOrEmpty(signInTaskId))
+        {
+            tab.UpdateGlobalServerConfig(Config.ServerIp, Config.ServerPort, Config.ServerPassword, Config.Version);
+        }
         Tabs.Add(tab);
         ActiveTab = tab;
         SaveWorkspace();

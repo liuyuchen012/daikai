@@ -43,6 +43,7 @@
 | 🏆 **排行榜** | 实时显示前 3 名最早打卡学生（🥇🥈🥉） |
 | 📊 **数据统计** | 实时统计打卡人数、出勤率、最早/最晚打卡时间 |
 | 📋 **多任务管理** | 多个打卡任务独立管理，支持标签页切换 |
+| 📱 **远程签到** | 教师创建签到任务，学生通过短链接扫码签到 |
 | 🔄 **后台同步** | 未打开的标签页自动在后台连接服务器同步数据 |
 | 🌐 **Web 管理面板** | 浏览器访问即可远程管理、查看数据 |
 | 📁 **设备分组** | 服务器按设备 UUID 自动分组，一目了然 |
@@ -95,9 +96,9 @@ check-in-net/
 │       └── MachineInfo.cs                 # 设备信息（UUID/名称/公钥/在线状态）
 │
 ├── 📁 Server/                             # ASP.NET Core Web API 服务器
-│   ├── Program.cs                         # Minimal API（设备分组+任务卡片+打卡操作）
+│   ├── Program.cs                         # Minimal API（设备分组+任务卡片+打卡操作+签到短链）
 │   ├── 📁 Data/
-│   │   └── AppDbContext.cs                # EF Core + SQLite（MachineEntity + AttendanceEntity）
+│   │   └── AppDbContext.cs                # EF Core + SQLite（MachineEntity + AttendanceEntity + SignInTaskEntity）
 │   └── 📁 wwwroot/
 │       ├── template.html                  # Web 管理面板 HTML（侧边栏+表格+网格+模态框）
 │       └── login.html                     # 登录页面
@@ -123,6 +124,7 @@ check-in-net/
 - **后台同步**：未激活的标签页自动运行轻量级后台实例
 - **RSA 签名**：所有 HTTP 通信经过 RSA-2048 签名验证
 - **设备分组**：服务器端按 UUID 分组，Web 端文件夹式浏览
+- **签到短链**：6 位字符随机生成短链，Cookie 防重复签到，二维码分享
 
 ---
 
@@ -204,8 +206,31 @@ chmod +x CheckIn.Server
 |------|------|
 | ⚙ **服务器设置** | 配置服务器 IP、端口、密码 |
 | 📡 **检查状态** | 测试与服务器的连接状态 |
+| 📱 **创建签到** | 创建远程签到任务，生成短链和二维码供学生扫码签到 |
 | 📥 **从服务器加载** | 从服务器下载最新打卡数据 |
 | 📤 **同步到服务器** | 将本地数据上传同步到服务器 |
+
+#### 📱 远程签到
+
+教师可在客户端创建远程签到任务，学生通过短链接或二维码扫码签到：
+
+**创建签到流程：**
+1. 菜单 → **远程** → **创建签到**
+2. 填写**签到密码**（需重复确认）、**教室名称**、**科目**
+3. 导入 **CSV 学生名单**（支持打卡功能导出的 CSV 格式）
+4. 点击创建，系统自动生成 **6 位短链码** 和 **二维码**
+5. 学生通过浏览器访问短链地址或扫描二维码进入签到页面
+
+**学生签到页面：**
+- 填写姓名、教室、签到密码
+- 一个终端设备（基于 Cookie）仅允许签到一次
+- 签到结果自动同步到客户端对应任务中
+
+**签到成功界面：**
+- 绿色圆圈包裹对勾 + "创建成功" 提示文字
+- 📱 **二维码按钮**：点击显示签到链接的二维码
+- 🔗 **复制链接按钮**：一键复制签到短链地址
+- 关闭后签到任务自动加入左侧任务树，与打卡任务一起管理
 
 #### ⚙ 设置菜单
 
@@ -289,6 +314,7 @@ URL: `/machine/{uuid}/task/{taskId}`
   🗎 数学打卡              ← 任务节点
   🗎 英语打卡              在线
   🗎 语文打卡              🔴 离线
+  📱 数学签到（短链）      签到任务
 🖿 学校（签到）
   🗎 四年级一班
 ```
@@ -415,7 +441,23 @@ AttendanceEntity (
 
 -- 索引
 CREATE INDEX IX_Attendances_MachineUuid_TaskId ON AttendanceEntity(MachineUuid, TaskId);
-CREATE UNIQUE INDEX IX_Attendances_Student ON AttendanceEntity(StudentName, MachineUuid, TaskId);
+
+-- 签到任务表
+SignInTaskEntity (
+    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ShortCode   TEXT,       -- 短链码（6位，唯一索引）
+    MachineUuid TEXT,       -- FK -> MachineEntity
+    Password    TEXT,       -- 签到密码
+    Classroom   TEXT,       -- 教室
+    Subject     TEXT,       -- 科目
+    StudentList TEXT,       -- JSON 学生名单
+    SignInRecords TEXT,     -- JSON 签到记录
+    CreatedAt   TEXT,       -- 创建时间
+    Status      TEXT        -- active/closed
+)
+
+CREATE UNIQUE INDEX IX_SignInTasks_ShortCode ON SignInTaskEntity(ShortCode);
+CREATE INDEX IX_SignInTasks_MachineUuid ON SignInTaskEntity(MachineUuid);
 ```
 
 ### 备份建议
@@ -436,6 +478,7 @@ CREATE UNIQUE INDEX IX_Attendances_Student ON AttendanceEntity(StudentName, Mach
 | 🔐 **通信安全** | RSA-2048 签名 (SHA256) + HMAC-SHA256 | — |
 | 🎨 **GUI 样式** | 原生 WPF + 圆角设计 + CustomControlTemplates | — |
 | 📄 **数据格式** | JSON / CSV | — |
+| 📱 **二维码** | QRCoder（客户端生成签到二维码） | 1.6.0 |
 | 📦 **依赖注入** | Microsoft.Extensions.DependencyInjection | — |
 | 🔌 **ORM** | Entity Framework Core + SQLite | — |
 | 📐 **架构** | MVVM (MainViewModel + TaskTabViewModel) | — |

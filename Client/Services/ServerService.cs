@@ -187,4 +187,57 @@ public class ServerService
         }
         catch { return null; }
     }
+
+    /// <summary>
+    /// 创建远程签到任务：上传签到密码、教室、科目和学生名单，获取短链码
+    /// </summary>
+    /// <param name="signPassword">学生签到密码</param>
+    /// <param name="classroom">教室名称</param>
+    /// <param name="subject">科目名称</param>
+    /// <param name="students">学生姓名列表</param>
+    /// <returns>包含 short_code（短链码）和 task_id 的结果，失败返回 null</returns>
+    public async Task<(string shortCode, string taskId)?> CreateSignInAsync(string signPassword, string classroom, string subject, List<string> students)
+    {
+        try
+        {
+            var body = new
+            {
+                uuid = _clientUuid,
+                sign_password = signPassword,
+                classroom,
+                subject,
+                students,
+                password = _password
+            };
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/create_signin", body);
+            if (!res.IsSuccessStatusCode) return null;
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            var shortCode = json.GetProperty("short_code").GetString() ?? "";
+            var taskId = json.GetProperty("task_id").GetString() ?? "";
+            return (shortCode, taskId);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// 拉取签到任务的结果（学生签到记录），需 challenge-签名验证
+    /// </summary>
+    /// <returns>签到结果列表（JSON 字符串），失败返回 null</returns>
+    public async Task<string?> GetSignInResultAsync()
+    {
+        try
+        {
+            var challenge = DateTime.Now.Ticks.ToString();
+            var body = new { uuid = _clientUuid, signature = Sign(challenge), challenge, password = _password };
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/signin_result", body);
+            if (!res.IsSuccessStatusCode) return null;
+            return await res.Content.ReadAsStringAsync();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// 获取服务器基础 URL（用于构建签到链接）
+    /// </summary>
+    public string BaseUrl => _baseUrl;
 }

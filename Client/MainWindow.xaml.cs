@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -5,7 +6,11 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using CheckIn.Client.Services;
 using CheckIn.Client.ViewModels;
+using Microsoft.Win32;
+using QRCoder;
 
 namespace CheckIn.Client;
 
@@ -329,6 +334,407 @@ public partial class MainWindow : Window
         ShowNewTaskDialog();
     }
 
+    // ---- 创建签到任务 ----
+    private List<string> _signInStudentList = new();
+
+    /// <summary>
+    /// 显示创建签到任务对话框：输入密码、教室、科目，导入 CSV 学生名单
+    /// 成功后显示二维码和复制链接选项
+    /// </summary>
+    private async void ShowCreateSignInDialog()
+    {
+        var win = new Window
+        {
+            Title = "创建签到任务", Width = 480, Height = 440,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        string signPassword = "";
+        string confirmPassword = "";
+        string classroom = "";
+        string subject = "";
+        _signInStudentList = new List<string>();
+
+        // 签到密码
+        var pwRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        pwRow.Children.Add(new TextBlock { Text = "签到密码:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+        var pwBox = new PasswordBox { Width = 280 };
+        pwBox.PasswordChanged += (_, _) => signPassword = pwBox.Password;
+        pwRow.Children.Add(pwBox);
+        panel.Children.Add(pwRow);
+
+        // 确认密码
+        var cpRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        cpRow.Children.Add(new TextBlock { Text = "确认密码:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+        var cpBox = new PasswordBox { Width = 280 };
+        cpBox.PasswordChanged += (_, _) => confirmPassword = cpBox.Password;
+        cpRow.Children.Add(cpBox);
+        panel.Children.Add(cpRow);
+
+        // 教室
+        var crRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        crRow.Children.Add(new TextBlock { Text = "教室:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+        var crBox = new TextBox { Width = 280 };
+        crBox.TextChanged += (_, _) => classroom = crBox.Text;
+        crRow.Children.Add(crBox);
+        panel.Children.Add(crRow);
+
+        // 科目
+        var sjRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        sjRow.Children.Add(new TextBlock { Text = "科目:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+        var sjBox = new TextBox { Width = 280, Text = "数学" };
+        sjBox.TextChanged += (_, _) => subject = sjBox.Text;
+        subject = sjBox.Text;
+        sjRow.Children.Add(sjBox);
+        panel.Children.Add(sjRow);
+
+        // 学生名单导入
+        var stRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        stRow.Children.Add(new TextBlock { Text = "学生名单:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
+        var stLabel = new TextBlock
+        {
+            Text = "未导入",
+            Width = 200, VerticalAlignment = VerticalAlignment.Center,
+            Foreground = new SolidColorBrush(Colors.Gray), FontSize = 12
+        };
+        var importBtn = new Button
+        {
+            Content = "导入CSV", Width = 80, Height = 28, Cursor = Cursors.Hand,
+            Background = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            Foreground = Brushes.White, BorderThickness = new Thickness(0)
+        };
+        importBtn.Click += (_, _) =>
+        {
+            var dlg = new OpenFileDialog { Filter = "CSV文件|*.csv" };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    // 从 CSV 中提取第一列（姓名）
+                    _signInStudentList = File.ReadAllLines(dlg.FileName)
+                        .Skip(1) // 跳过标题行
+                        .Select(line => line.Split(',')[0].Trim())
+                        .Where(name => !string.IsNullOrEmpty(name))
+                        .ToList();
+
+                    if (_signInStudentList.Count == 0)
+                    {
+                        // 如果跳过标题后没有数据，尝试所有行
+                        _signInStudentList = File.ReadAllLines(dlg.FileName)
+                            .Select(line => line.Split(',')[0].Trim())
+                            .Where(name => !string.IsNullOrEmpty(name) && name != "姓名")
+                            .ToList();
+                    }
+                    stLabel.Text = $"已导入 {_signInStudentList.Count} 名学生";
+                    stLabel.Foreground = new SolidColorBrush(Color.FromRgb(0x13, 0x73, 0x33));
+                }
+                catch { stLabel.Text = "导入失败"; }
+            }
+        };
+        stRow.Children.Add(stLabel);
+        stRow.Children.Add(importBtn);
+        panel.Children.Add(stRow);
+
+        // 提示文本
+        panel.Children.Add(new TextBlock
+        {
+            Text = "提示：可使用打卡功能导出的 CSV 文件作为学生名单",
+            Foreground = new SolidColorBrush(Colors.Gray), FontSize = 11,
+            Margin = new Thickness(0, 4, 0, 10)
+        });
+
+        // 加载中提示
+        var loadingText = new TextBlock
+        {
+            Text = "",
+            Foreground = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        panel.Children.Add(loadingText);
+
+        // 按钮
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+
+        var createBtn = new Button
+        {
+            Content = "创建签到", Width = 100, Height = 34, Margin = new Thickness(5),
+            Background = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            Foreground = Brushes.White, BorderThickness = new Thickness(0), Cursor = Cursors.Hand
+        };
+        createBtn.Click += async (_, _) =>
+        {
+            // 验证输入
+            if (string.IsNullOrWhiteSpace(signPassword))
+            { ModernDialog.Alert("请输入签到密码"); return; }
+            if (signPassword != confirmPassword)
+            { ModernDialog.Alert("两次输入的密码不一致"); return; }
+            if (string.IsNullOrWhiteSpace(classroom))
+            { ModernDialog.Alert("请输入教室名称"); return; }
+            if (string.IsNullOrWhiteSpace(subject))
+            { ModernDialog.Alert("请输入科目名称"); return; }
+            if (_signInStudentList.Count == 0)
+            {
+                if (!ModernDialog.Confirm("未导入学生名单，是否继续创建？（学生签到将不校验名单）"))
+                    return;
+            }
+
+            createBtn.IsEnabled = false;
+            loadingText.Text = "正在创建签到任务，请稍候...";
+            loadingText.Visibility = Visibility.Visible;
+
+            try
+            {
+                // 使用全局配置创建临时 ServerService
+                var server = new ServerService();
+                server.Initialize(_vm.Config.ServerIp, _vm.Config.ServerPort, _vm.Config.ServerPassword);
+                await server.RegisterAsync("SignWave签到");
+
+                var result = await server.CreateSignInAsync(signPassword, classroom, subject, _signInStudentList);
+                if (result == null)
+                {
+                    ModernDialog.Alert("创建签到失败，请检查服务器连接");
+                    return;
+                }
+
+                var (shortCode, taskId) = result.Value;
+                win.Close();
+
+                // 创建本地任务标签页（签到任务类型）
+                var taskName = $"{classroom} {subject} 签到";
+                _vm.AddTab(taskName, subject, isSignIn: true, signInTaskId: taskId);
+
+                // 显示成功页面
+                ShowSignInSuccessDialog(shortCode, _vm.Config.ServerIp, _vm.Config.ServerPort);
+            }
+            catch (Exception ex)
+            {
+                ModernDialog.Alert($"创建签到失败：{ex.Message}");
+            }
+            finally
+            {
+                createBtn.IsEnabled = true;
+                loadingText.Visibility = Visibility.Collapsed;
+            }
+        };
+
+        var cancelBtn = new Button
+        {
+            Content = "取消", Width = 100, Height = 34, Margin = new Thickness(5), Cursor = Cursors.Hand
+        };
+        cancelBtn.Click += (_, _) => win.Close();
+
+        btnPanel.Children.Add(createBtn);
+        btnPanel.Children.Add(cancelBtn);
+        panel.Children.Add(btnPanel);
+
+        win.Content = panel;
+        win.ShowDialog();
+    }
+
+    /// <summary>
+    /// 显示签到创建成功对话框：绿色圆圈对勾 + 二维码 + 复制链接
+    /// </summary>
+    private void ShowSignInSuccessDialog(string shortCode, string serverIp, int serverPort)
+    {
+        var signUrl = $"http://{serverIp}:{serverPort}/s/{shortCode}";
+
+        var win = new Window
+        {
+            Title = "签到创建成功",
+            Width = 420, Height = 520,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center };
+
+        // 绿色圆 + 对勾
+        var checkCircle = new Border
+        {
+            Width = 80, Height = 80, CornerRadius = new CornerRadius(40),
+            Background = new SolidColorBrush(Color.FromRgb(0x34, 0xa8, 0x53)),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0),
+            Child = new TextBlock
+            {
+                Text = "✓", FontSize = 42, Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = FontWeights.Bold
+            }
+        };
+        panel.Children.Add(checkCircle);
+
+        // 创建成功文字
+        panel.Children.Add(new TextBlock
+        {
+            Text = "创建成功",
+            FontSize = 18, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 0)
+        });
+
+        // 签到链接提示
+        panel.Children.Add(new TextBlock
+        {
+            Text = "学生可通过以下链接或二维码进入签到页面",
+            FontSize = 12, Foreground = new SolidColorBrush(Colors.Gray),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 16),
+            TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, MaxWidth = 340
+        });
+
+        // 二维码图片
+        try
+        {
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrData = qrGenerator.CreateQrCode(signUrl, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new QRCode(qrData);
+            var qrBitmap = qrCode.GetGraphic(8);
+
+            // 转换为 WPF BitmapImage
+            using var ms = new MemoryStream();
+            qrBitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            ms.Position = 0;
+            var bitmapImage = new BitmapImage();
+            bitmapImage.BeginInit();
+            bitmapImage.StreamSource = ms;
+            bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+            bitmapImage.EndInit();
+
+            var qrImage = new System.Windows.Controls.Image
+            {
+                Source = bitmapImage,
+                Width = 140, Height = 140,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            panel.Children.Add(qrImage);
+        }
+        catch
+        {
+            // 二维码生成失败时显示占位文本
+            panel.Children.Add(new TextBlock
+            {
+                Text = "[二维码]",
+                FontSize = 14, Foreground = new SolidColorBrush(Colors.Gray),
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 8)
+            });
+        }
+
+        // 链接显示
+        var linkBox = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0xf5, 0xf5, 0xf5)),
+            CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(0, 0, 0, 16), HorizontalAlignment = HorizontalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = signUrl, FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+                TextWrapping = TextWrapping.Wrap, MaxWidth = 320
+            }
+        };
+        panel.Children.Add(linkBox);
+
+        // 操作按钮行（圆形图标按钮）
+        var actionPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+
+        // 显示二维码按钮（重新显示）
+        var qrBtn = CreateCircleButton("📱", "二维码", () =>
+        {
+            // 二维码已在上面显示，点击刷新或重新打开
+            ShowSignInSuccessDialog(shortCode, serverIp, serverPort);
+            win.Close();
+        });
+        actionPanel.Children.Add(qrBtn);
+
+        // 复制链接按钮
+        var copyBtn = CreateCircleButton("📋", "复制链接", () =>
+        {
+            try
+            {
+                Clipboard.SetText(signUrl);
+                ModernDialog.Alert("签到链接已复制到剪贴板");
+            }
+            catch { ModernDialog.Alert("复制失败，请手动复制"); }
+        });
+        actionPanel.Children.Add(copyBtn);
+
+        panel.Children.Add(actionPanel);
+
+        // 关闭按钮
+        var closeBtn = new Button
+        {
+            Content = "关闭", Width = 100, Height = 34, Margin = new Thickness(0, 16, 0, 0),
+            Background = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            Foreground = Brushes.White, BorderThickness = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Center, Cursor = Cursors.Hand
+        };
+        closeBtn.Click += (_, _) => win.Close();
+        panel.Children.Add(closeBtn);
+
+        win.Content = panel;
+        win.ShowDialog();
+    }
+
+    /// <summary>
+    /// 创建圆形图标按钮（用于签到成功页面的操作按钮）
+    /// </summary>
+    private static Border CreateCircleButton(string icon, string label, Action onClick)
+    {
+        var container = new StackPanel { Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Center };
+
+        var circle = new Border
+        {
+            Width = 60, Height = 60, CornerRadius = new CornerRadius(30),
+            Background = new SolidColorBrush(Color.FromRgb(0xf0, 0xf4, 0xf8)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0)),
+            BorderThickness = new Thickness(1.5),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Cursor = Cursors.Hand,
+            Child = new TextBlock
+            {
+                Text = icon, FontSize = 24,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+
+        // 悬停效果
+        circle.MouseEnter += (_, _) =>
+        {
+            circle.Background = new SolidColorBrush(Color.FromRgb(0xe8, 0xf0, 0xfe));
+            circle.BorderBrush = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4));
+        };
+        circle.MouseLeave += (_, _) =>
+        {
+            circle.Background = new SolidColorBrush(Color.FromRgb(0xf0, 0xf4, 0xf8));
+            circle.BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0));
+        };
+        circle.MouseLeftButtonUp += (_, _) => onClick();
+
+        container.Children.Add(circle);
+        container.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 11,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0)
+        });
+
+        return new Border { Child = container };
+    }
+
     /// <summary>
     /// 显示新建打卡任务对话框
     /// </summary>
@@ -478,9 +884,12 @@ public partial class MainWindow : Window
         I("重命名任务", () => { if (_vm.ActiveTab != null) ShowRenameTabDialog(_vm.ActiveTab); }),
         I("退出", () => _vm.ExitCommand.Execute(null)));
 
-    /// <summary>远程菜单：服务器设置/状态检查/加载数据/同步数据</summary>
+    /// <summary>远程菜单：服务器设置/创建签到/状态检查/加载数据/同步数据</summary>
     private void MenuRemote_Click(object sender, RoutedEventArgs e) => ShowMenu(sender,
         I("远程服务器设置", () => _vm.ShowRemoteSettingsCommand.Execute(null)),
+        Sep(),
+        I("创建签到", () => ShowCreateSignInDialog()),
+        Sep(),
         I("检查服务器状态", () => _vm.ActiveTab?.CheckServerStatusCommand.Execute(null)),
         I("从服务器加载数据", () => _vm.ActiveTab?.LoadFromServerCommand.Execute(null)),
         I("同步数据到服务器", () => _vm.ActiveTab?.SyncToServerCommand.Execute(null)));

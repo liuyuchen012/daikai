@@ -113,8 +113,8 @@ string RenderLoginPage(string errorMsg = "")
 app.Use(async (ctx, next) =>
 {
     var path = ctx.Request.Path.Value ?? "/";
-    // Allow: login page, logout, API endpoints, static files
-    if (path.StartsWith("/api/") || path == "/login" || path == "/logout" || path.StartsWith("/static"))
+    // Allow: login page, logout, API endpoints, static files, sign-in pages
+    if (path.StartsWith("/api/") || path == "/login" || path == "/logout" || path.StartsWith("/static") || path.StartsWith("/s/"))
     {
         await next();
         return;
@@ -492,6 +492,305 @@ app.MapPost("/api/web_cancel_punch", async (AppDbContext db, JsonElement body) =
     return Results.Json(new { status = "ok" });
 });
 
+// ===== 签到任务 API =====
+
+/// <summary>
+/// 生成 6 位随机短链码（字母数字混合）
+/// </summary>
+string GenerateShortCode()
+{
+    const string chars = "abcdefghijkmnpqrstuvwxyz23456789"; // 去掉容易混淆的 0/O/1/l
+    var bytes = RandomNumberGenerator.GetBytes(6);
+    var sb = new StringBuilder(6);
+    foreach (var b in bytes) sb.Append(chars[b % chars.Length]);
+    return sb.ToString();
+}
+
+/// <summary>
+/// POST /api/create_signin - 教师客户端创建签到任务，返回短链供学生访问
+/// </summary>
+app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body) =>
+{
+    if (!CheckPwd(body, serverPassword))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var uuid = body.GetProperty("uuid").GetString() ?? "";
+    var signPassword = body.GetProperty("sign_password").GetString() ?? "";
+    var classroom = body.GetProperty("classroom").GetString() ?? "";
+    var subject = body.GetProperty("subject").GetString() ?? "";
+    var studentList = body.TryGetProperty("students", out var sl) ? sl.GetRawText() : "[]";
+
+    // 验证设备存在
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "unknown machine" }, statusCode: 403);
+
+    // 生成唯一短链码（确保不重复）
+    string shortCode;
+    do { shortCode = GenerateShortCode(); }
+    while (await db.SignInTasks.AnyAsync(s => s.ShortCode == shortCode));
+
+    var task = new SignInTaskEntity
+    {
+        ShortCode = shortCode,
+        MachineUuid = uuid,
+        Password = signPassword,
+        Classroom = classroom,
+        Subject = subject,
+        StudentList = studentList,
+        SignInRecords = "[]",
+        CreatedAt = DateTime.Now.ToString("O"),
+        Status = "active"
+    };
+    db.SignInTasks.Add(task);
+    if (machine != null) machine.LastSeen = DateTime.Now.ToString("O");
+    await db.SaveChangesAsync();
+
+    // 同时在 attendance 表中创建对应任务记录（初始化为学生名单字典）
+    var taskId = $"signin_{shortCode}";
+    var studentNames = JsonSerializer.Deserialize<List<string>>(studentList) ?? new();
+    var initialData = new Dictionary<string, StudentAttendance>();
+    foreach (var name in studentNames)
+        initialData[name] = new StudentAttendance { Name = name };
+
+    db.AttendanceRecords.Add(new AttendanceEntity
+    {
+        MachineUuid = uuid,
+        TaskId = taskId,
+        Data = JsonSerializer.Serialize(initialData),
+        UpdatedAt = DateTime.Now.ToString("O")
+    });
+    await db.SaveChangesAsync();
+
+    return Results.Json(new
+    {
+        short_code = shortCode,
+        task_id = taskId
+    });
+});
+
+/// <summary>
+/// POST /api/signin_result - 客户端拉取签到结果（含 challenge-签名验证）
+/// 返回该设备下所有活跃签到任务的签到记录
+/// </summary>
+app.MapPost("/api/signin_result", async (AppDbContext db, JsonElement body) =>
+{
+    if (!CheckPwd(body, serverPassword))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var uuid = body.GetProperty("uuid").GetString() ?? "";
+    var signature = body.GetProperty("signature").GetString() ?? "";
+    var challenge = body.GetProperty("challenge").GetString() ?? "";
+    var pubKey = GetPublicKey(db, uuid);
+    if (pubKey == null) return Results.Json(new { error = "unknown machine" }, statusCode: 403);
+    if (!VerifySignature(pubKey, challenge, signature))
+        return Results.Json(new { error = "invalid signature" }, statusCode: 403);
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine != null) machine.LastSeen = DateTime.Now.ToString("O");
+
+    // 获取该设备所有活跃的签到任务
+    var tasks = await db.SignInTasks
+        .Where(s => s.MachineUuid == uuid && s.Status == "active")
+        .ToListAsync();
+
+    var results = new List<object>();
+    foreach (var t in tasks)
+    {
+        var records = JsonSerializer.Deserialize<List<SignInRecord>>(t.SignInRecords) ?? new();
+        results.Add(new
+        {
+            short_code = t.ShortCode,
+            task_id = $"signin_{t.ShortCode}",
+            classroom = t.Classroom,
+            subject = t.Subject,
+            student_list = JsonSerializer.Deserialize<List<string>>(t.StudentList) ?? new(),
+            records
+        });
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Json(new { tasks = results });
+});
+
+// ---- 签到记录数据模型 ----
+/// <summary>
+/// 单条签到记录（学生姓名 + 签到时间 + 设备标识）
+/// </summary>
+var signinRecordType = new { name = "", time = "", device = "" };
+
+// ===== 学生签到页面 =====
+
+/// <summary>
+/// GET /s/{shortCode} - 学生签到页面（展示表单）
+/// </summary>
+app.MapGet("/s/{shortCode}", async (string shortCode, AppDbContext db, HttpContext ctx) =>
+{
+    var task = await db.SignInTasks.FirstOrDefaultAsync(s => s.ShortCode == shortCode);
+    if (task == null)
+        return Results.Content(RenderSignInPage(null, "签到任务不存在或已过期"), "text/html;charset=utf-8");
+
+    if (task.Status != "active")
+        return Results.Content(RenderSignInPage(null, "该签到任务已关闭"), "text/html;charset=utf-8");
+
+    // 检查该设备是否已签到（通过 Cookie）
+    var deviceCookie = $"si_dev_{shortCode}";
+    if (ctx.Request.Cookies.ContainsKey(deviceCookie))
+        return Results.Content(RenderSignInPage(task, null, "您已签到成功，无需重复签到"), "text/html;charset=utf-8");
+
+    return Results.Content(RenderSignInPage(task), "text/html;charset=utf-8");
+});
+
+/// <summary>
+/// POST /s/{shortCode} - 学生提交签到表单
+/// </summary>
+app.MapPost("/s/{shortCode}", async (string shortCode, AppDbContext db, HttpContext ctx) =>
+{
+    var task = await db.SignInTasks.FirstOrDefaultAsync(s => s.ShortCode == shortCode);
+    if (task == null)
+        return Results.Content(RenderSignInPage(null, "签到任务不存在或已过期"), "text/html;charset=utf-8");
+
+    if (task.Status != "active")
+        return Results.Content(RenderSignInPage(null, "该签到任务已关闭"), "text/html;charset=utf-8");
+
+    var deviceCookie = $"si_dev_{shortCode}";
+    if (ctx.Request.Cookies.ContainsKey(deviceCookie))
+        return Results.Content(RenderSignInPage(task, null, "您已签到成功，无需重复签到"), "text/html;charset=utf-8");
+
+    var form = await ctx.Request.ReadFormAsync();
+    var name = form["name"].ToString().Trim();
+    var classroom = form["classroom"].ToString().Trim();
+    var password = form["password"].ToString().Trim();
+
+    // 验证必填字段
+    var errors = new List<string>();
+    if (string.IsNullOrEmpty(name)) errors.Add("请输入姓名");
+    if (string.IsNullOrEmpty(classroom)) errors.Add("请输入教室");
+    if (string.IsNullOrEmpty(password)) errors.Add("请输入签到密码");
+    if (errors.Count > 0)
+        return Results.Content(RenderSignInPage(task, string.Join("；", errors)), "text/html;charset=utf-8");
+
+    // 验证密码
+    if (password != task.Password)
+        return Results.Content(RenderSignInPage(task, "签到密码错误"), "text/html;charset=utf-8");
+
+    // 检查是否在学生名单中
+    var studentList = JsonSerializer.Deserialize<List<string>>(task.StudentList) ?? new();
+    if (studentList.Count > 0 && !studentList.Contains(name, StringComparer.OrdinalIgnoreCase))
+        return Results.Content(RenderSignInPage(task, "您不在该签到任务的学生名单中"), "text/html;charset=utf-8");
+
+    // 检查是否已经签到过（按姓名查重）
+    var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
+    if (records.Any(r => r.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        return Results.Content(RenderSignInPage(task, null, "该姓名已签到，请勿重复签到"), "text/html;charset=utf-8");
+
+    // 记录签到
+    var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    var deviceFingerprint = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    records.Add(new SignInRecord
+    {
+        Name = name,
+        Time = nowStr,
+        Device = deviceFingerprint
+    });
+    task.SignInRecords = JsonSerializer.Serialize(records);
+
+    // 同步更新 attendance 表中的数据
+    var taskId = $"signin_{shortCode}";
+    var latest = await db.AttendanceRecords
+        .Where(a => a.MachineUuid == task.MachineUuid && a.TaskId == taskId)
+        .OrderByDescending(a => a.UpdatedAt)
+        .FirstOrDefaultAsync();
+
+    var attendanceData = latest != null
+        ? JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(latest.Data) ?? new()
+        : new();
+
+    if (!attendanceData.ContainsKey(name))
+        attendanceData[name] = new StudentAttendance { Name = name };
+    attendanceData[name].FirstTime = nowStr;
+    attendanceData[name].Count++;
+    attendanceData[name].History.Add(nowStr);
+
+    db.AttendanceRecords.Add(new AttendanceEntity
+    {
+        MachineUuid = task.MachineUuid,
+        TaskId = taskId,
+        Data = JsonSerializer.Serialize(attendanceData),
+        UpdatedAt = DateTime.Now.ToString("O")
+    });
+
+    await db.SaveChangesAsync();
+
+    // 设置设备 Cookie（30 天有效，防止同一设备重复签到）
+    ctx.Response.Cookies.Append(deviceCookie, "1", new CookieOptions
+    {
+        HttpOnly = true,
+        SameSite = SameSiteMode.Strict,
+        MaxAge = TimeSpan.FromDays(30),
+        Path = $"/s/{shortCode}"
+    });
+
+    return Results.Content(RenderSignInPage(task, null, $"签到成功！{name} 于 {nowStr} 完成签到"), "text/html;charset=utf-8");
+});
+
+/// <summary>
+/// 渲染学生签到页面 HTML
+/// </summary>
+string RenderSignInPage(SignInTaskEntity? task, string? errorMsg = null, string? successMsg = null)
+{
+    if (task == null)
+    {
+        return $@"<!DOCTYPE html><html lang=""zh""><head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width,initial-scale=1""><title>签到 - {HttpUtility.HtmlEncode(serverName)}</title>
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh;display:flex;align-items:center;justify-content:center}}div{{background:#fff;border-radius:16px;padding:40px;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:400px;width:90%;text-align:center}}h2{{color:#333;margin-bottom:16px}}p{{color:#666;font-size:14px}}</style></head>
+<body><div><h2>😕 签到不可用</h2><p>{(successMsg != null ? HttpUtility.HtmlEncode(successMsg) : (errorMsg != null ? HttpUtility.HtmlEncode(errorMsg) : "签到任务不存在或已过期"))}</p></div></body></html>";
+    }
+
+    var hasError = !string.IsNullOrEmpty(errorMsg);
+    var hasSuccess = !string.IsNullOrEmpty(successMsg);
+    var errorDisplay = hasError ? "block" : "none";
+    var successDisplay = hasSuccess ? "block" : "none";
+    var formDisplay = (!hasError && !hasSuccess) ? "block" : "none";
+
+    return $@"<!DOCTYPE html><html lang=""zh""><head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width,initial-scale=1""><title>签到 - {HttpUtility.HtmlEncode(task.Subject)} - {HttpUtility.HtmlEncode(task.Classroom)}</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh;display:flex;align-items:center;justify-content:center}}
+.card{{background:#fff;border-radius:16px;padding:32px 28px;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:420px;width:90%}}
+h2{{color:#333;font-size:22px;text-align:center;margin-bottom:4px}}
+h3{{color:#888;font-size:14px;text-align:center;font-weight:normal;margin-bottom:24px}}
+label{{display:block;font-size:13px;color:#555;margin-bottom:6px;font-weight:500}}
+input{{width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:15px;outline:none;transition:border .2s;margin-bottom:16px}}
+input:focus{{border-color:#4285f4}}
+.btn{{width:100%;padding:12px;background:#4285f4;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s}}
+.btn:hover{{background:#3367d6}}
+.alert{{padding:12px 16px;border-radius:8px;font-size:14px;margin-bottom:16px;display:none}}
+.alert-error{{background:#fce8e6;color:#c5221f;display:{errorDisplay}}}
+.alert-success{{background:#e6f4ea;color:#137333;display:{successDisplay}}}
+.form-area{{display:{formDisplay}}}
+.footer{{text-align:center;margin-top:16px;font-size:12px;color:#aaa}}
+</style></head>
+<body>
+<div class=""card"">
+<h2>{HttpUtility.HtmlEncode(task.Subject)} 课堂签到</h2>
+<h3>教室：{HttpUtility.HtmlEncode(task.Classroom)}</h3>
+<div class=""alert alert-error"">{HttpUtility.HtmlEncode(errorMsg ?? "")}</div>
+<div class=""alert alert-success"">{HttpUtility.HtmlEncode(successMsg ?? "")}</div>
+<div class=""form-area"">
+<form method=""post"" action=""/s/{HttpUtility.HtmlEncode(task.ShortCode)}"">
+<label>姓名</label>
+<input type=""text"" name=""name"" placeholder=""请输入你的姓名"" required autofocus>
+<label>教室</label>
+<input type=""text"" name=""classroom"" placeholder=""请输入教室名称"" required>
+<label>签到密码</label>
+<input type=""password"" name=""password"" placeholder=""请输入教师提供的签到密码"" required>
+<button type=""submit"" class=""btn"">确认签到</button>
+</form>
+</div>
+<div class=""footer"">SignWave 签到系统</div>
+</div>
+</body></html>";
+}
+
 // ===== 认证页面 =====
 
 /// <summary>
@@ -731,3 +1030,13 @@ app.MapGet("/machine/{uuid}/task/{taskId}", async (string uuid, string taskId, A
 });
 
 app.Run();
+
+/// <summary>
+/// 单条签到记录（学生姓名 + 签到时间 + 设备标识）
+/// </summary>
+public class SignInRecord
+{
+    public string Name { get; set; } = "";
+    public string Time { get; set; } = "";
+    public string Device { get; set; } = "";
+}

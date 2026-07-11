@@ -29,6 +29,10 @@ public class TabConfig
     public int ButtonCols { get; set; } = 6;
     /// <summary>是否启用在线模式</summary>
     public bool OnlineMode { get; set; } = true;
+    /// <summary>是否为签到任务</summary>
+    public bool IsSignInTask { get; set; } = false;
+    /// <summary>签到任务的服务器 TaskId（如 signin_abc123）</summary>
+    public string? SignInTaskId { get; set; }
 }
 
 /// <summary>
@@ -206,6 +210,12 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
+            // 签到任务使用特定的 TaskId
+            if (Config.IsSignInTask && !string.IsNullOrEmpty(Config.SignInTaskId))
+            {
+                _server.TaskId = Config.SignInTaskId;
+            }
+
             var name = Config.Name;
             if (await _server.RegisterAsync(name))
             {
