@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:CheckIn.Client.Maui.ViewModels"
+             xmlns:models="clr-namespace:CheckIn.Client.Models"
              xmlns:converters="clr-namespace:CheckIn.Client.Maui.Converters"
              x:Class="CheckIn.Client.Maui.Pages.TaskDetailPage"
              Title="{Binding Title}"
@@ -87,7 +88,7 @@
                                 AlignItems="Start"
                                 BindableLayout.ItemsSource="{Binding Students}">
                         <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="CheckIn.Client.Models.StudentModel">
+                            <DataTemplate x:DataType="models:StudentModel">
                                 <Border WidthRequest="120" HeightRequest="60"
                                         Margin="4"
                                         StrokeShape="RoundRectangle 8"

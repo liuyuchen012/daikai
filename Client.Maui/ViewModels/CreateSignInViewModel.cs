@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Input;
 using CheckIn.Client.Maui.Services;
@@ -79,9 +79,9 @@ public class CreateSignInViewModel : BaseViewModel
             using var reader = new StreamReader(stream);
             _studentList = new List<string>();
             bool isFirst = true;
-            while (!reader.EndOfStream)
+            string? line;
+            while ((line = await reader.ReadLineAsync()) != null)
             {
-                var line = await reader.ReadLineAsync();
                 if (isFirst) { isFirst = false; continue; }
                 if (string.IsNullOrEmpty(line)) continue;
                 var name = line.Split(',')[0].Trim();

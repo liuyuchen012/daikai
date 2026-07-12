@@ -55,7 +55,7 @@
                             </SwipeView.RightItems>
 
                             <!-- Task Card -->
-                            <Frame Style="{StaticResource TaskCardFrame}" Margin="16,6">
+                            <Border Style="{StaticResource TaskCardFrame}" Margin="16,6">
                                 <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="6">
                                     <!-- Task Name -->
                                     <Label Grid.Row="0" Grid.Column="0"
@@ -65,7 +65,7 @@
                                            TextColor="{StaticResource TextPrimary}" />
 
                                     <!-- Online Status Badge -->
-                                    <Frame Grid.Row="0" Grid.Column="1"
+                                    <Border Grid.Row="0" Grid.Column="1"
                                            Style="{StaticResource StatusBadgeOnline}"
                                            IsVisible="{Binding IsOnline}">
                                         <Label Text="Online"
@@ -73,8 +73,8 @@
                                                TextColor="White"
                                                HorizontalOptions="Center"
                                                VerticalOptions="Center" />
-                                    </Frame>
-                                    <Frame Grid.Row="0" Grid.Column="1"
+                                    </Border>
+                                    <Border Grid.Row="0" Grid.Column="1"
                                            Style="{StaticResource StatusBadgeOffline}"
                                            IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}">
                                         <Label Text="Offline"
@@ -82,7 +82,7 @@
                                                TextColor="White"
                                                HorizontalOptions="Center"
                                                VerticalOptions="Center" />
-                                    </Frame>
+                                    </Border>
 
                                     <!-- Student count -->
                                     <Label Grid.Row="1" Grid.Column="0"
@@ -111,7 +111,7 @@
                                            TextColor="{StaticResource Gray400}"
                                            VerticalOptions="Center" />
                                 </Grid>
-                            </Frame>
+                            </Border>
                         </SwipeView>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>

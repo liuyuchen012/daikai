@@ -14,8 +14,12 @@ public partial class AdminDashboardPage : ContentPage
 
         _viewModel.NavigateRequested += async (page) =>
         {
-            // 切换到对应的 Tab
             await Shell.Current.GoToAsync($"//main/{page}");
+        };
+
+        _viewModel.DeviceTapped += async (uuid, name) =>
+        {
+            await Shell.Current.GoToAsync($"attendance?machineUuid={Uri.EscapeDataString(uuid)}&deviceName={Uri.EscapeDataString(name)}");
         };
     }
 

@@ -366,14 +366,14 @@ public class MainViewModel : INotifyPropertyChanged
     // ---- 远程设置 ----
     private async Task ShowRemoteSettingsAsync()
     {
-        string ip = await DialogHelper.PromptAsync("服务器地址", "请输入服务器IP地址:", Config.ServerIp);
+        string? ip = await DialogHelper.PromptAsync("服务器地址", "请输入服务器IP地址:", Config.ServerIp);
         if (ip == null) return;
 
-        string portStr = await DialogHelper.PromptAsync("服务器端口", "请输入服务器端口:", Config.ServerPort.ToString());
+        string? portStr = await DialogHelper.PromptAsync("服务器端口", "请输入服务器端口:", Config.ServerPort.ToString());
         if (portStr == null) return;
         if (!int.TryParse(portStr, out int port)) return;
 
-        string password = await DialogHelper.PromptAsync("服务器密码", "请输入服务器密码:", Config.ServerPassword);
+        string? password = await DialogHelper.PromptAsync("服务器密码", "请输入服务器密码:", Config.ServerPassword);
         if (password == null) return;
 
         Config.ServerIp = ip;
@@ -425,12 +425,12 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (!await VerifyAdminPwd("访问管理员设置")) return;
 
-        string newPwd = await DialogHelper.PromptAsync("管理员设置", "新密码(留空不改):", "", true);
+        string? newPwd = await DialogHelper.PromptAsync("管理员设置", "新密码(留空不改):", "", true);
         if (newPwd == null) return;
 
         if (!string.IsNullOrEmpty(newPwd))
         {
-            string confirmPwd = await DialogHelper.PromptAsync("管理员设置", "确认密码:", "", true);
+            string? confirmPwd = await DialogHelper.PromptAsync("管理员设置", "确认密码:", "", true);
             if (confirmPwd == null) return;
             if (newPwd != confirmPwd)
             {
@@ -465,6 +465,7 @@ public class MainViewModel : INotifyPropertyChanged
     // ---- 辅助方法 ----
     private static void OpenUrl(string url)
     {
+        if (OperatingSystem.IsIOS()) return;
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch { }
     }

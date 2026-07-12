@@ -9,8 +9,8 @@
         <VerticalStackLayout Padding="16" Spacing="16" MaximumWidthRequest="500">
 
             <!-- 表单 -->
-            <Frame BackgroundColor="White" CornerRadius="12"
-                   Padding="20" HasShadow="False" BorderColor="#e8e8e8"
+            <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                   Padding="20" Stroke="#e8e8e8" StrokeThickness="1"
                    IsVisible="{Binding ShowForm}">
                 <VerticalStackLayout Spacing="14">
 
@@ -51,11 +51,11 @@
                                        Color="#4285f4" HorizontalOptions="Center" />
 
                 </VerticalStackLayout>
-            </Frame>
+            </Border>
 
             <!-- 生成结果 -->
-            <Frame BackgroundColor="White" CornerRadius="12"
-                   Padding="20" HasShadow="False" BorderColor="#e8e8e8"
+            <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                   Padding="20" Stroke="#e8e8e8" StrokeThickness="1"
                    IsVisible="{Binding Generated}">
                 <VerticalStackLayout Spacing="16" HorizontalOptions="Center">
 
@@ -72,14 +72,14 @@
                     </VerticalStackLayout>
 
                     <!-- 签到链接 -->
-                    <Frame BackgroundColor="#f0f4f8" CornerRadius="8"
-                           Padding="12" HasShadow="False" BorderColor="#e0e0e0">
+                    <Border BackgroundColor="#f0f4f8" StrokeShape="RoundRectangle 8"
+                           Padding="12" Stroke="#e0e0e0" StrokeThickness="1">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="签到链接" FontSize="12" TextColor="#888888" />
                             <Label Text="{Binding SignInUrl}" FontSize="14" TextColor="#4285f4"
                                    LineBreakMode="CharacterWrap" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
 
                     <Button Text="复制签到链接"
                             Command="{Binding CopyUrlCommand}"
@@ -93,7 +93,7 @@
                             CornerRadius="10" HeightRequest="44" FontSize="14" />
 
                 </VerticalStackLayout>
-            </Frame>
+            </Border>
 
         </VerticalStackLayout>
     </ScrollView>

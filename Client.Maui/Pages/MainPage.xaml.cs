@@ -26,7 +26,7 @@ public partial class MainPage : ContentPage
             ["重命名任务"] = () => ShowRenameDialog(),
         };
 
-        var choice = await DisplayActionSheet("文件", "取消", null, actions.Keys.ToArray());
+        var choice = await DisplayActionSheetAsync("文件", "取消", null, actions.Keys.ToArray());
         if (choice != null && actions.TryGetValue(choice, out var action))
             action();
     }
@@ -42,7 +42,7 @@ public partial class MainPage : ContentPage
             ["同步数据到服务器"] = () => _viewModel.ActiveTab?.SyncToServerCommand.Execute(null),
         };
 
-        var choice = await DisplayActionSheet("远程", "取消", null, actions.Keys.ToArray());
+        var choice = await DisplayActionSheetAsync("远程", "取消", null, actions.Keys.ToArray());
         if (choice != null && actions.TryGetValue(choice, out var action))
             action();
     }
@@ -55,7 +55,7 @@ public partial class MainPage : ContentPage
             ["管理员设置"] = () => _viewModel.ShowAdminSettingsCommand.Execute(null),
         };
 
-        var choice = await DisplayActionSheet("设置", "取消", null, actions.Keys.ToArray());
+        var choice = await DisplayActionSheetAsync("设置", "取消", null, actions.Keys.ToArray());
         if (choice != null && actions.TryGetValue(choice, out var action))
             action();
     }
@@ -69,7 +69,7 @@ public partial class MainPage : ContentPage
             ["关于"] = () => _viewModel.ShowAboutCommand.Execute(null),
         };
 
-        var choice = await DisplayActionSheet("帮助", "取消", null, actions.Keys.ToArray());
+        var choice = await DisplayActionSheetAsync("帮助", "取消", null, actions.Keys.ToArray());
         if (choice != null && actions.TryGetValue(choice, out var action))
             action();
     }

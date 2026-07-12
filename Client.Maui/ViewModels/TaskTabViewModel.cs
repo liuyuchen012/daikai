@@ -160,6 +160,10 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
             {
                 _server.TaskId = Config.SignInTaskId;
             }
+            else
+            {
+                _server.TaskId = TabId;
+            }
 
             var name = Config.Name;
             if (await _server.RegisterAsync(name))
@@ -351,13 +355,13 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     // ---- 管理员设置 ----
     private async Task ShowAdminSettingsAsync()
     {
-        string name = await DialogHelper.PromptAsync("任务设置", "任务名称:", Config.Name);
+        string? name = await DialogHelper.PromptAsync("任务设置", "任务名称:", Config.Name);
         if (name == null) return;
-        string km = await DialogHelper.PromptAsync("任务设置", "课程名称:", Config.Km);
+        string? km = await DialogHelper.PromptAsync("任务设置", "课程名称:", Config.Km);
         if (km == null) return;
-        string rowsStr = await DialogHelper.PromptAsync("任务设置", "按钮行数:", Config.ButtonRows.ToString());
+        string? rowsStr = await DialogHelper.PromptAsync("任务设置", "按钮行数:", Config.ButtonRows.ToString());
         if (rowsStr == null || !int.TryParse(rowsStr, out int rows)) return;
-        string colsStr = await DialogHelper.PromptAsync("任务设置", "按钮列数:", Config.ButtonCols.ToString());
+        string? colsStr = await DialogHelper.PromptAsync("任务设置", "按钮列数:", Config.ButtonCols.ToString());
         if (colsStr == null || !int.TryParse(colsStr, out int cols)) return;
 
         Config.Name = name; Config.Km = km;
@@ -468,12 +472,12 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
             using var reader = new StreamReader(stream);
             var import = new Dictionary<string, StudentModel>();
             bool isFirst = true;
-            while (!reader.EndOfStream)
+            string? csvLine;
+            while ((csvLine = await reader.ReadLineAsync()) != null)
             {
-                var line = await reader.ReadLineAsync();
                 if (isFirst) { isFirst = false; continue; }
-                if (string.IsNullOrEmpty(line)) continue;
-                var parts = line.Split(',');
+                if (string.IsNullOrEmpty(csvLine)) continue;
+                var parts = csvLine.Split(',');
                 if (parts.Length < 3) continue;
                 import[parts[0]] = new StudentModel
                 {

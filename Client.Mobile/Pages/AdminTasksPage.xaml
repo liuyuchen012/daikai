@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
              x:Class="CheckIn.Client.Mobile.Pages.AdminTasksPage"
              Title="任务管理"
              BackgroundColor="#f5f6fa">
@@ -20,8 +21,7 @@
                 </VerticalStackLayout>
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="viewmodels:TaskItem"
-                              xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels">
+                <DataTemplate x:DataType="viewmodels:TaskItem">
                     <SwipeView Margin="16,4">
                         <SwipeView.RightItems>
                             <SwipeItems>
@@ -34,30 +34,33 @@
                             </SwipeItems>
                         </SwipeView.RightItems>
 
-                        <Frame BackgroundColor="White" CornerRadius="12"
-                               Padding="14" HasShadow="False" BorderColor="#e8e8e8">
-                            <Frame.GestureRecognizers>
+                        <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                                Padding="14" Stroke="#e8e8e8" StrokeThickness="1"
+                                HeightRequest="90">
+                            <Border.GestureRecognizers>
                                 <TapGestureRecognizer
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewAttendanceCommand}"
                                     CommandParameter="{Binding .}" />
-                            </Frame.GestureRecognizers>
+                            </Border.GestureRecognizers>
                             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
                                 <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="8">
-                                    <Label Text="{Binding Subject}" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
-                                    <Frame BackgroundColor="{Binding StatusColor}" CornerRadius="4"
-                                           Padding="6,2" HasShadow="False" BorderColor="Transparent">
+                                    <Label Text="{Binding Subject}" FontSize="16" FontAttributes="Bold" TextColor="#333333" VerticalOptions="Center" />
+                                    <Border BackgroundColor="{Binding StatusColor}" StrokeShape="RoundRectangle 4"
+                                            Padding="6,2" Stroke="Transparent" StrokeThickness="0"
+                                            VerticalOptions="Center">
                                         <Label Text="{Binding StatusText}" FontSize="10" TextColor="White" />
-                                    </Frame>
+                                    </Border>
                                 </HorizontalStackLayout>
                                 <Label Text="{Binding ProgressText}" FontSize="15" FontAttributes="Bold"
-                                       TextColor="#4285f4" Grid.Row="0" Grid.Column="1" />
+                                       TextColor="#4285f4" Grid.Row="0" Grid.Column="1"
+                                       VerticalOptions="Center" HorizontalOptions="End" />
 
                                 <Label Text="{Binding Classroom}" FontSize="12" TextColor="#666666"
                                        Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" />
                                 <Label Text="{Binding CreatedAt, StringFormat='创建于 {0}'}" FontSize="11"
                                        TextColor="#aaaaaa" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" />
                             </Grid>
-                        </Frame>
+                        </Border>
                     </SwipeView>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

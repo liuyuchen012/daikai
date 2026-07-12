@@ -29,9 +29,21 @@ public class AdminTasksViewModel : INotifyPropertyChanged
     public AdminTasksViewModel(ApiService api)
     {
         _api = api;
-        RefreshCommand = new Command(async () => await LoadTasksAsync());
-        CloseTaskCommand = new Command<int>(async (id) => await CloseTaskAsync(id));
-        DeleteTaskCommand = new Command<int>(async (id) => await DeleteTaskAsync(id));
+        RefreshCommand = new Command(async () =>
+        {
+            try { await LoadTasksAsync(); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        CloseTaskCommand = new Command<int>(async (id) =>
+        {
+            try { await CloseTaskAsync(id); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        DeleteTaskCommand = new Command<int>(async (id) =>
+        {
+            try { await DeleteTaskAsync(id); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
         ViewAttendanceCommand = new Command<TaskItem>(item =>
         {
             if (item != null)

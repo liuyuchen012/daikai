@@ -39,17 +39,28 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
     public ICommand NavigateToUsersCommand { get; }
     public ICommand NavigateToTasksCommand { get; }
     public ICommand NavigateToQRCodeCommand { get; }
+    public ICommand DeviceTappedCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action<string>? NavigateRequested;
+    public event Action<string, string>? DeviceTapped; // uuid, name
 
     public AdminDashboardViewModel(ApiService api)
     {
         _api = api;
-        RefreshCommand = new Command(async () => await LoadDashboardAsync());
-        NavigateToUsersCommand = new Command(() => NavigateRequested?.Invoke("users"));
+        RefreshCommand = new Command(async () =>
+        {
+            try { await LoadDashboardAsync(); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        NavigateToUsersCommand = new Command(() => NavigateRequested?.Invoke("adminusers"));
         NavigateToTasksCommand = new Command(() => NavigateRequested?.Invoke("tasks"));
         NavigateToQRCodeCommand = new Command(() => NavigateRequested?.Invoke("qrcode"));
+        DeviceTappedCommand = new Command<DeviceInfo>(item =>
+        {
+            if (item != null)
+                DeviceTapped?.Invoke(item.Uuid, item.Name);
+        });
     }
 
     public async Task LoadDashboardAsync()

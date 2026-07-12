@@ -12,7 +12,7 @@
                    Style="{StaticResource PageTitle}" />
 
             <!-- Server Settings Card -->
-            <Frame Style="{StaticResource CardFrame}">
+            <Border Style="{StaticResource CardFrame}">
                 <VerticalStackLayout Spacing="12">
                     <Label Text="Server Configuration"
                            Style="{StaticResource SectionTitle}"
@@ -47,10 +47,10 @@
                             Clicked="OnSaveServerClicked"
                             Margin="0,8,0,0" />
                 </VerticalStackLayout>
-            </Frame>
+            </Border>
 
             <!-- Admin Settings Card -->
-            <Frame Style="{StaticResource CardFrame}">
+            <Border Style="{StaticResource CardFrame}">
                 <VerticalStackLayout Spacing="12">
                     <Label Text="Admin Settings"
                            Style="{StaticResource SectionTitle}"
@@ -77,10 +77,10 @@
                             Clicked="OnSaveAdminClicked"
                             Margin="0,8,0,0" />
                 </VerticalStackLayout>
-            </Frame>
+            </Border>
 
             <!-- About Card -->
-            <Frame Style="{StaticResource CardFrame}">
+            <Border Style="{StaticResource CardFrame}">
                 <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
                     <Label Text="AgoraIn"
                            FontSize="22"
@@ -105,7 +105,7 @@
                            HorizontalOptions="Center"
                            Margin="0,8,0,0" />
                 </VerticalStackLayout>
-            </Frame>
+            </Border>
 
             <!-- Sign-In button -->
             <Button Text="Create Sign-In Task"

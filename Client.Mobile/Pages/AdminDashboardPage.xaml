@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
              x:Class="CheckIn.Client.Mobile.Pages.AdminDashboardPage"
              Title="仪表盘"
              BackgroundColor="#f5f6fa">
@@ -13,40 +14,40 @@
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
 
                     <!-- 总设备 -->
-                    <Frame Grid.Row="0" Grid.Column="0" BackgroundColor="White"
-                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+                    <Border Grid.Row="0" Grid.Column="0" BackgroundColor="White"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="总设备" FontSize="12" TextColor="#888888" />
                             <Label Text="{Binding TotalDevices}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
 
                     <!-- 在线设备 -->
-                    <Frame Grid.Row="0" Grid.Column="1" BackgroundColor="#e6f4ea"
-                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="Transparent">
+                    <Border Grid.Row="0" Grid.Column="1" BackgroundColor="#e6f4ea"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="Transparent" StrokeThickness="0">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="在线设备" FontSize="12" TextColor="#34a853" />
                             <Label Text="{Binding OnlineDevices}" FontSize="28" FontAttributes="Bold" TextColor="#34a853" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
 
                     <!-- 用户总数 -->
-                    <Frame Grid.Row="1" Grid.Column="0" BackgroundColor="White"
-                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+                    <Border Grid.Row="1" Grid.Column="0" BackgroundColor="White"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="用户总数" FontSize="12" TextColor="#888888" />
                             <Label Text="{Binding TotalUsers}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
 
                     <!-- 今日签到 -->
-                    <Frame Grid.Row="1" Grid.Column="1" BackgroundColor="#e8f0fe"
-                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="Transparent">
+                    <Border Grid.Row="1" Grid.Column="1" BackgroundColor="#e8f0fe"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="Transparent" StrokeThickness="0">
                         <VerticalStackLayout Spacing="4">
                             <Label Text="今日签到" FontSize="12" TextColor="#4285f4" />
                             <Label Text="{Binding TodayCheckins}" FontSize="28" FontAttributes="Bold" TextColor="#4285f4" />
                         </VerticalStackLayout>
-                    </Frame>
+                    </Border>
 
                     <!-- 快捷操作 -->
                     <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
@@ -75,8 +76,8 @@
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Frame BackgroundColor="White" CornerRadius="10"
-                                   Padding="14" HasShadow="False" BorderColor="#e8e8e8"
+                            <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                   Padding="14" Stroke="#e8e8e8" StrokeThickness="1"
                                    Margin="0,0,0,8">
                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                                     <Label Text="{Binding Subject}" FontSize="15" FontAttributes="Bold"
@@ -87,34 +88,43 @@
                                     <Label Text="{Binding Classroom}" FontSize="12" TextColor="#888888"
                                            Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" />
                                 </Grid>
-                            </Frame>
+                            </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>
 
                 <!-- 设备列表 -->
                 <Label Text="设备列表" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
-                <CollectionView ItemsSource="{Binding Devices}">
+                <CollectionView ItemsSource="{Binding Devices}"
+                                SelectionMode="None">
                     <CollectionView.EmptyView>
                         <Label Text="暂无设备" TextColor="#888888"
                                HorizontalOptions="Center" Margin="0,20" />
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Frame BackgroundColor="White" CornerRadius="10"
-                                   Padding="12" HasShadow="False" BorderColor="#e8e8e8"
-                                   Margin="0,0,0,6">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Ellipse Grid.Column="0" WidthRequest="8" HeightRequest="8"
-                                             Fill="{Binding StatusColor}" VerticalOptions="Center" Margin="0,0,10,0" />
-                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                        <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" />
+                        <DataTemplate x:DataType="viewmodels:DeviceInfo">
+                            <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                    Padding="12" Stroke="#e8e8e8" StrokeThickness="1"
+                                    Margin="0,0,0,6">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeviceTappedCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                    <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10"
+                                             Fill="{Binding StatusColor}" VerticalOptions="Center" />
+                                    <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                        <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" LineBreakMode="TailTruncation" />
                                         <Label Text="{Binding StatusText}" FontSize="11" TextColor="{Binding StatusColor}" />
                                     </VerticalStackLayout>
-                                    <Label Grid.Column="2" Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
-                                           FontSize="12" TextColor="#888888" VerticalOptions="Center" />
+                                    <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End">
+                                        <Label Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
+                                               FontSize="12" TextColor="#888888" />
+                                        <Label Text="点击查看 ›" FontSize="10" TextColor="#aaaaaa" HorizontalOptions="End" Margin="0,2,0,0" />
+                                    </VerticalStackLayout>
                                 </Grid>
-                            </Frame>
+                            </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>

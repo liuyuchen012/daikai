@@ -16,7 +16,7 @@ public partial class SignInResultPage : ContentPage
     {
         if (string.IsNullOrEmpty(_signUrl)) return;
         await Clipboard.Default.SetTextAsync(_signUrl);
-        await DisplayAlert("提示", "签到链接已复制到剪贴板", "确定");
+        await DisplayAlertAsync("提示", "签到链接已复制到剪贴板", "确定");
     }
 
     private async void OnCloseClicked(object sender, EventArgs e)

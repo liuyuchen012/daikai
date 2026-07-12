@@ -59,7 +59,7 @@
         <!-- Left Sidebar: Task Tree -->
         <Border Grid.Row="1" Grid.Column="0"
                 BackgroundColor="#FFFFFF"
-                Stroke="#E8E8E8" StrokeThickness="0,1,1,0">
+                Stroke="#E8E8E8" StrokeThickness="1">
             <Grid RowDefinitions="Auto,*">
                 <Label Text="我的任务" FontSize="14" FontAttributes="Bold"
                        TextColor="#333333" Margin="16,12,16,8" />

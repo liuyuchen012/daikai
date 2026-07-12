@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
              x:Class="CheckIn.Client.Mobile.Pages.AdminUsersPage"
              Title="用户管理"
              BackgroundColor="#f5f6fa">
@@ -8,8 +9,8 @@
     <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="12">
 
         <!-- 创建用户表单 -->
-        <Frame Grid.Row="0" BackgroundColor="White" CornerRadius="12"
-               Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+        <Border Grid.Row="0" BackgroundColor="White" StrokeShape="RoundRectangle 12"
+               Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
             <VerticalStackLayout Spacing="10">
                 <Label Text="创建用户" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
 
@@ -28,14 +29,14 @@
                         CornerRadius="10" HeightRequest="44" FontSize="14" />
 
                 <!-- 提示消息 -->
-                <Frame BackgroundColor="#e6f4ea" CornerRadius="8" Padding="10"
-                       HasShadow="False" BorderColor="Transparent"
+                <Border BackgroundColor="#e6f4ea" StrokeShape="RoundRectangle 8" Padding="10"
+                       Stroke="Transparent" StrokeThickness="0"
                        IsVisible="{Binding HasMessage}">
                     <Label Text="{Binding Message}" FontSize="13"
                            TextColor="#137333" />
-                </Frame>
+                </Border>
             </VerticalStackLayout>
-        </Frame>
+        </Border>
 
         <!-- 用户列表 -->
         <RefreshView Grid.Row="1" IsRefreshing="{Binding IsLoading}" Command="{Binding RefreshCommand}">
@@ -47,8 +48,7 @@
                     <Label Text="暂无用户" TextColor="#888888" HorizontalOptions="Center" Margin="0,20" />
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewmodels:UserItem"
-                                  xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels">
+                    <DataTemplate x:DataType="viewmodels:UserItem">
                         <SwipeView Margin="0,0,0,6">
                             <SwipeView.RightItems>
                                 <SwipeItems>
@@ -57,25 +57,25 @@
                                                CommandParameter="{Binding Id}" />
                                 </SwipeItems>
                             </SwipeView.RightItems>
-                            <Frame BackgroundColor="White" CornerRadius="10"
-                                   Padding="12" HasShadow="False" BorderColor="#e8e8e8">
+                            <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                   Padding="12" Stroke="#e8e8e8" StrokeThickness="1">
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                    <Frame Grid.Column="0" BackgroundColor="{Binding RoleColor}"
-                                           CornerRadius="6" Padding="6,3" HasShadow="False"
-                                           BorderColor="Transparent" VerticalOptions="Center">
+                                    <Border Grid.Column="0" BackgroundColor="{Binding RoleColor}"
+                                           StrokeShape="RoundRectangle 6" Padding="6,3"
+                                           Stroke="Transparent" StrokeThickness="0" VerticalOptions="Center">
                                         <Label Text="{Binding RoleText}" FontSize="11" TextColor="White" />
-                                    </Frame>
+                                    </Border>
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
                                         <Label Text="{Binding Username}" FontSize="15" FontAttributes="Bold" TextColor="#333333" />
                                         <Label Text="{Binding DisplayName}" FontSize="12" TextColor="#888888" />
                                     </VerticalStackLayout>
-                                    <Frame Grid.Column="2" BackgroundColor="{Binding StatusColor}"
-                                           CornerRadius="4" Padding="6,2" HasShadow="False"
-                                           BorderColor="Transparent" VerticalOptions="Center">
+                                    <Border Grid.Column="2" BackgroundColor="{Binding StatusColor}"
+                                           StrokeShape="RoundRectangle 4" Padding="6,2"
+                                           Stroke="Transparent" StrokeThickness="0" VerticalOptions="Center">
                                         <Label Text="{Binding StatusText}" FontSize="10" TextColor="White" />
-                                    </Frame>
+                                    </Border>
                                 </Grid>
-                            </Frame>
+                            </Border>
                         </SwipeView>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>

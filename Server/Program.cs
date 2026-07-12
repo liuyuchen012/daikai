@@ -13,11 +13,35 @@ using System.Web;
 //       移动端 API（JWT 令牌认证、二维码签到、管理员仪表盘）
 // =============================================================================
 
-// ---- SHA256 哈希辅助方法 ----
+// ---- 密码哈希辅助方法（加盐 SHA256） ----
 string Sha256(string input)
 {
     var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
     return Convert.ToHexString(bytes).ToLower();
+}
+
+/// <summary>生成加盐密码哈希，格式: salt:SHA256(salt+password)</summary>
+string HashPassword(string password)
+{
+    var salt = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLower();
+    var hash = Sha256(salt + password);
+    return $"{salt}:{hash}";
+}
+
+/// <summary>验证密码哈希，兼容旧版无盐 SHA256 格式</summary>
+bool VerifyPassword(string password, string storedHash)
+{
+    if (string.IsNullOrEmpty(storedHash)) return false;
+    // 新格式: salt:hash
+    var idx = storedHash.IndexOf(':');
+    if (idx > 0)
+    {
+        var salt = storedHash[..idx];
+        var hash = storedHash[(idx + 1)..];
+        return Sha256(salt + password) == hash;
+    }
+    // 旧格式: 纯 SHA256（向后兼容）
+    return Sha256(password) == storedHash;
 }
 
 // ---- 加载服务器配置文件 config.json ----
@@ -28,14 +52,50 @@ if (!File.Exists(configPath))
 var configJson = File.Exists(configPath) ? JsonDocument.Parse(File.ReadAllText(configPath)).RootElement : default;
 var cfgPort = configJson.TryGetProperty("Port", out var p) ? p.GetInt32() : 5250;
 var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "AgoraIn 集控平台" : "AgoraIn 集控平台";
-var serverPassword = configJson.TryGetProperty("ServerPassword", out var sp) ? sp.GetString() ?? "admin123" : "admin123";
+
+// 服务器密码：必须通过 config.json 设置，不存在则生成随机密码并回写
+string serverPassword;
+if (configJson.TryGetProperty("ServerPassword", out var sp) && sp.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(sp.GetString()))
+{
+    serverPassword = sp.GetString()!;
+}
+else
+{
+    serverPassword = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLower();
+    Console.WriteLine($"[安全] 未配置 ServerPassword，已自动生成: {serverPassword}");
+    // 回写到 config.json
+    try
+    {
+        var configObj = File.Exists(configPath)
+            ? JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(configPath)) ?? new()
+            : new();
+        configObj["ServerPassword"] = serverPassword;
+        File.WriteAllText(configPath, JsonSerializer.Serialize(configObj, new JsonSerializerOptions { WriteIndented = true }));
+    }
+    catch (Exception ex) { Console.WriteLine($"[警告] 无法回写 config.json: {ex.Message}"); }
+}
+
+// 会话密钥持久化（服务器重启不会导致所有用户重新登录）
+var sessionSecretFile = Path.Combine(AppContext.BaseDirectory, "session_secret.txt");
+string sessionSecret;
+if (File.Exists(sessionSecretFile))
+{
+    sessionSecret = File.ReadAllText(sessionSecretFile).Trim();
+}
+else
+{
+    sessionSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLower();
+    File.WriteAllText(sessionSecretFile, sessionSecret);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{cfgPort}");
 
 var connStr = builder.Configuration.GetConnectionString("Default") ?? "Data Source=checkin.db";
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connStr));
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
+    .SetIsOriginAllowed(origin => new Uri(origin).IsLoopback)  // 仅允许本地回环地址
+    .AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 
 var app = builder.Build();
 app.UseCors();
@@ -75,7 +135,6 @@ using (var scope = app.Services.CreateScope())
 
 // ---- 会话认证（Session Auth） ----
 // 使用 HMAC-SHA256 签名的 Cookie 实现无状态会话管理
-var sessionSecret = Guid.NewGuid().ToString("N");
 const string CookieName = "sw_session";
 
 /// <summary>
@@ -282,16 +341,23 @@ static bool CheckPwd(JsonElement body, string expected)
 app.MapGet("/api/status", async (AppDbContext db) =>
 {
     var machines = await db.Machines.ToListAsync();
-    var attendances = await db.AttendanceRecords.ToListAsync();
+    // 仅加载必要字段，避免全表 JSON 数据加载
+    var taskGroups = await db.AttendanceRecords
+        .Select(a => new { a.MachineUuid, a.TaskId })
+        .Distinct()
+        .ToListAsync();
+    var taskLookup = taskGroups.GroupBy(x => x.MachineUuid)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.TaskId).ToList());
     var now = DateTime.Now;
 
-    // 按设备分组
-    var groupedMachines = machines.Select(m => {
-        var tasks = attendances.Where(a => a.MachineUuid == m.Uuid).Select(a => a.TaskId).Distinct().ToList();
+    var groupedMachines = machines.Select(m =>
+    {
+        var tasks = taskLookup.TryGetValue(m.Uuid, out var t) ? t : new List<string>();
         var last = m.LastSeen != null ? DateTime.Parse(m.LastSeen) : (DateTime?)null;
         var online = last != null && (now - last.Value).TotalSeconds < 300;
 
-        return new {
+        return new
+        {
             uuid = m.Uuid,
             name = m.Name,
             online,
@@ -669,7 +735,7 @@ app.MapPost("/api/users", async (AppDbContext db, HttpContext ctx) =>
     var user = new UserEntity
     {
         Username = username,
-        PasswordHash = Sha256(password),
+        PasswordHash = HashPassword(password),
         Role = role,
         DisplayName = string.IsNullOrEmpty(displayName) ? username : displayName,
         IsActive = true,
@@ -806,11 +872,11 @@ app.MapPost("/api/users/change-password", async (AppDbContext db, HttpContext ct
     {
         if (string.IsNullOrEmpty(oldPassword))
             return Results.Json(new { error = "旧密码不能为空" }, statusCode: 400);
-        if (Sha256(oldPassword) != targetUser.PasswordHash)
+        if (!VerifyPassword(oldPassword, targetUser.PasswordHash))
             return Results.Json(new { error = "旧密码错误" }, statusCode: 403);
     }
 
-    targetUser.PasswordHash = Sha256(newPassword);
+    targetUser.PasswordHash = HashPassword(newPassword);
     await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
 });
@@ -1130,9 +1196,9 @@ app.MapPost("/login", async (HttpContext ctx, AppDbContext db) =>
     var username = form["username"].ToString();
     var password = form["password"].ToString();
 
-    // 从数据库查询用户并验证密码
-    var passwordHash = Sha256(password);
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == passwordHash && u.IsActive);
+    // 从数据库查询用户并验证密码（支持加盐哈希）
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.IsActive);
+    if (user != null && !VerifyPassword(password, user.PasswordHash)) user = null;
 
     if (user != null)
     {
@@ -1167,7 +1233,13 @@ app.MapGet("/logout", (HttpContext ctx) =>
 app.MapGet("/", async (AppDbContext db, HttpContext ctx) =>
 {
     var machines = await db.Machines.ToListAsync();
-    var attendances = await db.AttendanceRecords.ToListAsync();
+    // 仅加载必要字段，避免全表 JSON 数据加载
+    var taskGroups = await db.AttendanceRecords
+        .Select(a => new { a.MachineUuid, a.TaskId })
+        .Distinct()
+        .ToListAsync();
+    var taskLookup = taskGroups.GroupBy(x => x.MachineUuid)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.TaskId).Distinct().Count());
     var now = DateTime.Now;
     int onlineCount = 0, totalCount = machines.Count;
 
@@ -1178,7 +1250,7 @@ app.MapGet("/", async (AppDbContext db, HttpContext ctx) =>
         var online = last != null && (now - last.Value).TotalSeconds < 300;
         if (online) onlineCount++;
 
-        var taskCount = attendances.Where(a => a.MachineUuid == m.Uuid).Select(a => a.TaskId).Distinct().Count();
+        var taskCount = taskLookup.TryGetValue(m.Uuid, out var tc) ? tc : 0;
         var badgeCls = online ? "badge-online" : "badge-offline";
         var badgeText = online ? "在线" : "离线";
         var lastSeenStr = last?.ToString("yyyy-MM-dd HH:mm:ss") ?? "从未连接";
@@ -1548,10 +1620,8 @@ app.MapPost("/api/auth/login", async (AppDbContext db, JsonElement body) =>
     if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         return Results.Json(new { error = "用户名和密码不能为空" }, statusCode: 400);
 
-    var passwordHash = Sha256(password);
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == passwordHash);
-
-    if (user == null)
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+    if (user == null || !VerifyPassword(password, user.PasswordHash))
         return Results.Json(new { error = "用户名或密码错误" }, statusCode: 401);
 
     if (!user.IsActive)
@@ -1804,7 +1874,13 @@ app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var machines = await db.Machines.ToListAsync();
-    var attendances = await db.AttendanceRecords.ToListAsync();
+    // 仅加载必要字段，避免全表 JSON 数据加载
+    var taskGroups = await db.AttendanceRecords
+        .Select(a => new { a.MachineUuid, a.TaskId })
+        .Distinct()
+        .ToListAsync();
+    var taskLookup = taskGroups.GroupBy(x => x.MachineUuid)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.TaskId).Distinct().Count());
     var signInTasks = await db.SignInTasks.ToListAsync();
     var now = DateTime.Now;
 
@@ -1837,7 +1913,7 @@ app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
     {
         uuid = m.Uuid,
         name = m.Name,
-        task_count = attendances.Where(a => a.MachineUuid == m.Uuid).Select(a => a.TaskId).Distinct().Count(),
+        task_count = taskLookup.TryGetValue(m.Uuid, out var tc) ? tc : 0,
         last = m.LastSeen != null ? DateTime.Parse(m.LastSeen) : (DateTime?)null,
         online = m.LastSeen != null ? (now - DateTime.Parse(m.LastSeen)).TotalSeconds < 300 : false
     }).OrderByDescending(d => d.online).ToList();

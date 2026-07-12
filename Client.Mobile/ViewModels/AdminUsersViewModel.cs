@@ -50,10 +50,26 @@ public class AdminUsersViewModel : INotifyPropertyChanged
     public AdminUsersViewModel(ApiService api)
     {
         _api = api;
-        RefreshCommand = new Command(async () => await LoadUsersAsync());
-        CreateUserCommand = new Command(async () => await CreateUserAsync());
-        DeleteUserCommand = new Command<int>(async (id) => await DeleteUserAsync(id));
-        ToggleUserCommand = new Command<UserItem>(async (user) => await ToggleUserAsync(user));
+        RefreshCommand = new Command(async () =>
+        {
+            try { await LoadUsersAsync(); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        CreateUserCommand = new Command(async () =>
+        {
+            try { await CreateUserAsync(); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        DeleteUserCommand = new Command<int>(async (id) =>
+        {
+            try { await DeleteUserAsync(id); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
+        ToggleUserCommand = new Command<UserItem>(async (user) =>
+        {
+            try { await ToggleUserAsync(user); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        });
     }
 
     public async Task LoadUsersAsync()

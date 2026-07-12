@@ -79,15 +79,15 @@
         </ScrollView>
 
         <!-- Fixed Submit Button -->
-        <Frame Grid.Row="1" BackgroundColor="{StaticResource Surface}"
-               CornerRadius="0" Padding="20,12" HasShadow="True"
-               BorderColor="{StaticResource Divider}">
+        <Border Grid.Row="1" BackgroundColor="{StaticResource Surface}"
+               StrokeShape="RoundRectangle 0" Padding="20,12"
+               Stroke="{StaticResource Divider}" StrokeThickness="1">
             <Button x:Name="SubmitButton"
                     Text="Create Sign-In"
                     Style="{StaticResource PrimaryButton}"
                     Clicked="OnCreateClicked"
                     HorizontalOptions="Fill" />
-        </Frame>
+        </Border>
 
     </Grid>
 

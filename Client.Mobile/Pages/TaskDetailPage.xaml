@@ -18,7 +18,6 @@
                    VerticalOptions="Center"
                    LineBreakMode="TailTruncation" />
             <ImageButton Grid.Column="1"
-                         Source="sync_icon.png"
                          WidthRequest="32"
                          HeightRequest="32"
                          Margin="0,0,4,0"
@@ -49,7 +48,7 @@
     <Grid RowDefinitions="Auto,*" Padding="0">
 
         <!-- Stats bar -->
-        <Frame Grid.Row="0" BackgroundColor="#e8f0fe" CornerRadius="0" Padding="16,10" HasShadow="False">
+        <Border Grid.Row="0" BackgroundColor="#e8f0fe" StrokeShape="RoundRectangle 0" Padding="16,10" StrokeThickness="0">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                 <!-- Status row -->
                 <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="6">
@@ -71,22 +70,22 @@
                        Margin="0,4,0,0" />
 
                 <!-- Online badge -->
-                <Frame Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
                        Style="{StaticResource StatusBadgeOnline}"
                        IsVisible="{Binding IsOnline}"
                        VerticalOptions="Center">
                     <Label Text="Online" FontSize="10" TextColor="White"
                            HorizontalOptions="Center" VerticalOptions="Center" />
-                </Frame>
-                <Frame Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                </Border>
+                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
                        Style="{StaticResource StatusBadgeOffline}"
                        IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}"
                        VerticalOptions="Center">
                     <Label Text="Offline" FontSize="10" TextColor="White"
                            HorizontalOptions="Center" VerticalOptions="Center" />
-                </Frame>
+                </Border>
             </Grid>
-        </Frame>
+        </Border>
 
         <!-- Main content: phone=tabbed, tablet=split -->
         <Grid Grid.Row="1" x:Name="ContentContainer" Padding="0">
@@ -165,8 +164,8 @@
             <!-- Tablet layout: split view -->
             <Grid x:Name="TabletLayout" IsVisible="False" ColumnDefinitions="0.4*,0.6*" ColumnSpacing="0">
                 <!-- Left: Ranking -->
-                <Frame Grid.Column="0" BackgroundColor="{StaticResource SurfaceContainer}"
-                       CornerRadius="0" Padding="12" HasShadow="False">
+                <Border Grid.Column="0" BackgroundColor="{StaticResource SurfaceContainer}"
+                       StrokeShape="RoundRectangle 0" Padding="12" StrokeThickness="0">
                     <Grid RowDefinitions="Auto,*">
                         <Label Grid.Row="0"
                                Text="Ranking"
@@ -201,7 +200,7 @@
                             </CollectionView.ItemTemplate>
                         </CollectionView>
                     </Grid>
-                </Frame>
+                </Border>
 
                 <!-- Right: Student grid -->
                 <ScrollView Grid.Column="1">

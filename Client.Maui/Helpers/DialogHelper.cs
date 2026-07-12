@@ -12,7 +12,7 @@ public static class DialogHelper
     {
         var page = Application.Current?.Windows.FirstOrDefault()?.Page;
         if (page == null) return false;
-        return await page.DisplayAlert(title, message, "确定", "取消");
+        return await page.DisplayAlertAsync(title, message, "确定", "取消");
     }
 
     /// <summary>
@@ -22,7 +22,7 @@ public static class DialogHelper
     {
         var page = Application.Current?.Windows.FirstOrDefault()?.Page;
         if (page == null) return;
-        await page.DisplayAlert(title, message, "确定");
+        await page.DisplayAlertAsync(title, message, "确定");
     }
 
     /// <summary>

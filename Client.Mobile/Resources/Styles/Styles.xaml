@@ -5,12 +5,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!-- ============ Card Style ============ -->
-    <Style x:Key="CardFrame" TargetType="Frame">
+    <Style x:Key="CardFrame" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
-        <Setter Property="BorderColor" Value="{StaticResource CardBorder}" />
-        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
         <Setter Property="Padding" Value="16" />
-        <Setter Property="HasShadow" Value="True" />
     </Style>
 
     <!-- ============ Primary Button ============ -->
@@ -64,12 +64,12 @@
     </Style>
 
     <!-- ============ Task Card Frame ============ -->
-    <Style x:Key="TaskCardFrame" TargetType="Frame">
+    <Style x:Key="TaskCardFrame" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
-        <Setter Property="BorderColor" Value="{StaticResource CardBorder}" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
         <Setter Property="Padding" Value="16" />
-        <Setter Property="HasShadow" Value="True" />
         <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
 
@@ -112,20 +112,18 @@
     </Style>
 
     <!-- ============ Status Badge Online ============ -->
-    <Style x:Key="StatusBadgeOnline" TargetType="Frame">
+    <Style x:Key="StatusBadgeOnline" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource Success}" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
         <Setter Property="Padding" Value="8,2" />
-        <Setter Property="HasShadow" Value="False" />
         <Setter Property="HeightRequest" Value="22" />
     </Style>
 
     <!-- ============ Status Badge Offline ============ -->
-    <Style x:Key="StatusBadgeOffline" TargetType="Frame">
+    <Style x:Key="StatusBadgeOffline" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource Error}" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
         <Setter Property="Padding" Value="8,2" />
-        <Setter Property="HasShadow" Value="False" />
         <Setter Property="HeightRequest" Value="22" />
     </Style>
 

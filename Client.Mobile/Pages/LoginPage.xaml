@@ -48,19 +48,18 @@
             </VerticalStackLayout>
 
             <!-- Error Message -->
-            <Frame BackgroundColor="#fce8e6" BorderColor="Transparent"
-                   CornerRadius="8" Padding="12" HasShadow="False"
-                   IsVisible="{Binding HasError}">
+            <Border BackgroundColor="#fce8e6" Stroke="Transparent"
+                    StrokeShape="RoundRectangle 8" Padding="12"
+                    IsVisible="{Binding HasError}">
                 <Label Text="{Binding ErrorMessage}" TextColor="#c5221f" FontSize="13" />
-            </Frame>
+            </Border>
 
             <!-- Login Button -->
-            <Button Text="登 录"
-                    Command="{Binding LoginCommand}"
+            <Button x:Name="btnLogin" Text="登 录"
+                    Clicked="OnLoginClicked"
                     BackgroundColor="#4285f4" TextColor="White"
                     FontSize="17" FontAttributes="Bold"
-                    HeightRequest="52" CornerRadius="12"
-                    IsEnabled="{Binding CanLogin}" />
+                    HeightRequest="52" CornerRadius="12" />
 
             <!-- Loading -->
             <ActivityIndicator IsRunning="{Binding IsLoading}"

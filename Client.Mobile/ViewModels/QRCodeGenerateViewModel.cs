@@ -63,7 +63,11 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
     {
         _api = api;
         _baseUrl = Preferences.Get("server_url", "http://localhost:5250");
-        GenerateCommand = new Command(async () => await GenerateAsync(), () => CanGenerate);
+        GenerateCommand = new Command(async () =>
+        {
+            try { await GenerateAsync(); }
+            catch { /* 防止 async void 异常崩溃 */ }
+        }, () => CanGenerate);
         ResetCommand = new Command(() =>
         {
             Generated = false;
@@ -71,11 +75,15 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
         });
         CopyUrlCommand = new Command(async () =>
         {
-            if (!string.IsNullOrEmpty(SignInUrl))
+            try
             {
-                await Clipboard.SetTextAsync(SignInUrl);
-                await Shell.Current.DisplayAlertAsync("已复制", $"签到链接已复制到剪贴板\n{SignInUrl}", "确定");
+                if (!string.IsNullOrEmpty(SignInUrl))
+                {
+                    await Clipboard.SetTextAsync(SignInUrl);
+                    await Shell.Current.DisplayAlertAsync("已复制", $"签到链接已复制到剪贴板\n{SignInUrl}", "确定");
+                }
             }
+            catch { /* 防止 async void 异常崩溃 */ }
         });
     }
 

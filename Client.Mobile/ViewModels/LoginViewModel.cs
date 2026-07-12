@@ -63,15 +63,24 @@ public class LoginViewModel : INotifyPropertyChanged
         _auth = auth;
         _api = api;
 
-        // 加载上次保存的服务器地址
-        var savedUrl = Preferences.Get("server_url", "http://");
-        _serverUrl = savedUrl;
+        // 加载上次保存的服务器地址（安全获取，捕获可能的初始化异常）
+        try
+        {
+            var savedUrl = Preferences.Get("server_url", "http://");
+            if (!string.IsNullOrEmpty(savedUrl))
+                _serverUrl = savedUrl;
+        }
+        catch { /* Preferences 可能未初始化 */ }
         OnPropertyChanged(nameof(ServerUrl));
 
-        LoginCommand = new Command(async () => await LoginAsync(), () => CanLogin);
+        LoginCommand = new Command(async () =>
+        {
+            try { await LoginAsync(); }
+            catch { /* 由 code-behind Clicked 事件处理 */ }
+        }, () => CanLogin);
     }
 
-    private async Task LoginAsync()
+    public async Task LoginAsync()
     {
         if (!CanLogin) return;
 

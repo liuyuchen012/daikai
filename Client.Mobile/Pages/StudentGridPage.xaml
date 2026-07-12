@@ -34,7 +34,7 @@
     <Grid RowDefinitions="Auto,*" Padding="0">
 
         <!-- Stats bar -->
-        <Frame Grid.Row="0" BackgroundColor="#e8f0fe" CornerRadius="0" Padding="16,10" HasShadow="False">
+        <Border Grid.Row="0" BackgroundColor="#e8f0fe" StrokeShape="RoundRectangle 0" Padding="16,10" StrokeThickness="0">
             <Grid ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0"
                        Text="{Binding PunchInfo}"
@@ -42,22 +42,22 @@
                        FontAttributes="Bold"
                        TextColor="{StaticResource Primary}"
                        VerticalOptions="Center" />
-                <Frame Grid.Column="1"
+                <Border Grid.Column="1"
                        Style="{StaticResource StatusBadgeOnline}"
                        IsVisible="{Binding IsOnline}"
                        VerticalOptions="Center">
                     <Label Text="Online" FontSize="10" TextColor="White"
                            HorizontalOptions="Center" VerticalOptions="Center" />
-                </Frame>
-                <Frame Grid.Column="1"
+                </Border>
+                <Border Grid.Column="1"
                        Style="{StaticResource StatusBadgeOffline}"
                        IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}"
                        VerticalOptions="Center">
                     <Label Text="Offline" FontSize="10" TextColor="White"
                            HorizontalOptions="Center" VerticalOptions="Center" />
-                </Frame>
+                </Border>
             </Grid>
-        </Frame>
+        </Border>
 
         <!-- Student Grid -->
         <ScrollView Grid.Row="1">
