@@ -28,25 +28,25 @@ public partial class CreateSignInPage : ContentPage
 
         if (string.IsNullOrWhiteSpace(password))
         {
-            await DisplayAlert("Error", "Please enter a sign-in password", "OK");
+            await DisplayAlertAsync("Error", "Please enter a sign-in password", "OK");
             return;
         }
 
         if (password != confirmPassword)
         {
-            await DisplayAlert("Error", "Passwords do not match", "OK");
+            await DisplayAlertAsync("Error", "Passwords do not match", "OK");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(classroom))
         {
-            await DisplayAlert("Error", "Please enter a classroom name", "OK");
+            await DisplayAlertAsync("Error", "Please enter a classroom name", "OK");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(subject))
         {
-            await DisplayAlert("Error", "Please enter a subject name", "OK");
+            await DisplayAlertAsync("Error", "Please enter a subject name", "OK");
             return;
         }
 
@@ -63,7 +63,7 @@ public partial class CreateSignInPage : ContentPage
 
         if (students.Count == 0)
         {
-            bool proceed = await DisplayAlert("Warning",
+            bool proceed = await DisplayAlertAsync("Warning",
                 "No students entered. Continue anyway? (Students will not be verified)",
                 "Continue", "Cancel");
             if (!proceed) return;
@@ -81,7 +81,7 @@ public partial class CreateSignInPage : ContentPage
             var result = await _mainVm.CreateRemoteSignInAsync(password, classroom, subject, students);
             if (result == null)
             {
-                await DisplayAlert("Error", "Failed to create sign-in. Check server connection.", "OK");
+                await DisplayAlertAsync("Error", "Failed to create sign-in. Check server connection.", "OK");
                 return;
             }
 
@@ -93,7 +93,7 @@ public partial class CreateSignInPage : ContentPage
 
             // Show success with link
             var signUrl = $"http://{_mainVm.Config.ServerIp}:{_mainVm.Config.ServerPort}/s/{shortCode}";
-            await DisplayAlert("Success",
+            await DisplayAlertAsync("Success",
                 $"Sign-in task created!\n\nLink: {signUrl}\n\nStudents can use this link to sign in.",
                 "OK");
 
@@ -101,7 +101,7 @@ public partial class CreateSignInPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", $"Failed: {ex.Message}", "OK");
+            await DisplayAlertAsync("Error", $"Failed: {ex.Message}", "OK");
         }
         finally
         {

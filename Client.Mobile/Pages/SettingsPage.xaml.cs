@@ -30,18 +30,18 @@ public partial class SettingsPage : ContentPage
 
         if (string.IsNullOrWhiteSpace(ip))
         {
-            await DisplayAlert("Error", "Please enter server IP address", "OK");
+            await DisplayAlertAsync("Error", "Please enter server IP address", "OK");
             return;
         }
 
         if (!int.TryParse(portText, out int port) || port <= 0 || port > 65535)
         {
-            await DisplayAlert("Error", "Please enter a valid port number (1-65535)", "OK");
+            await DisplayAlertAsync("Error", "Please enter a valid port number (1-65535)", "OK");
             return;
         }
 
         _mainVm.UpdateServerConfig(ip, port, password ?? "");
-        await DisplayAlert("Success", "Server settings saved", "OK");
+        await DisplayAlertAsync("Success", "Server settings saved", "OK");
     }
 
     private async void OnSaveAdminClicked(object? sender, EventArgs e)
@@ -53,7 +53,7 @@ public partial class SettingsPage : ContentPage
         {
             if (newPassword != confirmPassword)
             {
-                await DisplayAlert("Error", "Passwords do not match", "OK");
+                await DisplayAlertAsync("Error", "Passwords do not match", "OK");
                 return;
             }
 
@@ -71,18 +71,18 @@ public partial class SettingsPage : ContentPage
 
                 if (MainViewModel.HashPassword(currentPwd) != _mainVm.Config.AdminPasswordHash)
                 {
-                    await DisplayAlert("Error", "Incorrect admin password", "OK");
+                    await DisplayAlertAsync("Error", "Incorrect admin password", "OK");
                     return;
                 }
             }
 
             _mainVm.Config.AdminPasswordHash = MainViewModel.HashPassword(newPassword);
             _mainVm.SaveGlobalConfig();
-            await DisplayAlert("Success", "Admin password updated", "OK");
+            await DisplayAlertAsync("Success", "Admin password updated", "OK");
         }
         else
         {
-            await DisplayAlert("Info", "No changes made (password left empty)", "OK");
+            await DisplayAlertAsync("Info", "No changes made (password left empty)", "OK");
         }
     }
 

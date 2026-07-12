@@ -25,7 +25,7 @@ public class ResponsiveHelper : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Whether the current device is a phone (width < 600dp).
+    /// Whether the current device is a phone (width &lt; 600dp).
     /// </summary>
     public bool IsPhone => !_isTablet;
 

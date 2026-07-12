@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.StudentHistoryPage"
+             Title="签到记录"
+             BackgroundColor="#f5f6fa">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="16">
+
+        <!-- 用户信息 -->
+        <Frame Grid.Row="0" BackgroundColor="White" CornerRadius="12"
+               Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Frame Grid.Column="0" BackgroundColor="#4285f4" CornerRadius="24"
+                       WidthRequest="48" HeightRequest="48" Padding="0"
+                       HasShadow="False" BorderColor="Transparent">
+                    <Label Text="👤" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center" />
+                </Frame>
+                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                    <Label x:Name="lblUsername" Text="" FontSize="17" FontAttributes="Bold" TextColor="#333333" />
+                    <Label x:Name="lblRole" Text="" FontSize="12" TextColor="#888888" />
+                </VerticalStackLayout>
+            </Grid>
+        </Frame>
+
+        <!-- 统计 -->
+        <Frame Grid.Row="1" BackgroundColor="#e8f0fe" CornerRadius="10"
+               Padding="12" HasShadow="False" BorderColor="Transparent">
+            <HorizontalStackLayout Spacing="4" HorizontalOptions="Center">
+                <Label Text="总签到次数：" FontSize="14" TextColor="#4285f4" />
+                <Label x:Name="lblTotal" Text="0" FontSize="18" FontAttributes="Bold" TextColor="#4285f4" />
+            </HorizontalStackLayout>
+        </Frame>
+
+        <!-- 签到历史列表 -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout x:Name="historyStack" Spacing="6" />
+        </ScrollView>
+
+        <!-- 退出按钮 -->
+        <Button Grid.Row="3" Text="退出登录"
+                Clicked="OnLogoutClicked"
+                BackgroundColor="#ea4335" TextColor="White"
+                CornerRadius="12" HeightRequest="48"
+                FontSize="15" Margin="0,8,0,0" />
+
+    </Grid>
+
+</ContentPage>

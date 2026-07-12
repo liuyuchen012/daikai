@@ -133,7 +133,7 @@ public class MainViewModel : BaseViewModel
         SaveWorkspace();
     }
 
-    private void RefreshAllTasks()
+    public void RefreshAllTasks()
     {
         AllTasks.Clear();
         foreach (var t in Tabs.OrderBy(t => t.Config.Name))

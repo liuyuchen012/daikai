@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.AdminUsersPage"
+             Title="用户管理"
+             BackgroundColor="#f5f6fa">
+
+    <Grid RowDefinitions="Auto,*" Padding="16" RowSpacing="12">
+
+        <!-- 创建用户表单 -->
+        <Frame Grid.Row="0" BackgroundColor="White" CornerRadius="12"
+               Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="创建用户" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
+
+                <Entry Placeholder="用户名" Text="{Binding NewUsername}" FontSize="14" />
+                <Entry Placeholder="密码" Text="{Binding NewPassword}" IsPassword="True" FontSize="14" />
+                <Entry Placeholder="显示名称（可选）" Text="{Binding NewDisplayName}" FontSize="14" />
+
+                <HorizontalStackLayout Spacing="10">
+                    <Label Text="角色:" FontSize="14" TextColor="#555555" VerticalOptions="Center" />
+                    <Picker ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}"
+                            FontSize="14" WidthRequest="120" />
+                </HorizontalStackLayout>
+
+                <Button Text="创建用户" Command="{Binding CreateUserCommand}"
+                        BackgroundColor="#4285f4" TextColor="White"
+                        CornerRadius="10" HeightRequest="44" FontSize="14" />
+
+                <!-- 提示消息 -->
+                <Frame BackgroundColor="#e6f4ea" CornerRadius="8" Padding="10"
+                       HasShadow="False" BorderColor="Transparent"
+                       IsVisible="{Binding HasMessage}">
+                    <Label Text="{Binding Message}" FontSize="13"
+                           TextColor="#137333" />
+                </Frame>
+            </VerticalStackLayout>
+        </Frame>
+
+        <!-- 用户列表 -->
+        <RefreshView Grid.Row="1" IsRefreshing="{Binding IsLoading}" Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Users}" SelectionMode="None">
+                <CollectionView.Header>
+                    <Label Text="用户列表" FontSize="16" FontAttributes="Bold" TextColor="#333333" Margin="0,0,0,10" />
+                </CollectionView.Header>
+                <CollectionView.EmptyView>
+                    <Label Text="暂无用户" TextColor="#888888" HorizontalOptions="Center" Margin="0,20" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewmodels:UserItem"
+                                  xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels">
+                        <SwipeView Margin="0,0,0,6">
+                            <SwipeView.RightItems>
+                                <SwipeItems>
+                                    <SwipeItem Text="删除" BackgroundColor="#ea4335"
+                                               Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteUserCommand}"
+                                               CommandParameter="{Binding Id}" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+                            <Frame BackgroundColor="White" CornerRadius="10"
+                                   Padding="12" HasShadow="False" BorderColor="#e8e8e8">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Frame Grid.Column="0" BackgroundColor="{Binding RoleColor}"
+                                           CornerRadius="6" Padding="6,3" HasShadow="False"
+                                           BorderColor="Transparent" VerticalOptions="Center">
+                                        <Label Text="{Binding RoleText}" FontSize="11" TextColor="White" />
+                                    </Frame>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="{Binding Username}" FontSize="15" FontAttributes="Bold" TextColor="#333333" />
+                                        <Label Text="{Binding DisplayName}" FontSize="12" TextColor="#888888" />
+                                    </VerticalStackLayout>
+                                    <Frame Grid.Column="2" BackgroundColor="{Binding StatusColor}"
+                                           CornerRadius="4" Padding="6,2" HasShadow="False"
+                                           BorderColor="Transparent" VerticalOptions="Center">
+                                        <Label Text="{Binding StatusText}" FontSize="10" TextColor="White" />
+                                    </Frame>
+                                </Grid>
+                            </Frame>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+    </Grid>
+
+</ContentPage>

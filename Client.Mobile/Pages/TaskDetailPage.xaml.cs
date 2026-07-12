@@ -104,19 +104,19 @@ public partial class TaskDetailPage : ContentPage
 
     private View CreateStudentButton(StudentModel student)
     {
-        var frame = new Frame
+        var checkedColor = Color.FromArgb("#4285f4");
+        var uncheckedBg = Color.FromArgb("#e8e8e8");
+        var uncheckedStroke = Color.FromArgb("#d0d0d0");
+        var border = new Border
         {
-            CornerRadius = 10,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 10 },
             Padding = new Thickness(12, 8),
-            HasShadow = true,
+            Shadow = new Shadow { Brush = new SolidColorBrush(Colors.Black), Offset = new Point(0, 2), Radius = 4, Opacity = 0.15f },
             Margin = new Thickness(4),
             MinimumWidthRequest = 100,
-            BackgroundColor = student.IsCheckedIn
-                ? Color.FromArgb("#4285f4")
-                : Color.FromArgb("#e8e8e8"),
-            BorderColor = student.IsCheckedIn
-                ? Color.FromArgb("#4285f4")
-                : Color.FromArgb("#d0d0d0"),
+            BackgroundColor = student.IsCheckedIn ? checkedColor : uncheckedBg,
+            Stroke = new SolidColorBrush(student.IsCheckedIn ? checkedColor : uncheckedStroke),
+            StrokeThickness = 1,
             Content = new Label
             {
                 Text = student.DisplayText,
@@ -136,10 +136,10 @@ public partial class TaskDetailPage : ContentPage
             if (!student.IsCheckedIn && _tabVm != null)
             {
                 _tabVm.CheckInCommand.Execute(student);
-                UpdateButtonAppearance(frame, student);
+                UpdateButtonAppearance(border, student);
             }
         };
-        frame.GestureRecognizers.Add(tapGesture);
+        border.GestureRecognizers.Add(tapGesture);
 
         // Long press for cancel
         // Note: MAUI doesn't have built-in long press, but we can simulate
@@ -149,31 +149,30 @@ public partial class TaskDetailPage : ContentPage
         {
             if (student.IsCheckedIn && _tabVm != null)
             {
-                bool confirm = await Application.Current!.Windows[0].Page!.DisplayAlert(
+                bool confirm = await DisplayAlertAsync(
                     "Cancel Check-in",
                     $"Cancel {student.Name}'s check-in?",
                     "Yes", "No");
                 if (confirm)
                 {
                     _tabVm.CancelCheckInCommand.Execute(student);
-                    UpdateButtonAppearance(frame, student);
+                    UpdateButtonAppearance(border, student);
                 }
             }
         };
-        frame.GestureRecognizers.Add(tapGesture);
+        border.GestureRecognizers.Add(tapGesture);
 
-        return frame;
+        return border;
     }
 
-    private void UpdateButtonAppearance(Frame frame, StudentModel student)
+    private void UpdateButtonAppearance(Border border, StudentModel student)
     {
-        frame.BackgroundColor = student.IsCheckedIn
-            ? Color.FromArgb("#4285f4")
-            : Color.FromArgb("#e8e8e8");
-        frame.BorderColor = student.IsCheckedIn
-            ? Color.FromArgb("#4285f4")
-            : Color.FromArgb("#d0d0d0");
-        if (frame.Content is Label label)
+        var checkedColor = Color.FromArgb("#4285f4");
+        var uncheckedBg = Color.FromArgb("#e8e8e8");
+        var uncheckedStroke = Color.FromArgb("#d0d0d0");
+        border.BackgroundColor = student.IsCheckedIn ? checkedColor : uncheckedBg;
+        border.Stroke = new SolidColorBrush(student.IsCheckedIn ? checkedColor : uncheckedStroke);
+        if (border.Content is Label label)
         {
             label.Text = student.DisplayText;
             label.TextColor = student.IsCheckedIn ? Colors.White : Color.FromArgb("#333333");

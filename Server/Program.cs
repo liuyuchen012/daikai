@@ -10,6 +10,7 @@ using System.Web;
 // =============================================================================
 // AgoraIn 集控平台 - 服务器端入口
 // 功能：设备注册与管理、打卡数据同步、Web 管理面板（含多用户登录认证和权限管理）
+//       移动端 API（JWT 令牌认证、二维码签到、管理员仪表盘）
 // =============================================================================
 
 // ---- SHA256 哈希辅助方法 ----
@@ -151,6 +152,72 @@ bool IsAdmin(HttpContext ctx) => HasRole(ctx, new[] { "admin" });
 /// 检查用户是否为管理员或操作员
 /// </summary>
 bool IsAdminOrOperator(HttpContext ctx) => HasRole(ctx, new[] { "admin", "operator" });
+
+// ---- Bearer Token 认证（用于移动端 API） ----
+// 复用现有的 HMAC Token 机制，但通过 Authorization: Bearer <token> 头传递
+
+/// <summary>
+/// 从请求的 Authorization 头中提取并验证 Bearer Token
+/// </summary>
+(string? Username, string? Role, string? Error) ParseBearerToken(HttpContext ctx)
+{
+    var authHeader = ctx.Request.Headers.Authorization.FirstOrDefault();
+    if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        return (null, null, "缺少认证令牌");
+
+    var token = authHeader["Bearer ".Length..].Trim();
+    if (!ValidateToken(token))
+        return (null, null, "令牌无效或已过期");
+
+    var parts = token.Split(':');
+    if (parts.Length < 3)
+        return (null, null, "令牌格式错误");
+
+    // 检查过期（7天有效期）
+    if (long.TryParse(parts[2], out var ts))
+    {
+        var tokenTime = DateTimeOffset.FromUnixTimeSeconds(ts);
+        if ((DateTimeOffset.UtcNow - tokenTime).TotalDays > 7)
+            return (null, null, "令牌已过期");
+    }
+
+    return (parts[0], parts[1], null);
+}
+
+/// <summary>
+/// 通过 Bearer Token 获取用户名
+/// </summary>
+string? GetBearerUsername(HttpContext ctx)
+{
+    var (username, _, error) = ParseBearerToken(ctx);
+    return error == null ? username : null;
+}
+
+/// <summary>
+/// 通过 Bearer Token 获取用户角色
+/// </summary>
+string? GetBearerUserRole(HttpContext ctx)
+{
+    var (_, role, error) = ParseBearerToken(ctx);
+    return error == null ? role : null;
+}
+
+/// <summary>
+/// 通过 Bearer Token 检查是否为管理员
+/// </summary>
+bool IsBearerAdmin(HttpContext ctx)
+{
+    var role = GetBearerUserRole(ctx);
+    return role == "admin";
+}
+
+/// <summary>
+/// 生成移动端登录令牌（与 Web Cookie 令牌格式相同，但作为 JSON 返回）
+/// </summary>
+string MakeLoginToken(string username, string role)
+{
+    return MakeToken(username, role);
+}
 
 // ---- 加载 HTML 模板文件（template.html 和 login.html） ----
 var wwwroot = builder.Environment.WebRootPath ?? "wwwroot";
@@ -1420,7 +1487,7 @@ function openEditUserModal(id, username, displayName, role, isActive) {{
 }}
 
 function deleteUser(id, username) {{
-    if (!confirm('确定要删除用户 "' + username + '" 吗？此操作不可撤销！')) return;
+    if (!confirm('确定要删除用户 ""' + username + '"" 吗？此操作不可撤销！')) return;
     fetch('/api/users/' + id, {{ method: 'DELETE' }})
         .then(r => r.json())
         .then(d => {{
@@ -1494,6 +1561,511 @@ document.getElementById('changePwdForm').onsubmit = function(e) {{
 }};
 </script>";
     return Results.Content(RenderPage(content, "profile", ctx), "text/html;charset=utf-8");
+});
+
+// =============================================================================
+// 移动端 API（Bearer Token 认证，供 Admin 和学生端 App 使用）
+// =============================================================================
+
+// ---- 认证 API ----
+
+/// <summary>
+/// POST /api/auth/login - 移动端登录，验证用户名密码，返回 Bearer Token
+/// </summary>
+app.MapPost("/api/auth/login", async (AppDbContext db, JsonElement body) =>
+{
+    var username = body.TryGetProperty("username", out var un) ? un.GetString()?.Trim() ?? "" : "";
+    var password = body.TryGetProperty("password", out var pw) ? pw.GetString() ?? "" : "";
+
+    if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        return Results.Json(new { error = "用户名和密码不能为空" }, statusCode: 400);
+
+    var passwordHash = Sha256(password);
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == passwordHash);
+
+    if (user == null)
+        return Results.Json(new { error = "用户名或密码错误" }, statusCode: 401);
+
+    if (!user.IsActive)
+        return Results.Json(new { error = "该账户已被禁用，请联系管理员" }, statusCode: 403);
+
+    var token = MakeLoginToken(username, user.Role);
+
+    return Results.Json(new
+    {
+        token,
+        user = new
+        {
+            id = user.Id,
+            username = user.Username,
+            role = user.Role,
+            display_name = user.DisplayName
+        }
+    });
+});
+
+/// <summary>
+/// POST /api/auth/verify - 验证 Bearer Token 是否有效，返回用户信息
+/// </summary>
+app.MapPost("/api/auth/verify", (HttpContext ctx) =>
+{
+    var (username, role, error) = ParseBearerToken(ctx);
+    if (error != null)
+        return Results.Json(new { valid = false, error }, statusCode: 401);
+
+    return Results.Json(new { valid = true, username, role });
+});
+
+// ---- 二维码签到 API ----
+
+/// <summary>
+/// POST /api/qrcode/generate - 管理员创建签到任务，生成二维码数据（返回 shortCode）
+/// 需要 admin 或 operator 角色
+/// </summary>
+app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
+{
+    // Bearer Token 认证 + 权限检查
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足，仅管理员或操作员可创建签到任务" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+        bodyStr = await reader.ReadToEndAsync();
+
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var classroom = body.TryGetProperty("classroom", out var cr) ? cr.GetString()?.Trim() ?? "" : "";
+    var subject = body.TryGetProperty("subject", out var sj) ? sj.GetString()?.Trim() ?? "" : "";
+    var signPassword = body.TryGetProperty("sign_password", out var sp) ? sp.GetString()?.Trim() ?? "" : "";
+    var studentNamesStr = body.TryGetProperty("students", out var sn) ? sn.GetRawText() : "[]";
+    var machineUuid = body.TryGetProperty("machine_uuid", out var mu) ? mu.GetString()?.Trim() ?? "" : "";
+
+    if (string.IsNullOrEmpty(subject))
+        return Results.Json(new { error = "科目名称不能为空" }, statusCode: 400);
+    if (string.IsNullOrEmpty(signPassword))
+        return Results.Json(new { error = "签到密码不能为空" }, statusCode: 400);
+
+    // 解析学生名单
+    List<string> studentNames;
+    try { studentNames = JsonSerializer.Deserialize<List<string>>(studentNamesStr) ?? new(); }
+    catch { return Results.Json(new { error = "学生名单格式错误" }, statusCode: 400); }
+
+    // 如果没有指定设备 UUID，使用管理员用户名作为虚拟设备标识
+    var actualUuid = string.IsNullOrEmpty(machineUuid)
+        ? $"admin_{username}"
+        : machineUuid;
+
+    // 确保虚拟设备存在
+    if (!await db.Machines.AnyAsync(m => m.Uuid == actualUuid))
+    {
+        db.Machines.Add(new MachineEntity
+        {
+            Uuid = actualUuid,
+            Name = $"管理员 {username} 创建的签到",
+            PublicKey = "mobile-admin",
+            LastSeen = DateTime.Now.ToString("O")
+        });
+    }
+
+    // 生成唯一短链码
+    string shortCode;
+    do { shortCode = GenerateShortCode(); }
+    while (await db.SignInTasks.AnyAsync(s => s.ShortCode == shortCode));
+
+    var task = new SignInTaskEntity
+    {
+        ShortCode = shortCode,
+        MachineUuid = actualUuid,
+        Password = signPassword,
+        Classroom = classroom,
+        Subject = subject,
+        StudentList = studentNamesStr,
+        SignInRecords = "[]",
+        CreatedAt = DateTime.Now.ToString("O"),
+        Status = "active"
+    };
+    db.SignInTasks.Add(task);
+
+    // 同步创建 attendance 记录
+    var taskId = $"signin_{shortCode}";
+    var initialData = new Dictionary<string, StudentAttendance>();
+    foreach (var name in studentNames)
+        initialData[name] = new StudentAttendance { Name = name };
+
+    db.AttendanceRecords.Add(new AttendanceEntity
+    {
+        MachineUuid = actualUuid,
+        TaskId = taskId,
+        Data = JsonSerializer.Serialize(initialData),
+        UpdatedAt = DateTime.Now.ToString("O")
+    });
+
+    var machine = await db.Machines.FindAsync(actualUuid);
+    if (machine != null) machine.LastSeen = DateTime.Now.ToString("O");
+    await db.SaveChangesAsync();
+
+    return Results.Json(new
+    {
+        short_code = shortCode,
+        task_id = taskId,
+        qrcode_url = $"/s/{shortCode}",
+        subject,
+        classroom,
+        student_count = studentNames.Count,
+        created_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+    });
+});
+
+/// <summary>
+/// POST /api/qrcode/checkin - 学生通过扫码签到（JSON API）
+/// 任何拥有有效令牌的登录用户都可以使用（学生端登录即可）
+/// </summary>
+app.MapPost("/api/qrcode/checkin", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+        bodyStr = await reader.ReadToEndAsync();
+
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var shortCode = body.TryGetProperty("short_code", out var sc) ? sc.GetString()?.Trim() ?? "" : "";
+    var studentName = body.TryGetProperty("student_name", out var sn) ? sn.GetString()?.Trim() ?? "" : "";
+    var signPassword = body.TryGetProperty("sign_password", out var sp) ? sp.GetString()?.Trim() ?? "" : "";
+
+    if (string.IsNullOrEmpty(shortCode))
+        return Results.Json(new { error = "签到码不能为空" }, statusCode: 400);
+    if (string.IsNullOrEmpty(studentName))
+        return Results.Json(new { error = "姓名不能为空" }, statusCode: 400);
+    if (string.IsNullOrEmpty(signPassword))
+        return Results.Json(new { error = "签到密码不能为空" }, statusCode: 400);
+
+    var task = await db.SignInTasks.FirstOrDefaultAsync(s => s.ShortCode == shortCode);
+    if (task == null)
+        return Results.Json(new { error = "签到任务不存在或已过期" }, statusCode: 404);
+
+    if (task.Status != "active")
+        return Results.Json(new { error = "该签到任务已关闭" }, statusCode: 400);
+
+    // 验证密码
+    if (signPassword != task.Password)
+        return Results.Json(new { error = "签到密码错误" }, statusCode: 403);
+
+    // 检查是否在学生名单中
+    var studentList = JsonSerializer.Deserialize<List<string>>(task.StudentList) ?? new();
+    if (studentList.Count > 0 && !studentList.Contains(studentName, StringComparer.OrdinalIgnoreCase))
+        return Results.Json(new { error = "你不在该签到任务的学生名单中" }, statusCode: 403);
+
+    // 检查是否已签到
+    var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
+    if (records.Any(r => r.Name.Equals(studentName, StringComparison.OrdinalIgnoreCase)))
+        return Results.Json(new { error = "该姓名已签到，请勿重复签到" }, statusCode: 409);
+
+    // 记录签到
+    var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    var deviceInfo = ctx.Connection.RemoteIpAddress?.ToString() ?? "mobile";
+    records.Add(new SignInRecord
+    {
+        Name = studentName,
+        Time = nowStr,
+        Device = deviceInfo
+    });
+    task.SignInRecords = JsonSerializer.Serialize(records);
+
+    // 同步更新 attendance 表
+    var taskId = $"signin_{shortCode}";
+    var latest = await db.AttendanceRecords
+        .Where(a => a.MachineUuid == task.MachineUuid && a.TaskId == taskId)
+        .OrderByDescending(a => a.UpdatedAt)
+        .FirstOrDefaultAsync();
+
+    var attendanceData = latest != null
+        ? JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(latest.Data) ?? new()
+        : new();
+
+    if (!attendanceData.ContainsKey(studentName))
+        attendanceData[studentName] = new StudentAttendance { Name = studentName };
+    attendanceData[studentName].FirstTime = nowStr;
+    attendanceData[studentName].Count++;
+    attendanceData[studentName].History.Add(nowStr);
+
+    db.AttendanceRecords.Add(new AttendanceEntity
+    {
+        MachineUuid = task.MachineUuid,
+        TaskId = taskId,
+        Data = JsonSerializer.Serialize(attendanceData),
+        UpdatedAt = DateTime.Now.ToString("O")
+    });
+
+    await db.SaveChangesAsync();
+
+    return Results.Json(new
+    {
+        status = "ok",
+        message = "签到成功",
+        student_name = studentName,
+        time = nowStr,
+        subject = task.Subject,
+        classroom = task.Classroom,
+        rank = records.Count
+    });
+});
+
+// ---- 管理员仪表盘 API ----
+
+/// <summary>
+/// GET /api/mobile/dashboard - 管理员仪表盘数据
+/// 需要 admin 或 operator 角色
+/// </summary>
+app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machines = await db.Machines.ToListAsync();
+    var attendances = await db.AttendanceRecords.ToListAsync();
+    var signInTasks = await db.SignInTasks.ToListAsync();
+    var now = DateTime.Now;
+
+    // 设备统计
+    var onlineCount = machines.Count(m =>
+    {
+        var last = m.LastSeen != null ? DateTime.Parse(m.LastSeen) : (DateTime?)null;
+        return last != null && (now - last.Value).TotalSeconds < 300;
+    });
+
+    // 今日签到统计
+    var todayStr = now.ToString("yyyy-MM-dd");
+    var todayCheckins = signInTasks
+        .SelectMany(s => JsonSerializer.Deserialize<List<SignInRecord>>(s.SignInRecords) ?? new())
+        .Count(r => r.Time.StartsWith(todayStr));
+
+    // 活跃签到任务
+    var activeSignInTasks = signInTasks.Where(s => s.Status == "active").Select(s => new
+    {
+        short_code = s.ShortCode,
+        subject = s.Subject,
+        classroom = s.Classroom,
+        student_count = (JsonSerializer.Deserialize<List<string>>(s.StudentList) ?? new()).Count,
+        signed_count = (JsonSerializer.Deserialize<List<SignInRecord>>(s.SignInRecords) ?? new()).Count,
+        created_at = s.CreatedAt
+    }).ToList();
+
+    // 按设备汇总任务数
+    var deviceTasks = machines.Select(m => new
+    {
+        uuid = m.Uuid,
+        name = m.Name,
+        task_count = attendances.Where(a => a.MachineUuid == m.Uuid).Select(a => a.TaskId).Distinct().Count(),
+        last = m.LastSeen != null ? DateTime.Parse(m.LastSeen) : (DateTime?)null,
+        online = m.LastSeen != null ? (now - DateTime.Parse(m.LastSeen)).TotalSeconds < 300 : false
+    }).OrderByDescending(d => d.online).ToList();
+
+    return Results.Json(new
+    {
+        summary = new
+        {
+            total_devices = machines.Count,
+            online_devices = onlineCount,
+            total_users = await db.Users.CountAsync(),
+            today_checkins = todayCheckins,
+            active_signin_tasks = activeSignInTasks.Count
+        },
+        devices = deviceTasks,
+        active_signin_tasks = activeSignInTasks
+    });
+});
+
+/// <summary>
+/// GET /api/mobile/attendance - 查询打卡数据
+/// 支持参数：machine_uuid, task_id（可选筛选）
+/// 需要 admin 或 operator 角色
+/// </summary>
+app.MapGet("/api/mobile/attendance", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machineUuid = ctx.Request.Query["machine_uuid"].FirstOrDefault();
+    var taskId = ctx.Request.Query["task_id"].FirstOrDefault();
+
+    var query = db.AttendanceRecords.AsQueryable();
+    if (!string.IsNullOrEmpty(machineUuid))
+        query = query.Where(a => a.MachineUuid == machineUuid);
+    if (!string.IsNullOrEmpty(taskId))
+        query = query.Where(a => a.TaskId == taskId);
+
+    var records = await query
+        .OrderByDescending(a => a.UpdatedAt)
+        .Take(200) // 限制返回数量
+        .ToListAsync();
+
+    // 按 device+task 分组，返回每条最新记录
+    var grouped = records
+        .GroupBy(r => new { r.MachineUuid, r.TaskId })
+        .Select(g =>
+        {
+            var latest = g.OrderByDescending(r => r.UpdatedAt).First();
+            var machineName = db.Machines.Where(m => m.Uuid == latest.MachineUuid).Select(m => m.Name).FirstOrDefault() ?? "";
+            var data = JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(latest.Data) ?? new();
+            var totalStudents = data.Count;
+            var punchedCount = data.Values.Count(v => v.FirstTime != null);
+
+            return new
+            {
+                machine_uuid = latest.MachineUuid,
+                machine_name = machineName,
+                task_id = latest.TaskId,
+                total_students = totalStudents,
+                punched_count = punchedCount,
+                unpunched_count = totalStudents - punchedCount,
+                attendance_rate = totalStudents > 0 ? Math.Round((double)punchedCount / totalStudents * 100, 1) : 0,
+                last_updated = latest.UpdatedAt,
+                students = data.Select(kv => new
+                {
+                    name = kv.Key,
+                    checked_in = kv.Value.FirstTime != null,
+                    first_time = kv.Value.FirstTime,
+                    count = kv.Value.Count
+                }).ToList()
+            };
+        }).ToList();
+
+    return Results.Json(new { tasks = grouped });
+});
+
+/// <summary>
+/// GET /api/mobile/tasks - 获取所有签到任务列表（管理员）
+/// </summary>
+app.MapGet("/api/mobile/tasks", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var tasks = await db.SignInTasks
+        .OrderByDescending(s => s.CreatedAt)
+        .Take(100)
+        .Select(s => new
+        {
+            id = s.Id,
+            short_code = s.ShortCode,
+            subject = s.Subject,
+            classroom = s.Classroom,
+            status = s.Status,
+            student_count = s.StudentList.Length > 2
+                ? (JsonSerializer.Deserialize<List<string>>(s.StudentList) ?? new()).Count
+                : 0,
+            signed_count = s.SignInRecords.Length > 2
+                ? (JsonSerializer.Deserialize<List<SignInRecord>>(s.SignInRecords) ?? new()).Count
+                : 0,
+            created_at = s.CreatedAt,
+            machine_uuid = s.MachineUuid
+        })
+        .ToListAsync();
+
+    return Results.Json(new { tasks });
+});
+
+/// <summary>
+/// POST /api/mobile/tasks/{id}/close - 关闭签到任务
+/// </summary>
+app.MapPost("/api/mobile/tasks/{id}/close", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var task = await db.SignInTasks.FindAsync(id);
+    if (task == null)
+        return Results.Json(new { error = "任务不存在" }, statusCode: 404);
+
+    task.Status = "closed";
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", message = "任务已关闭" });
+});
+
+/// <summary>
+/// DELETE /api/mobile/tasks/{id} - 删除签到任务及其打卡数据
+/// </summary>
+app.MapDelete("/api/mobile/tasks/{id}", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin" && role != "operator")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var task = await db.SignInTasks.FindAsync(id);
+    if (task == null)
+        return Results.Json(new { error = "任务不存在" }, statusCode: 404);
+
+    var taskId = $"signin_{task.ShortCode}";
+    db.AttendanceRecords.RemoveRange(
+        db.AttendanceRecords.Where(a => a.MachineUuid == task.MachineUuid && a.TaskId == taskId));
+    db.SignInTasks.Remove(task);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", message = "任务已删除" });
+});
+
+/// <summary>
+/// GET /api/mobile/students - 获取学生签到历史（学生端查看自己的签到记录）
+/// </summary>
+app.MapGet("/api/mobile/students/history", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+
+    // 查询该用户作为学生的签到记录（在所有签到任务中搜索）
+    var signInTasks = await db.SignInTasks.ToListAsync();
+    var history = new List<object>();
+
+    foreach (var task in signInTasks)
+    {
+        var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
+        var userRecord = records.FirstOrDefault(r => r.Name.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (userRecord != null)
+        {
+            history.Add(new
+            {
+                subject = task.Subject,
+                classroom = task.Classroom,
+                short_code = task.ShortCode,
+                time = userRecord.Time,
+                status = task.Status
+            });
+        }
+    }
+
+    return Results.Json(new
+    {
+        student_name = username,
+        total_checkins = history.Count,
+        history = history.OrderByDescending(h => ((dynamic)h).time).ToList()
+    });
 });
 
 app.Run();

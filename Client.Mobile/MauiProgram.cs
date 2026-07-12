@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
+using ZXing.Net.Maui.Controls;
 
 namespace CheckIn.Client.Mobile;
 
@@ -11,6 +12,7 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseMauiCommunityToolkit()
+            .UseBarcodeReader()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -21,19 +23,40 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        // Register services
-        builder.Services.AddSingleton<CheckIn.Client.Mobile.Services.ServerService>();
-        builder.Services.AddSingleton<CheckIn.Client.Mobile.ViewModels.MainViewModel>();
+        // ===== 核心服务（Singleton） =====
+        builder.Services.AddSingleton<Services.ApiService>();
+        builder.Services.AddSingleton<Services.AuthService>();
 
-        // Register ViewModels as transient
-        builder.Services.AddTransient<CheckIn.Client.Mobile.ViewModels.TaskTabViewModel>();
+        // ===== 保留旧的兼容服务 =====
+        builder.Services.AddSingleton<Services.ServerService>();
+        builder.Services.AddSingleton<ViewModels.MainViewModel>();
 
-        // Register pages
-        builder.Services.AddTransient<CheckIn.Client.Mobile.Pages.TaskListPage>();
-        builder.Services.AddTransient<CheckIn.Client.Mobile.Pages.TaskDetailPage>();
-        builder.Services.AddTransient<CheckIn.Client.Mobile.Pages.CreateSignInPage>();
-        builder.Services.AddTransient<CheckIn.Client.Mobile.Pages.StudentGridPage>();
-        builder.Services.AddTransient<CheckIn.Client.Mobile.Pages.SettingsPage>();
+        // ===== ViewModels（Transient） =====
+        builder.Services.AddTransient<ViewModels.LoginViewModel>();
+        builder.Services.AddTransient<ViewModels.AdminDashboardViewModel>();
+        builder.Services.AddTransient<ViewModels.AdminTasksViewModel>();
+        builder.Services.AddTransient<ViewModels.AdminUsersViewModel>();
+        builder.Services.AddTransient<ViewModels.QRCodeGenerateViewModel>();
+        builder.Services.AddTransient<ViewModels.StudentScanViewModel>();
+        builder.Services.AddTransient<ViewModels.TaskTabViewModel>();
+
+        // ===== Pages（Transient） =====
+        // 新页面
+        builder.Services.AddTransient<Pages.LoginPage>();
+        builder.Services.AddTransient<Pages.AdminDashboardPage>();
+        builder.Services.AddTransient<Pages.AdminTasksPage>();
+        builder.Services.AddTransient<Pages.AdminUsersPage>();
+        builder.Services.AddTransient<Pages.QRCodeGeneratePage>();
+        builder.Services.AddTransient<Pages.StudentScanPage>();
+        builder.Services.AddTransient<Pages.StudentHistoryPage>();
+        builder.Services.AddTransient<Pages.AttendanceDetailPage>();
+
+        // 保留旧页面兼容
+        builder.Services.AddTransient<Pages.TaskListPage>();
+        builder.Services.AddTransient<Pages.TaskDetailPage>();
+        builder.Services.AddTransient<Pages.CreateSignInPage>();
+        builder.Services.AddTransient<Pages.StudentGridPage>();
+        builder.Services.AddTransient<Pages.SettingsPage>();
 
         return builder.Build();
     }

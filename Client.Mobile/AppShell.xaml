@@ -4,37 +4,52 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:pages="clr-namespace:CheckIn.Client.Mobile.Pages"
-    xmlns:helpers="clr-namespace:CheckIn.Client.Mobile.Helpers"
-    Shell.FlyoutBehavior="{Binding FlyoutBehavior, Source={x:Static helpers:ResponsiveHelper.Instance}}"
-    Shell.FlyoutWidth="280">
+    Shell.FlyoutBehavior="Disabled"
+    Shell.NavBarHasShadow="True"
+    Shell.TabBarBackgroundColor="White"
+    Shell.TabBarTitleColor="#4285f4"
+    Shell.TabBarUnselectedColor="#888888">
 
-    <!-- Tablet layout: Flyout with side navigation -->
-    <FlyoutItem Title="首页" Icon="home_icon.png" FlyoutDisplayOptions="AsMultipleItems">
-        <ShellContent
-            Title="任务列表"
-            ContentTemplate="{DataTemplate pages:TaskListPage}"
-            Route="tasklist" />
-    </FlyoutItem>
+    <!-- 登录页（初始路由） -->
+    <ShellContent Route="login"
+                  ContentTemplate="{DataTemplate pages:LoginPage}"
+                  Shell.TabBarIsVisible="False"
+                  Shell.NavBarIsVisible="False" />
 
-    <FlyoutItem Title="设置" Icon="settings_icon.png">
-        <ShellContent
-            Title="设置"
-            ContentTemplate="{DataTemplate pages:SettingsPage}"
-            Route="settings" />
-    </FlyoutItem>
+    <!-- ==================== 管理员 TabBar ==================== -->
+    <TabBar x:Name="AdminTabs" Route="main">
+        <ShellContent Title="仪表盘"
+                      Icon="{OnPlatform Default='dashboard.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminDashboardPage}"
+                      Route="dashboard" />
+        <ShellContent Title="任务"
+                      Icon="{OnPlatform Default='tasks.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminTasksPage}"
+                      Route="tasks" />
+        <ShellContent Title="二维码"
+                      Icon="{OnPlatform Default='qrcode.png'}"
+                      ContentTemplate="{DataTemplate pages:QRCodeGeneratePage}"
+                      Route="qrcode" />
+        <ShellContent Title="用户"
+                      Icon="{OnPlatform Default='users.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminUsersPage}"
+                      Route="adminusers" />
+        <ShellContent Title="我的"
+                      Icon="{OnPlatform Default='profile.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentHistoryPage}"
+                      Route="profile" />
+    </TabBar>
 
-    <!-- TabBar for phone: bottom tabs -->
-    <TabBar x:Name="PhoneTabBar">
-        <ShellContent
-            Title="首页"
-            Icon="home_icon.png"
-            ContentTemplate="{DataTemplate pages:TaskListPage}"
-            Route="phonetasklist" />
-        <ShellContent
-            Title="设置"
-            Icon="settings_icon.png"
-            ContentTemplate="{DataTemplate pages:SettingsPage}"
-            Route="phonesettings" />
+    <!-- ==================== 学生端 TabBar ==================== -->
+    <TabBar x:Name="StudentTabs" Route="student">
+        <ShellContent Title="扫码签到"
+                      Icon="{OnPlatform Default='scan.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentScanPage}"
+                      Route="scan" />
+        <ShellContent Title="签到记录"
+                      Icon="{OnPlatform Default='history.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentHistoryPage}"
+                      Route="history" />
     </TabBar>
 
 </Shell>

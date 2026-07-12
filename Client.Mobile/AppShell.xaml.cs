@@ -1,37 +1,45 @@
+using CheckIn.Client.Mobile.Services;
+
 namespace CheckIn.Client.Mobile;
 
 public partial class AppShell : Shell
 {
-    public AppShell()
+    private readonly AuthService _auth;
+
+    public AppShell(AuthService auth)
     {
         InitializeComponent();
+        _auth = auth;
 
-        // Register routes for navigation
-        Routing.RegisterRoute("taskdetail", typeof(Pages.TaskDetailPage));
-        Routing.RegisterRoute("createsignin", typeof(Pages.CreateSignInPage));
-        Routing.RegisterRoute("studentgrid", typeof(Pages.StudentGridPage));
-
-        // Set responsive layout based on device
-        UpdateResponsiveLayout();
+        // 注册子页面路由
+        Routing.RegisterRoute("attendance", typeof(Pages.AttendanceDetailPage));
     }
 
-    public void UpdateResponsiveLayout()
+    /// <summary>
+    /// 根据用户角色切换显示的 TabBar
+    /// </summary>
+    public void SetRoleBasedTabs()
     {
-        var isTablet = Helpers.ResponsiveHelper.Instance.IsTablet;
-
-        // Toggle visibility based on device type
-        foreach (var item in Items)
+        if (_auth.IsAdmin)
         {
-            if (item is FlyoutItem fi)
-            {
-                fi.IsVisible = isTablet;
-            }
-            if (item is TabBar tb)
-            {
-                tb.IsVisible = !isTablet;
-            }
+            // 管理员：显示管理 TabBar
+            AdminTabs.IsVisible = true;
+            StudentTabs.IsVisible = false;
         }
+        else
+        {
+            // 学生：显示学生 TabBar
+            AdminTabs.IsVisible = false;
+            StudentTabs.IsVisible = true;
+        }
+    }
 
-        Shell.SetFlyoutBehavior(this, isTablet ? FlyoutBehavior.Locked : FlyoutBehavior.Disabled);
+    /// <summary>
+    /// 登出：返回登录页
+    /// </summary>
+    public async Task LogoutAsync()
+    {
+        _auth.Logout();
+        await GoToAsync("//login");
     }
 }

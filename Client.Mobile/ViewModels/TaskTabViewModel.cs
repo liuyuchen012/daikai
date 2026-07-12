@@ -159,6 +159,8 @@ public class TaskTabViewModel : BaseViewModel, IDisposable
     {
         TabId = tabId;
         _tabDir = Path.Combine(baseDir, "data", "tabs", tabId);
+        _dataFile = Path.Combine(_tabDir, "attendance.dat");
+        _nameFile = Path.Combine(_tabDir, "name.txt");
         _configFile = Path.Combine(_tabDir, "config.json");
 
         _globalServerIp = globalConfig.ServerIp;

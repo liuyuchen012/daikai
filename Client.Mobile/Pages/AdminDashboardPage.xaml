@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.AdminDashboardPage"
+             Title="仪表盘"
+             BackgroundColor="#f5f6fa">
+
+    <RefreshView IsRefreshing="{Binding IsLoading}" Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <VerticalStackLayout Padding="16" Spacing="16">
+
+                <!-- 统计卡片区 -->
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+
+                    <!-- 总设备 -->
+                    <Frame Grid.Row="0" Grid.Column="0" BackgroundColor="White"
+                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="总设备" FontSize="12" TextColor="#888888" />
+                            <Label Text="{Binding TotalDevices}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- 在线设备 -->
+                    <Frame Grid.Row="0" Grid.Column="1" BackgroundColor="#e6f4ea"
+                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="Transparent">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="在线设备" FontSize="12" TextColor="#34a853" />
+                            <Label Text="{Binding OnlineDevices}" FontSize="28" FontAttributes="Bold" TextColor="#34a853" />
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- 用户总数 -->
+                    <Frame Grid.Row="1" Grid.Column="0" BackgroundColor="White"
+                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="#e8e8e8">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="用户总数" FontSize="12" TextColor="#888888" />
+                            <Label Text="{Binding TotalUsers}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- 今日签到 -->
+                    <Frame Grid.Row="1" Grid.Column="1" BackgroundColor="#e8f0fe"
+                           CornerRadius="12" Padding="16" HasShadow="False" BorderColor="Transparent">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="今日签到" FontSize="12" TextColor="#4285f4" />
+                            <Label Text="{Binding TodayCheckins}" FontSize="28" FontAttributes="Bold" TextColor="#4285f4" />
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- 快捷操作 -->
+                    <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Text="任务管理"
+                                Command="{Binding NavigateToTasksCommand}"
+                                BackgroundColor="#4285f4" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                        <Button Grid.Column="1" Text="生成二维码"
+                                Command="{Binding NavigateToQRCodeCommand}"
+                                BackgroundColor="#34a853" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                        <Button Grid.Column="2" Text="用户管理"
+                                Command="{Binding NavigateToUsersCommand}"
+                                BackgroundColor="#ea4335" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                    </Grid>
+                </Grid>
+
+                <!-- 活跃签到任务 -->
+                <Label Text="活跃签到任务" FontSize="16" FontAttributes="Bold" TextColor="#333333" Margin="0,8,0,0" />
+                <CollectionView ItemsSource="{Binding ActiveTaskList}"
+                                HeightRequest="200">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无活跃任务" TextColor="#888888"
+                               HorizontalOptions="Center" Margin="0,20" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White" CornerRadius="10"
+                                   Padding="14" HasShadow="False" BorderColor="#e8e8e8"
+                                   Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                    <Label Text="{Binding Subject}" FontSize="15" FontAttributes="Bold"
+                                           TextColor="#333333" Grid.Row="0" Grid.Column="0" />
+                                    <Label Text="{Binding ProgressText}" FontSize="14"
+                                           TextColor="#4285f4" FontAttributes="Bold"
+                                           Grid.Row="0" Grid.Column="1" />
+                                    <Label Text="{Binding Classroom}" FontSize="12" TextColor="#888888"
+                                           Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" />
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 设备列表 -->
+                <Label Text="设备列表" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
+                <CollectionView ItemsSource="{Binding Devices}">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无设备" TextColor="#888888"
+                               HorizontalOptions="Center" Margin="0,20" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White" CornerRadius="10"
+                                   Padding="12" HasShadow="False" BorderColor="#e8e8e8"
+                                   Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Ellipse Grid.Column="0" WidthRequest="8" HeightRequest="8"
+                                             Fill="{Binding StatusColor}" VerticalOptions="Center" Margin="0,0,10,0" />
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" />
+                                        <Label Text="{Binding StatusText}" FontSize="11" TextColor="{Binding StatusColor}" />
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="2" Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
+                                           FontSize="12" TextColor="#888888" VerticalOptions="Center" />
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+
+</ContentPage>
