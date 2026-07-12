@@ -148,11 +148,6 @@ bool HasRole(HttpContext ctx, string[] roles)
 /// </summary>
 bool IsAdmin(HttpContext ctx) => HasRole(ctx, new[] { "admin" });
 
-/// <summary>
-/// 检查用户是否为管理员或操作员
-/// </summary>
-bool IsAdminOrOperator(HttpContext ctx) => HasRole(ctx, new[] { "admin", "operator" });
-
 // ---- Bearer Token 认证（用于移动端 API） ----
 // 复用现有的 HMAC Token 机制，但通过 Authorization: Bearer <token> 头传递
 
@@ -182,33 +177,6 @@ bool IsAdminOrOperator(HttpContext ctx) => HasRole(ctx, new[] { "admin", "operat
     }
 
     return (parts[0], parts[1], null);
-}
-
-/// <summary>
-/// 通过 Bearer Token 获取用户名
-/// </summary>
-string? GetBearerUsername(HttpContext ctx)
-{
-    var (username, _, error) = ParseBearerToken(ctx);
-    return error == null ? username : null;
-}
-
-/// <summary>
-/// 通过 Bearer Token 获取用户角色
-/// </summary>
-string? GetBearerUserRole(HttpContext ctx)
-{
-    var (_, role, error) = ParseBearerToken(ctx);
-    return error == null ? role : null;
-}
-
-/// <summary>
-/// 通过 Bearer Token 检查是否为管理员
-/// </summary>
-bool IsBearerAdmin(HttpContext ctx)
-{
-    var role = GetBearerUserRole(ctx);
-    return role == "admin";
 }
 
 /// <summary>
