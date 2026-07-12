@@ -16,21 +16,21 @@
   <circle cx="75" cy="75" r="65" fill="url(#bgGrad)" />
 
   <!-- 三条波浪线（半透明白色，由深到浅） -->
-  <path d="M20,60 C35,45 50,75 65,60 C80,45 95,75 110,60 C125,45 140,75 155,60" 
+  <path d="M20,60 C35,45 50,75 65,60 C80,45 95,75 110,60 C125,45 140,75 155,60"
         fill="none" stroke="white" stroke-width="3" opacity="0.2" stroke-linecap="round"/>
-  <path d="M20,75 C35,60 50,90 65,75 C80,60 95,90 110,75 C125,60 140,90 155,75" 
+  <path d="M20,75 C35,60 50,90 65,75 C80,60 95,90 110,75 C125,60 140,90 155,75"
         fill="none" stroke="white" stroke-width="4" opacity="0.5" stroke-linecap="round"/>
-  <path d="M20,90 C35,75 50,105 65,90 C80,75 95,105 110,90 C125,75 140,105 155,90" 
+  <path d="M20,90 C35,75 50,105 65,90 C80,75 95,105 110,90 C125,75 140,105 155,90"
         fill="none" stroke="white" stroke-width="3" opacity="0.2" stroke-linecap="round"/>
 
   <!-- 对勾（签到） -->
-  <path d="M48,72 L66,90 L102,52" 
+  <path d="M48,72 L66,90 L102,52"
         fill="none" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- 项目名称 -->
-  <text x="160" y="85" 
-        font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+  <text x="160" y="85"
+        font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         font-size="44" font-weight="700" fill="url(#textGrad)">
-    SignWave
+    AgoraIn
   </text>
 </svg>

@@ -1,4 +1,4 @@
-# SignWave 集控平台 - 服务器 API 文档
+# AgoraIn 集控平台 - 服务器 API 文档
 
 ## 目录
 
@@ -9,18 +9,20 @@
 - [5. API 接口一览](#5-api-接口一览)
 - [6. 客户端 API 详解](#6-客户端-api-详解)
 - [7. Web 面板 API 详解](#7-web-面板-api-详解)
-- [8. 认证页面接口](#8-认证页面接口)
-- [9. Web 管理面板页面](#9-web-管理面板页面)
-- [10. 调用示例](#10-调用示例)
+- [8. 签到功能 API 详解（V2.7）](#8-签到功能-api-详解v27-新增)
+- [9. 认证页面接口](#9-认证页面接口)
+- [10. Web 管理面板页面](#10-web-管理面板页面)
+- [11. 调用示例](#11-调用示例)
 
 ---
 
 ## 1. 概述
 
-SignWave 集控平台是一个轻量级的 **学生打卡管理系统** 服务器，基于 ASP.NET Core Minimal API 构建。提供以下能力：
+AgoraIn 集控平台是一个轻量级的 **学生打卡管理系统** 服务器，基于 ASP.NET Core Minimal API 构建。提供以下能力：
 
 - **客户端管理**：设备注册、RSA 签名验证、打卡数据同步
 - **Web 管理面板**：可视化设备管理、打卡排名查看、远程打卡操作
+- **远程签到**：教师创建签到任务生成短链，学生通过浏览器扫码签到
 - **Session 认证**：基于 HMAC-SHA256 签名 Cookie 的安全会话管理
 
 ### 技术栈
@@ -58,7 +60,7 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
   "Port": 5250,
   "AdminUsername": "admin",
   "AdminPassword": "admin",
-  "ServerName": "SignWave 集控平台",
+  "ServerName": "AgoraIn 集控平台",
   "ServerPassword": "admin123"
 }
 ```
@@ -68,7 +70,7 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
 | `Port` | int | `5250` | 服务器监听端口 |
 | `AdminUsername` | string | `admin` | Web 管理面板登录用户名 |
 | `AdminPassword` | string | `admin` | Web 管理面板登录密码 |
-| `ServerName` | string | `SignWave 集控平台` | 显示在 Web 页面标题栏的名称 |
+| `ServerName` | string | `AgoraIn 集控平台` | 显示在 Web 页面标题栏的名称 |
 | `ServerPassword` | string | `admin123` | 客户端 API 调用的共享密钥 |
 
 ---
@@ -103,6 +105,7 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | `/login` | 不需要 |
 | `/logout` | 不需要 |
 | `/static` | 不需要 |
+| `/s/*` | 不需要（公开的学生签到页面） |
 | 其他所有路径 | **需要登录** |
 
 ---
@@ -132,6 +135,23 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | `UpdatedAt` | string | 更新时间（ISO 8601 格式） |
 
 > **索引**：`MachineUuid` 单列索引 + `(MachineUuid, TaskId)` 复合索引，优化查询性能。
+
+#### SignInTaskEntity（签到任务表）※ V2.7 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Id` | int | 主键，自增 |
+| `ShortCode` | string(16) | 短链码（6 位字母数字混合），唯一索引 |
+| `MachineUuid` | string(64) | 创建该任务的设备 UUID |
+| `Password` | string | 签到密码（学生签到需输入） |
+| `Classroom` | string | 教室名称 |
+| `Subject` | string | 科目名称 |
+| `StudentList` | string | 学生名单 JSON 数组（如 `["张三","李四"]`） |
+| `SignInRecords` | string | 签到记录 JSON 数组（`List<SignInRecord>`） |
+| `CreatedAt` | string | 创建时间（ISO 8601 格式） |
+| `Status` | string | 任务状态：`active`（进行中）/ `closed`（已关闭） |
+
+> **索引**：`ShortCode` 唯一索引（快速查找签到页面）+ `MachineUuid` 索引（按设备查询任务列表）。
 
 ### 4.2 业务数据模型
 
@@ -179,6 +199,22 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | `Z` | int | `6` | 按钮网格行数 |
 | `L` | int | `6` | 按钮网格列数 |
 
+#### SignInRecord（签到记录）※ V2.7 新增
+
+```json
+{
+  "Name": "张三",
+  "Time": "2026-07-11 09:30:00",
+  "Device": "192.168.1.100"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Name` | string | 签到学生姓名 |
+| `Time` | string | 签到时间（`yyyy-MM-dd HH:mm:ss`） |
+| `Device` | string | 签到设备标识（客户端 IP 地址） |
+
 ---
 
 ## 5. API 接口一览
@@ -197,6 +233,12 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | POST | `/api/delete_machine` | Web面板删除设备 | 密码 |
 | POST | `/api/web_punch` | Web面板远程打卡 | 密码 |
 | POST | `/api/web_cancel_punch` | Web面板取消打卡 | 密码 |
+| POST | `/api/create_signin` | ※ 客户端创建签到任务 | 密码+RSA签名 |
+| POST | `/api/signin_result` | ※ 客户端拉取签到结果 | 密码+challenge签名 |
+| GET | `/s/{shortCode}` | ※ 学生签到页面（HTML表单） | 无需认证 |
+| POST | `/s/{shortCode}` | ※ 学生提交签到 | 无需认证 |
+
+> ※ 标记为 V2.7 新增的签到功能接口。
 
 ---
 
@@ -840,9 +882,266 @@ POST /api/web_cancel_punch
 
 ---
 
-## 8. 认证页面接口
+## 8. 签到功能 API 详解（V2.7 新增）
 
-### 8.1 登录页面
+### 8.1 创建签到任务
+
+```
+POST /api/create_signin
+```
+
+**用途**：教师客户端创建远程签到任务，服务器生成 6 位短链码供学生访问。同时会在 Attendance 表中创建对应的任务记录。
+
+**请求体**（JSON）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `password` | string | 是 | 服务器共享密钥 |
+| `uuid` | string | 是 | 设备 UUID |
+| `sign_password` | string | 是 | 学生签到密码 |
+| `classroom` | string | 是 | 教室名称 |
+| `subject` | string | 是 | 科目名称 |
+| `students` | string[] | 是 | 学生姓名列表 JSON 数组 |
+
+**请求示例**：
+
+```json
+{
+  "password": "admin123",
+  "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "sign_password": "math2024",
+  "classroom": "301教室",
+  "subject": "数学",
+  "students": ["张三", "李四", "王五"]
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "short_code": "k7mx9q",
+  "task_id": "signin_k7mx9q"
+}
+```
+> HTTP Status: 200
+
+| 响应字段 | 类型 | 说明 |
+|----------|------|------|
+| `short_code` | string | 6 位短链码（字母数字混合，不含 0/O/1/l） |
+| `task_id` | string | 签到任务 ID，格式 `signin_{shortCode}` |
+
+**签到链接**：`http://{服务器IP}:{端口}/s/{short_code}`
+
+**错误响应**：
+
+| 错误内容 | HTTP Status | 触发条件 |
+|----------|-------------|----------|
+| `{"error":"invalid password"}` | 403 | 密码错误 |
+| `{"error":"unknown machine"}` | 403 | UUID 对应的设备不存在 |
+
+**工作原理**：
+
+1. 验证密码和设备是否存在
+2. 使用 `RNGCryptoServiceProvider` 生成 6 位随机短链码（排除易混淆字符 0/O/1/l），确保全局唯一
+3. 创建 `SignInTaskEntity` 记录，状态设为 `active`
+4. 在 `AttendanceRecords` 表中创建对应任务记录（初始化为学生名单字典）
+5. 更新设备 `LastSeen` 时间
+
+**调用示例**：
+
+```bash
+curl -X POST http://localhost:5250/api/create_signin \
+  -H "Content-Type: application/json" \
+  -d '{"password":"admin123","uuid":"a1b2c3d4-...","sign_password":"math2024","classroom":"301教室","subject":"数学","students":["张三","李四","王五"]}'
+```
+
+---
+
+### 8.2 拉取签到结果
+
+```
+POST /api/signin_result
+```
+
+**用途**：客户端轮询拉取该设备下所有活跃签到任务的签到记录（含 challenge-签名验证）。
+
+**请求体**（JSON）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `password` | string | 是 | 服务器共享密钥 |
+| `uuid` | string | 是 | 设备 UUID |
+| `challenge` | string | 是 | 随机挑战字符串 |
+| `signature` | string | 是 | 对 challenge 的 RSA SHA256 签名（Base64） |
+| `task_id` | string | 否 | 任务 ID（未使用该字段，返回设备下所有签到任务） |
+
+**请求示例**：
+
+```json
+{
+  "password": "admin123",
+  "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "challenge": "random_challenge_string_12345",
+  "signature": "Base64签名..."
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "tasks": [
+    {
+      "short_code": "k7mx9q",
+      "task_id": "signin_k7mx9q",
+      "classroom": "301教室",
+      "subject": "数学",
+      "student_list": ["张三", "李四", "王五"],
+      "records": [
+        {
+          "Name": "张三",
+          "Time": "2026-07-11 09:30:00",
+          "Device": "192.168.1.100"
+        },
+        {
+          "Name": "李四",
+          "Time": "2026-07-11 09:31:15",
+          "Device": "192.168.1.101"
+        }
+      ]
+    }
+  ]
+}
+```
+
+| 响应字段 | 类型 | 说明 |
+|----------|------|------|
+| `tasks[]` | array | 该设备下所有活跃签到任务 |
+| `tasks[].short_code` | string | 短链码 |
+| `tasks[].task_id` | string | 签到任务 ID |
+| `tasks[].classroom` | string | 教室名称 |
+| `tasks[].subject` | string | 科目名称 |
+| `tasks[].student_list` | string[] | 学生名单 |
+| `tasks[].records[]` | array | 签到记录列表 |
+| `tasks[].records[].Name` | string | 签到学生姓名 |
+| `tasks[].records[].Time` | string | 签到时间 |
+| `tasks[].records[].Device` | string | 签到设备 IP |
+
+**错误响应**：
+
+| 错误内容 | HTTP Status | 触发条件 |
+|----------|-------------|----------|
+| `{"error":"invalid password"}` | 403 | 密码错误 |
+| `{"error":"unknown machine"}` | 403 | UUID 不存在 |
+| `{"error":"invalid signature"}` | 403 | challenge 签名验证失败 |
+
+**调用示例**：
+
+```bash
+CHALLENGE="random_challenge_$(date +%s)"
+SIG=$(echo -n "$CHALLENGE" | openssl dgst -sha256 -sign private.pem | base64 -w0)
+
+curl -X POST http://localhost:5250/api/signin_result \
+  -H "Content-Type: application/json" \
+  -d "{\"password\":\"admin123\",\"uuid\":\"a1b2c3d4-...\",\"challenge\":\"$CHALLENGE\",\"signature\":\"$SIG\"}"
+```
+
+---
+
+### 8.3 学生签到页面
+
+```
+GET /s/{shortCode}
+```
+
+**用途**：学生通过浏览器访问短链，显示签到表单页面。
+
+**路径参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `shortCode` | string | 6 位短链码 |
+
+**响应**：`text/html` - 签到表单页面
+
+**页面内容**：
+
+- 任务标题（科目 + 教室）
+- 三个表单字段：姓名、教室、签到密码
+- 提交按钮
+- 错误/成功提示消息（通过查询参数或服务端渲染）
+
+**特殊处理**：
+
+- 任务不存在时显示"签到任务不存在或已过期"
+- 任务已关闭（Status 非 active）显示"该签到任务已关闭"
+- 同一设备已签到（检测 Cookie `si_dev_{shortCode}`）显示"您已签到成功，无需重复签到"
+
+**调用方式**：浏览器访问 `http://localhost:5250/s/k7mx9q`
+
+---
+
+### 8.4 提交签到
+
+```
+POST /s/{shortCode}
+```
+
+**用途**：学生提交签到表单，记录签到信息。
+
+**路径参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `shortCode` | string | 6 位短链码 |
+
+**请求格式**：HTML Form 表单（`application/x-www-form-urlencoded`）
+
+**表单字段**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 学生姓名 |
+| `classroom` | string | 是 | 教室（需与创建时一致） |
+| `password` | string | 是 | 签到密码 |
+
+**成功响应**：签到成功页面，显示"签到成功！{姓名} 于 {时间} 完成签到"，并设置 Cookie `si_dev_{shortCode}=1`（30 天有效，HttpOnly，SameSite=Strict，Path=`/s/{shortCode}`）。
+
+**错误情况**：
+
+| 错误消息 | 触发条件 |
+|----------|----------|
+| 请输入姓名 / 请输入教室 / 请输入签到密码 | 必填字段为空 |
+| 签到密码错误 | 密码不匹配 |
+| 您不在该签到任务的学生名单中 | 姓名不在 StudentList 中 |
+| 该姓名已签到，请勿重复签到 | 同一姓名已存在签到记录 |
+| 签到任务不存在或已过期 | shortCode 无效 |
+| 该签到任务已关闭 | Status 不是 active |
+
+**工作原理**：
+
+1. 查找 shortCode 对应的签到任务
+2. 验证任务状态和必填字段
+3. 验证签到密码
+4. 检查学生是否在名单中
+5. 检查该姓名是否已签到（防止重复签到）
+6. 记录签到（姓名、时间、设备 IP）到 `SignInRecords`
+7. 同步更新 `AttendanceRecords` 表中的对应学生数据（设置 FirstTime、增加 Count、追加 History）
+8. 设置设备 Cookie 防止同一终端重复签到
+
+**调用示例**：
+
+```bash
+curl -X POST http://localhost:5250/s/k7mx9q \
+  -d "name=张三&classroom=301教室&password=math2024"
+```
+
+---
+
+## 9. 认证页面接口
+
+### 9.1 登录页面
 
 ```
 GET /login
@@ -855,7 +1154,7 @@ GET /login
 **调用方式**：浏览器直接访问 `http://localhost:5250/login`
 
 
-### 8.2 提交登录
+### 9.2 提交登录
 
 ```
 POST /login
@@ -889,7 +1188,7 @@ curl -X POST http://localhost:5250/login \
 ```
 
 
-### 8.3 退出登录
+### 9.3 退出登录
 
 ```
 GET /logout
@@ -903,11 +1202,11 @@ GET /logout
 
 ---
 
-## 9. Web 管理面板页面
+## 10. Web 管理面板页面
 
 以下页面在浏览器中展示，**需要先登录**才能访问。
 
-### 9.1 首页 - 设备总览
+### 10.1 首页 - 设备总览
 
 ```
 GET /
@@ -920,7 +1219,7 @@ GET /
 - 顶部统计卡片：设备总数、在线设备数、离线设备数
 - 设备列表表格：设备名称（文件夹图标）、在线状态徽章、任务数、最后在线时间、操作按钮（查看/删除）
 
-### 9.2 设备详情页
+### 10.2 设备详情页
 
 ```
 GET /machine/{uuid}
@@ -940,7 +1239,7 @@ GET /machine/{uuid}
 - 设备名称、在线状态、编辑配置按钮、删除设备按钮
 - 任务卡片网格：任务图标、任务名称、总人数/已打卡统计、最后更新时间
 
-### 9.3 任务详情页
+### 10.3 任务详情页
 
 ```
 GET /machine/{uuid}/task/{taskId}
@@ -965,9 +1264,9 @@ GET /machine/{uuid}/task/{taskId}
 
 ---
 
-## 10. 调用示例
+## 11. 调用示例
 
-### 10.1 完整的客户端工作流
+### 11.1 完整的客户端工作流
 
 ```
 ┌─────────┐                              ┌─────────┐
@@ -1004,7 +1303,46 @@ GET /machine/{uuid}/task/{taskId}
      │                                        │
 ```
 
-### 10.2 使用 PowerShell 调用
+### 11.2 签到工作流（V2.7 新增）
+
+```
+┌─────────┐           ┌─────────┐           ┌─────────┐
+│  教师    │           │ Server  │           │  学生    │
+│  Client  │           │         │           │ Browser │
+└────┬─────┘           └────┬────┘           └────┬────┘
+     │                      │                     │
+     │ 1. POST create_signin│                     │
+     │ (uuid+pwd+classroom) │                     │
+     │ ───────────────────> │                     │
+     │                      │                     │
+     │  返回 short_code     │                     │
+     │ <─────────────────── │                     │
+     │                      │                     │
+     │ (显示二维码和链接)    │                     │
+     │                      │                     │
+     │                      │  2. GET /s/{code}   │
+     │                      │ <────────────────── │
+     │                      │                     │
+     │                      │  签到表单 HTML       │
+     │                      │ ──────────────────> │
+     │                      │                     │
+     │                      │  3. POST /s/{code}  │
+     │                      │ (name+classroom+pwd)│
+     │                      │ <────────────────── │
+     │                      │                     │
+     │                      │  签到成功页面        │
+     │                      │ ──────────────────> │
+     │                      │                     │
+     │ 4. POST signin_result│                     │
+     │ (challenge+sig)      │                     │
+     │ ───────────────────> │                     │
+     │                      │                     │
+     │  返回签到记录列表     │                     │
+     │ <─────────────────── │                     │
+     │                      │                     │
+```
+
+### 11.3 使用 PowerShell 调用
 
 ```powershell
 $ServerUrl = "http://localhost:5250"
@@ -1029,7 +1367,7 @@ Write-Host "注册成功，UUID: $Uuid"
 Invoke-RestMethod -Uri "$ServerUrl/api/machines/$Uuid/tasks" | ConvertTo-Json
 ```
 
-### 10.3 使用 Python 调用
+### 11.4 使用 Python 调用
 
 ```python
 import requests
@@ -1064,5 +1402,5 @@ print(resp.json())
 
 ---
 
-> **文档版本**：对应 CheckIn.Net V2.6 分支
+> **文档版本**：对应 CheckIn.Net V2.7 分支
 > **最后更新**：2026-07-11

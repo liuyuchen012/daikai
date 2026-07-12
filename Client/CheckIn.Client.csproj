@@ -7,8 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>icon.ico</ApplicationIcon>
-    <AssemblyName>SignWave</AssemblyName>
-    <Product>SignWave</Product>
+    <AssemblyName>AgoraIn</AssemblyName>
+    <Product>AgoraIn</Product>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="SharpVectors" Version="1.8.4" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <ItemGroup>

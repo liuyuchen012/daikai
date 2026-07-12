@@ -38,6 +38,33 @@ public class AttendanceEntity
 }
 
 /// <summary>
+/// 签到任务实体：存储教师创建的远程签到任务，学生通过短链页面签到
+/// </summary>
+public class SignInTaskEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>短链码（6-8位随机字符），作为签到页面路径标识</summary>
+    public string ShortCode { get; set; } = string.Empty;
+    /// <summary>创建该任务的设备 UUID</summary>
+    public string MachineUuid { get; set; } = string.Empty;
+    /// <summary>签到密码（学生签到需要输入）</summary>
+    public string Password { get; set; } = string.Empty;
+    /// <summary>教室名称</summary>
+    public string Classroom { get; set; } = string.Empty;
+    /// <summary>科目名称</summary>
+    public string Subject { get; set; } = string.Empty;
+    /// <summary>学生名单 JSON 数组（从 CSV 导入的学生姓名列表）</summary>
+    public string StudentList { get; set; } = "[]";
+    /// <summary>签到记录 JSON 数组（格式：[{name, time}]）</summary>
+    public string SignInRecords { get; set; } = "[]";
+    /// <summary>创建时间（ISO 8601 格式）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+    /// <summary>任务状态：active（进行中）/ closed（已关闭）</summary>
+    public string Status { get; set; } = "active";
+}
+
+/// <summary>
 /// 应用程序数据库上下文，使用 SQLite 存储设备信息和打卡记录
 /// </summary>
 public class AppDbContext : DbContext
@@ -48,6 +75,8 @@ public class AppDbContext : DbContext
     public DbSet<MachineEntity> Machines => Set<MachineEntity>();
     /// <summary>打卡记录表</summary>
     public DbSet<AttendanceEntity> AttendanceRecords => Set<AttendanceEntity>();
+    /// <summary>签到任务表</summary>
+    public DbSet<SignInTaskEntity> SignInTasks => Set<SignInTaskEntity>();
 
     /// <summary>
     /// 配置实体映射：设置主键、字段长度限制和索引
@@ -69,6 +98,16 @@ public class AppDbContext : DbContext
             e.Property(a => a.TaskId).HasMaxLength(64);
             e.HasIndex(a => a.MachineUuid);                       // 按设备查询索引
             e.HasIndex(a => new { a.MachineUuid, a.TaskId });     // 按设备+任务复合索引
+        });
+
+        // 签到任务实体配置
+        modelBuilder.Entity<SignInTaskEntity>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.ShortCode).HasMaxLength(16);
+            e.Property(s => s.MachineUuid).HasMaxLength(64);
+            e.HasIndex(s => s.ShortCode).IsUnique();              // 短链码唯一索引
+            e.HasIndex(s => s.MachineUuid);                       // 按设备查询索引
         });
     }
 }
