@@ -1,7 +1,6 @@
 <Solution>
   <Folder Name="/Client/">
     <Project Path="Client/CheckIn.Client.csproj" />
-    <Project Path="Client.Maui/AgoraIn.Client.Maui.csproj" />
     <Project Path="Client.Mobile/AgoraIn.Client.Mobile.csproj" />
   </Folder>
   <Folder Name="/Server/">
