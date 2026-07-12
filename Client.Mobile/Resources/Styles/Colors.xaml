@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Material Design 3 Primary Colors -->
+    <Color x:Key="Primary">#4285f4</Color>
+    <Color x:Key="PrimaryDark">#3367d6</Color>
+    <Color x:Key="PrimaryLight">#669df6</Color>
+    <Color x:Key="OnPrimary">#FFFFFF</Color>
+
+    <!-- Surface Colors -->
+    <Color x:Key="Surface">#FFFFFF</Color>
+    <Color x:Key="SurfaceVariant">#f5f5f5</Color>
+    <Color x:Key="SurfaceContainer">#f8f9fa</Color>
+
+    <!-- Background -->
+    <Color x:Key="Background">#f0f2f5</Color>
+    <Color x:Key="BackgroundLight">#ffffff</Color>
+
+    <!-- Text Colors -->
+    <Color x:Key="TextPrimary">#333333</Color>
+    <Color x:Key="TextSecondary">#666666</Color>
+    <Color x:Key="TextTertiary">#888888</Color>
+    <Color x:Key="TextOnPrimary">#FFFFFF</Color>
+
+    <!-- Status Colors -->
+    <Color x:Key="Success">#34a853</Color>
+    <Color x:Key="Error">#ea4335</Color>
+    <Color x:Key="Warning">#fbbc04</Color>
+
+    <!-- Card -->
+    <Color x:Key="CardBackground">#FFFFFF</Color>
+    <Color x:Key="CardBorder">#e8e8e8</Color>
+
+    <!-- Divider -->
+    <Color x:Key="Divider">#e0e0e0</Color>
+
+    <!-- Button -->
+    <Color x:Key="ButtonCheckedIn">#4285f4</Color>
+    <Color x:Key="ButtonNotChecked">#e8e8e8</Color>
+    <Color x:Key="ButtonDisabled">#cccccc</Color>
+
+    <!-- Rank Colors -->
+    <Color x:Key="RankGold">#FFD700</Color>
+    <Color x:Key="RankSilver">#C0C0C0</Color>
+    <Color x:Key="RankBronze">#CD7F32</Color>
+
+    <!-- Gray Scale -->
+    <Color x:Key="Gray50">#FAFAFA</Color>
+    <Color x:Key="Gray100">#F5F5F5</Color>
+    <Color x:Key="Gray200">#EEEEEE</Color>
+    <Color x:Key="Gray300">#E0E0E0</Color>
+    <Color x:Key="Gray400">#BDBDBD</Color>
+    <Color x:Key="Gray500">#9E9E9E</Color>
+    <Color x:Key="Gray600">#757575</Color>
+    <Color x:Key="Gray900">#212121</Color>
+
+</ResourceDictionary>

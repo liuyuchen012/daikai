@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             xmlns:helpers="clr-namespace:CheckIn.Client.Mobile.Helpers"
+             x:Class="CheckIn.Client.Mobile.Pages.TaskListPage"
+             Title="AgoraIn"
+             Shell.NavBarIsVisible="True">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto" Padding="0,0,8,0">
+            <Label Grid.Column="0"
+                   Text="AgoraIn"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="+"
+                    FontSize="24"
+                    FontAttributes="Bold"
+                    TextColor="White"
+                    BackgroundColor="Transparent"
+                    BorderWidth="0"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    Clicked="OnAddTaskClicked"
+                    VerticalOptions="Center" />
+        </Grid>
+    </Shell.TitleView>
+
+    <Grid RowDefinitions="*" Padding="0">
+
+        <!-- Pull to refresh task list -->
+        <RefreshView x:Name="TaskRefreshView"
+                     IsRefreshing="{Binding IsBusy}"
+                     Refreshing="OnRefreshing">
+
+            <!-- Phone layout: vertical list -->
+            <CollectionView ItemsSource="{Binding AllTasks}"
+                            x:Name="PhoneTaskList"
+                            SelectionMode="Single"
+                            SelectionChanged="OnTaskSelected">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TaskTabViewModel">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems>
+                                    <SwipeItem Text="Delete"
+                                               BackgroundColor="#ea4335"
+                                               Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteTabCommand}"
+                                               CommandParameter="{Binding .}" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+
+                            <!-- Task Card -->
+                            <Frame Style="{StaticResource TaskCardFrame}" Margin="16,6">
+                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="6">
+                                    <!-- Task Name -->
+                                    <Label Grid.Row="0" Grid.Column="0"
+                                           Text="{Binding TabDisplayName}"
+                                           FontSize="18"
+                                           FontAttributes="Bold"
+                                           TextColor="{StaticResource TextPrimary}" />
+
+                                    <!-- Online Status Badge -->
+                                    <Frame Grid.Row="0" Grid.Column="1"
+                                           Style="{StaticResource StatusBadgeOnline}"
+                                           IsVisible="{Binding IsOnline}">
+                                        <Label Text="Online"
+                                               FontSize="10"
+                                               TextColor="White"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
+                                    </Frame>
+                                    <Frame Grid.Row="0" Grid.Column="1"
+                                           Style="{StaticResource StatusBadgeOffline}"
+                                           IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}">
+                                        <Label Text="Offline"
+                                               FontSize="10"
+                                               TextColor="White"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
+                                    </Frame>
+
+                                    <!-- Student count -->
+                                    <Label Grid.Row="1" Grid.Column="0"
+                                           Text="{Binding PunchInfo}"
+                                           FontSize="13"
+                                           TextColor="{StaticResource TextSecondary}" />
+
+                                    <!-- Last check time -->
+                                    <Label Grid.Row="2" Grid.Column="0"
+                                           Grid.ColumnSpan="2"
+                                           FontSize="11"
+                                           TextColor="{StaticResource TextTertiary}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="Last sync: " />
+                                                <Span Text="{Binding LastCheck}" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+
+                                    <!-- Arrow indicator -->
+                                    <Label Grid.Row="1" Grid.Column="1"
+                                           Grid.RowSpan="2"
+                                           Text=">"
+                                           FontSize="20"
+                                           TextColor="{StaticResource Gray400}"
+                                           VerticalOptions="Center" />
+                                </Grid>
+                            </Frame>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <!-- Empty state -->
+                <CollectionView.EmptyView>
+                    <StackLayout VerticalOptions="Center" HorizontalOptions="Center" Padding="40">
+                        <Label Text="No Tasks Yet"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Gray400}"
+                               HorizontalOptions="Center" />
+                        <Label Text="Tap + to create your first check-in task"
+                               FontSize="14"
+                               TextColor="{StaticResource Gray400}"
+                               HorizontalOptions="Center"
+                               Margin="0,8,0,0" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+
+</ContentPage>

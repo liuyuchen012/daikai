@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             xmlns:models="clr-namespace:CheckIn.Client.Mobile.Models"
+             x:Class="CheckIn.Client.Mobile.Pages.StudentGridPage"
+             Title="Student Check-In"
+             Shell.NavBarIsVisible="True">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto" Padding="0,0,4,0">
+            <Label Grid.Column="0"
+                   Text="{Binding Title}"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   VerticalOptions="Center"
+                   LineBreakMode="TailTruncation" />
+            <ImageButton Grid.Column="1"
+                         WidthRequest="32"
+                         HeightRequest="32"
+                         Command="{Binding SyncToServerCommand}"
+                         BackgroundColor="Transparent">
+                <ImageButton.Source>
+                    <FontImageSource Glyph="&#x21bb;"
+                                     FontFamily="OpenSansRegular"
+                                     Size="20"
+                                     Color="White" />
+                </ImageButton.Source>
+            </ImageButton>
+        </Grid>
+    </Shell.TitleView>
+
+    <Grid RowDefinitions="Auto,*" Padding="0">
+
+        <!-- Stats bar -->
+        <Frame Grid.Row="0" BackgroundColor="#e8f0fe" CornerRadius="0" Padding="16,10" HasShadow="False">
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0"
+                       Text="{Binding PunchInfo}"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource Primary}"
+                       VerticalOptions="Center" />
+                <Frame Grid.Column="1"
+                       Style="{StaticResource StatusBadgeOnline}"
+                       IsVisible="{Binding IsOnline}"
+                       VerticalOptions="Center">
+                    <Label Text="Online" FontSize="10" TextColor="White"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Frame>
+                <Frame Grid.Column="1"
+                       Style="{StaticResource StatusBadgeOffline}"
+                       IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}"
+                       VerticalOptions="Center">
+                    <Label Text="Offline" FontSize="10" TextColor="White"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Frame>
+            </Grid>
+        </Frame>
+
+        <!-- Student Grid -->
+        <ScrollView Grid.Row="1">
+            <FlexLayout x:Name="StudentGrid"
+                        Wrap="Wrap"
+                        JustifyContent="Center"
+                        AlignItems="Start"
+                        BindableLayout.ItemsSource="{Binding Students}"
+                        Padding="12,8" />
+        </ScrollView>
+
+    </Grid>
+
+</ContentPage>

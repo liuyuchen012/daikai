@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Maui.Pages.SignInResultPage"
+             Title="签到结果"
+             BackgroundColor="#F0F2F5">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16" MaximumWidthRequest="500">
+
+            <!-- Success Header -->
+            <Border WidthRequest="64" HeightRequest="64"
+                    StrokeShape="RoundRectangle 32"
+                    BackgroundColor="#34a853"
+                    HorizontalOptions="Center" Margin="0,20,0,0">
+                <Label Text="&#x2713;" FontSize="32" TextColor="White"
+                       HorizontalOptions="Center" VerticalOptions="Center" />
+            </Border>
+
+            <Label Text="签到创建成功" FontSize="22" FontAttributes="Bold"
+                   TextColor="#333333" HorizontalOptions="Center" />
+
+            <Label Text="学生可通过以下链接进入签到页面"
+                   FontSize="14" TextColor="#999999"
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center" />
+
+            <!-- QR Code Placeholder -->
+            <Border BackgroundColor="#FFFFFF" Stroke="#E8E8E8" StrokeThickness="1"
+                    StrokeShape="RoundRectangle 12" Padding="24"
+                    HorizontalOptions="Center">
+                <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Image x:Name="QrImage" WidthRequest="160" HeightRequest="160"
+                           HorizontalOptions="Center" />
+                    <Label x:Name="QrPlaceholder" Text="[二维码]"
+                           FontSize="14" TextColor="#CCCCCC"
+                           HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- URL -->
+            <Border BackgroundColor="#F5F5F5" Padding="12,8"
+                    StrokeShape="RoundRectangle 8">
+                <Label x:Name="SignUrlLabel" FontSize="12"
+                       TextColor="#4285f4"
+                       HorizontalTextAlignment="Center" />
+            </Border>
+
+            <!-- Actions -->
+            <HorizontalStackLayout Spacing="16" HorizontalOptions="Center">
+                <Button Text="复制链接" BackgroundColor="#4285f4" TextColor="White"
+                        CornerRadius="6" HeightRequest="40" WidthRequest="120"
+                        FontSize="13" Clicked="OnCopyLinkClicked" />
+                <Button Text="关闭" BackgroundColor="#F0F0F0" TextColor="#666666"
+                        CornerRadius="6" HeightRequest="40" WidthRequest="120"
+                        FontSize="13" Clicked="OnCloseClicked" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

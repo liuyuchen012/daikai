@@ -9,8 +9,15 @@ using System.Web;
 
 // =============================================================================
 // AgoraIn 集控平台 - 服务器端入口
-// 功能：设备注册与管理、打卡数据同步、Web 管理面板（含登录认证）
+// 功能：设备注册与管理、打卡数据同步、Web 管理面板（含多用户登录认证和权限管理）
 // =============================================================================
+
+// ---- SHA256 哈希辅助方法 ----
+string Sha256(string input)
+{
+    var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+    return Convert.ToHexString(bytes).ToLower();
+}
 
 // ---- 加载服务器配置文件 config.json ----
 var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
@@ -19,8 +26,6 @@ if (!File.Exists(configPath))
 
 var configJson = File.Exists(configPath) ? JsonDocument.Parse(File.ReadAllText(configPath)).RootElement : default;
 var cfgPort = configJson.TryGetProperty("Port", out var p) ? p.GetInt32() : 5250;
-var cfgAdminUser = configJson.TryGetProperty("AdminUsername", out var au) ? au.GetString() ?? "admin" : "admin";
-var cfgAdminPwd = configJson.TryGetProperty("AdminPassword", out var ap) ? ap.GetString() ?? "admin" : "admin";
 var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "AgoraIn 集控平台" : "AgoraIn 集控平台";
 var serverPassword = configJson.TryGetProperty("ServerPassword", out var sp) ? sp.GetString() ?? "admin123" : "admin123";
 
@@ -38,6 +43,33 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // ---- 从 config.json 种子用户数据（仅在 Users 表为空时） ----
+    if (!db.Users.Any() && configJson.TryGetProperty("Users", out var usersArr))
+    {
+        foreach (var userEl in usersArr.EnumerateArray())
+        {
+            var username = userEl.TryGetProperty("Username", out var un) ? un.GetString() ?? "" : "";
+            var passwordHash = userEl.TryGetProperty("PasswordHash", out var ph) ? ph.GetString() ?? "" : "";
+            var role = userEl.TryGetProperty("Role", out var r) ? r.GetString() ?? "viewer" : "viewer";
+            var displayName = userEl.TryGetProperty("DisplayName", out var dn) ? dn.GetString() ?? "" : "";
+            var isActive = userEl.TryGetProperty("IsActive", out var ia) && ia.GetBoolean();
+
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(passwordHash))
+            {
+                db.Users.Add(new UserEntity
+                {
+                    Username = username,
+                    PasswordHash = passwordHash,
+                    Role = role,
+                    DisplayName = displayName,
+                    IsActive = isActive,
+                    CreatedAt = DateTime.Now.ToString("O")
+                });
+            }
+        }
+        db.SaveChanges();
+    }
 }
 
 // ---- 会话认证（Session Auth） ----
@@ -46,12 +78,12 @@ var sessionSecret = Guid.NewGuid().ToString("N");
 const string CookieName = "sw_session";
 
 /// <summary>
-/// 创建带签名的会话令牌，格式：username:timestamp:signature
+/// 创建带签名的会话令牌，格式：username:role:timestamp:signature
 /// </summary>
-string MakeToken(string username)
+string MakeToken(string username, string role = "viewer")
 {
     var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-    var payload = $"{username}:{ts}";
+    var payload = $"{username}:{role}:{ts}";
     using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(sessionSecret));
     var sig = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload))).ToLower();
     return $"{payload}:{sig}";
@@ -63,11 +95,11 @@ string MakeToken(string username)
 bool ValidateToken(string token)
 {
     var parts = token.Split(':');
-    if (parts.Length != 3) return false;
-    var payload = $"{parts[0]}:{parts[1]}";
+    if (parts.Length != 4) return false;
+    var payload = $"{parts[0]}:{parts[1]}:{parts[2]}";
     using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(sessionSecret));
     var expected = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload))).ToLower();
-    return expected == parts[2];
+    return expected == parts[3];
 }
 
 /// <summary>
@@ -79,6 +111,47 @@ bool IsAuthenticated(HttpContext ctx)
     return ValidateToken(token);
 }
 
+/// <summary>
+/// 从会话令牌中提取用户名
+/// </summary>
+string? GetUsername(HttpContext ctx)
+{
+    if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token)) return null;
+    if (!ValidateToken(token)) return null;
+    var parts = token.Split(':');
+    return parts.Length >= 2 ? parts[0] : null;
+}
+
+/// <summary>
+/// 从会话令牌中提取用户角色
+/// </summary>
+string? GetUserRole(HttpContext ctx)
+{
+    if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token)) return null;
+    if (!ValidateToken(token)) return null;
+    var parts = token.Split(':');
+    return parts.Length >= 3 ? parts[1] : null;
+}
+
+/// <summary>
+/// 检查用户是否拥有指定角色之一
+/// </summary>
+bool HasRole(HttpContext ctx, string[] roles)
+{
+    var role = GetUserRole(ctx);
+    return role != null && roles.Contains(role);
+}
+
+/// <summary>
+/// 检查用户是否为管理员
+/// </summary>
+bool IsAdmin(HttpContext ctx) => HasRole(ctx, new[] { "admin" });
+
+/// <summary>
+/// 检查用户是否为管理员或操作员
+/// </summary>
+bool IsAdminOrOperator(HttpContext ctx) => HasRole(ctx, new[] { "admin", "operator" });
+
 // ---- 加载 HTML 模板文件（template.html 和 login.html） ----
 var wwwroot = builder.Environment.WebRootPath ?? "wwwroot";
 var templatePath = Path.Combine(wwwroot, "template.html");
@@ -89,11 +162,18 @@ var loginTemplateContent = File.Exists(loginTemplatePath) ? File.ReadAllText(log
 /// <summary>
 /// 将页面内容嵌入模板，替换标题和导航高亮
 /// </summary>
-string RenderPage(string content, string activeNav = "home")
+string RenderPage(string content, string activeNav = "home", HttpContext? ctx = null)
 {
+    var isAdminUser = ctx != null && IsAdmin(ctx);
+    var username = ctx != null ? GetUsername(ctx) ?? "" : "";
+
     return templateContent
         .Replace("{TITLE}", HttpUtility.HtmlEncode(serverName))
         .Replace("{NAV_HOME}", activeNav == "home" ? "active" : "")
+        .Replace("{NAV_USERS}", activeNav == "users" ? "active" : "")
+        .Replace("{NAV_PROFILE}", activeNav == "profile" ? "active" : "")
+        .Replace("{USERS_VISIBLE}", isAdminUser ? "block" : "none")
+        .Replace("{CURRENT_USER}", HttpUtility.HtmlEncode(username))
         .Replace("{CONTENT}", content);
 }
 
@@ -492,6 +572,214 @@ app.MapPost("/api/web_cancel_punch", async (AppDbContext db, JsonElement body) =
     return Results.Json(new { status = "ok" });
 });
 
+// ===== 用户管理 API =====
+
+/// <summary>
+/// GET /api/users - 列出所有用户（需要管理员角色）
+/// </summary>
+app.MapGet("/api/users", async (AppDbContext db, HttpContext ctx) =>
+{
+    if (!IsAdmin(ctx))
+        return Results.Json(new { error = "权限不足，仅管理员可访问" }, statusCode: 403);
+
+    var users = await db.Users
+        .OrderBy(u => u.Id)
+        .Select(u => new
+        {
+            id = u.Id,
+            username = u.Username,
+            role = u.Role,
+            display_name = u.DisplayName,
+            created_at = u.CreatedAt,
+            is_active = u.IsActive
+        })
+        .ToListAsync();
+
+    return Results.Json(users);
+});
+
+/// <summary>
+/// POST /api/users - 创建用户（需要管理员角色）
+/// </summary>
+app.MapPost("/api/users", async (AppDbContext db, HttpContext ctx) =>
+{
+    if (!IsAdmin(ctx))
+        return Results.Json(new { error = "权限不足，仅管理员可创建用户" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+    {
+        bodyStr = await reader.ReadToEndAsync();
+    }
+
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var username = body.TryGetProperty("username", out var un) ? un.GetString()?.Trim() ?? "" : "";
+    var password = body.TryGetProperty("password", out var pw) ? pw.GetString() ?? "" : "";
+    var role = body.TryGetProperty("role", out var r) ? r.GetString() ?? "viewer" : "viewer";
+    var displayName = body.TryGetProperty("display_name", out var dn) ? dn.GetString()?.Trim() ?? "" : "";
+
+    if (string.IsNullOrEmpty(username))
+        return Results.Json(new { error = "用户名不能为空" }, statusCode: 400);
+    if (string.IsNullOrEmpty(password))
+        return Results.Json(new { error = "密码不能为空" }, statusCode: 400);
+    if (!new[] { "admin", "operator", "viewer" }.Contains(role))
+        return Results.Json(new { error = "无效的角色，必须是 admin、operator 或 viewer" }, statusCode: 400);
+
+    if (await db.Users.AnyAsync(u => u.Username == username))
+        return Results.Json(new { error = "用户名已存在" }, statusCode: 409);
+
+    var user = new UserEntity
+    {
+        Username = username,
+        PasswordHash = Sha256(password),
+        Role = role,
+        DisplayName = string.IsNullOrEmpty(displayName) ? username : displayName,
+        IsActive = true,
+        CreatedAt = DateTime.Now.ToString("O")
+    };
+    db.Users.Add(user);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new
+    {
+        id = user.Id,
+        username = user.Username,
+        role = user.Role,
+        display_name = user.DisplayName,
+        created_at = user.CreatedAt,
+        is_active = user.IsActive
+    });
+});
+
+/// <summary>
+/// PUT /api/users/{id} - 更新用户信息（管理员或本人）
+/// </summary>
+app.MapPut("/api/users/{id}", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var currentUsername = GetUsername(ctx);
+    if (currentUsername == null)
+        return Results.Json(new { error = "未认证" }, statusCode: 401);
+
+    var user = await db.Users.FindAsync(id);
+    if (user == null)
+        return Results.Json(new { error = "用户不存在" }, statusCode: 404);
+
+    // 只有管理员或用户本人可以更新
+    if (!IsAdmin(ctx) && user.Username != currentUsername)
+        return Results.Json(new { error = "权限不足，只能修改自己的信息" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+    {
+        bodyStr = await reader.ReadToEndAsync();
+    }
+
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    // 非管理员只能修改 display_name
+    if (IsAdmin(ctx))
+    {
+        if (body.TryGetProperty("role", out var r))
+        {
+            var role = r.GetString() ?? "viewer";
+            if (new[] { "admin", "operator", "viewer" }.Contains(role))
+                user.Role = role;
+        }
+        if (body.TryGetProperty("is_active", out var ia))
+            user.IsActive = ia.GetBoolean();
+    }
+
+    if (body.TryGetProperty("display_name", out var dn))
+    {
+        var displayName = dn.GetString()?.Trim();
+        if (!string.IsNullOrEmpty(displayName))
+            user.DisplayName = displayName;
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// DELETE /api/users/{id} - 删除用户（需要管理员角色，不能删除自己）
+/// </summary>
+app.MapDelete("/api/users/{id}", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    if (!IsAdmin(ctx))
+        return Results.Json(new { error = "权限不足，仅管理员可删除用户" }, statusCode: 403);
+
+    var currentUsername = GetUsername(ctx);
+    var user = await db.Users.FindAsync(id);
+    if (user == null)
+        return Results.Json(new { error = "用户不存在" }, statusCode: 404);
+
+    if (user.Username == currentUsername)
+        return Results.Json(new { error = "不能删除自己的账户" }, statusCode: 400);
+
+    db.Users.Remove(user);
+    await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/users/change-password - 修改密码（本人或管理员）
+/// </summary>
+app.MapPost("/api/users/change-password", async (AppDbContext db, HttpContext ctx) =>
+{
+    var currentUsername = GetUsername(ctx);
+    if (currentUsername == null)
+        return Results.Json(new { error = "未认证" }, statusCode: 401);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+    {
+        bodyStr = await reader.ReadToEndAsync();
+    }
+
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var oldPassword = body.TryGetProperty("old_password", out var op) ? op.GetString() ?? "" : "";
+    var newPassword = body.TryGetProperty("new_password", out var np) ? np.GetString() ?? "" : "";
+
+    if (string.IsNullOrEmpty(newPassword))
+        return Results.Json(new { error = "新密码不能为空" }, statusCode: 400);
+
+    // 管理员可以通过 user_id 指定目标用户，否则修改自己
+    UserEntity? targetUser;
+    if (IsAdmin(ctx) && body.TryGetProperty("user_id", out var uid) && uid.ValueKind == JsonValueKind.Number)
+    {
+        targetUser = await db.Users.FindAsync(uid.GetInt32());
+        if (targetUser == null)
+            return Results.Json(new { error = "目标用户不存在" }, statusCode: 404);
+    }
+    else
+    {
+        targetUser = await db.Users.FirstOrDefaultAsync(u => u.Username == currentUsername);
+        if (targetUser == null)
+            return Results.Json(new { error = "用户不存在" }, statusCode: 404);
+    }
+
+    // 非管理员修改自己时必须提供旧密码
+    if (!IsAdmin(ctx) || targetUser.Username == currentUsername)
+    {
+        if (string.IsNullOrEmpty(oldPassword))
+            return Results.Json(new { error = "旧密码不能为空" }, statusCode: 400);
+        if (Sha256(oldPassword) != targetUser.PasswordHash)
+            return Results.Json(new { error = "旧密码错误" }, statusCode: 403);
+    }
+
+    targetUser.PasswordHash = Sha256(newPassword);
+    await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
 // ===== 签到任务 API =====
 
 /// <summary>
@@ -799,17 +1087,21 @@ input:focus{{border-color:#4285f4}}
 app.MapGet("/login", () => Results.Content(RenderLoginPage(), "text/html;charset=utf-8"));
 
 /// <summary>
-/// POST /login - 提交登录表单，验证用户名密码后设置会话 Cookie
+/// POST /login - 提交登录表单，从 Users 表验证用户名和 SHA256 密码哈希
 /// </summary>
-app.MapPost("/login", async (HttpContext ctx) =>
+app.MapPost("/login", async (HttpContext ctx, AppDbContext db) =>
 {
     var form = await ctx.Request.ReadFormAsync();
     var username = form["username"].ToString();
     var password = form["password"].ToString();
 
-    if (username == cfgAdminUser && password == cfgAdminPwd)
+    // 从数据库查询用户并验证密码
+    var passwordHash = Sha256(password);
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == passwordHash && u.IsActive);
+
+    if (user != null)
     {
-        var token = MakeToken(username);
+        var token = MakeToken(username, user.Role);
         ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
         {
             HttpOnly = true,
@@ -819,6 +1111,7 @@ app.MapPost("/login", async (HttpContext ctx) =>
         });
         return Results.Redirect("/");
     }
+
     return Results.Content(RenderLoginPage("用户名或密码错误"), "text/html;charset=utf-8");
 });
 
@@ -836,7 +1129,7 @@ app.MapGet("/logout", (HttpContext ctx) =>
 /// <summary>
 /// GET / - 首页：显示所有已注册设备的列表（文件夹式卡片布局）
 /// </summary>
-app.MapGet("/", async (AppDbContext db) =>
+app.MapGet("/", async (AppDbContext db, HttpContext ctx) =>
 {
     var machines = await db.Machines.ToListAsync();
     var attendances = await db.AttendanceRecords.ToListAsync();
@@ -887,16 +1180,16 @@ app.MapGet("/", async (AppDbContext db) =>
 .folder-icon .icon {{ font-size:18px; }}
 .folder-icon .name {{ font-weight:500; }}
 </style>";
-    return Results.Content(RenderPage(content, "home"), "text/html;charset=utf-8");
+    return Results.Content(RenderPage(content, "home", ctx), "text/html;charset=utf-8");
 });
 
 /// <summary>
 /// GET /machine/{uuid} - 设备详情页：显示该设备的所有打卡任务（卡片式布局）
 /// </summary>
-app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db) =>
+app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db, HttpContext ctx) =>
 {
     var machine = await db.Machines.FindAsync(uuid);
-    if (machine == null) return Results.Content(RenderPage("<div class='card'><h3>设备不存在</h3><p>该 UUID 对应的设备不存在。</p></div>"), "text/html;charset=utf-8");
+    if (machine == null) return Results.Content(RenderPage("<div class='card'><h3>设备不存在</h3><p>该 UUID 对应的设备不存在。</p></div>", ctx: ctx), "text/html;charset=utf-8");
 
     var config = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
     var taskRecords = await db.AttendanceRecords
@@ -969,16 +1262,16 @@ app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db) =>
 .task-stats .value {{ font-size:18px;font-weight:600;color:var(--text); }}
 .task-time {{ font-size:12px;color:var(--text-secondary); }}
 </style>";
-    return Results.Content(RenderPage(content, "home"), "text/html;charset=utf-8");
+    return Results.Content(RenderPage(content, "home", ctx), "text/html;charset=utf-8");
 });
 
 /// <summary>
 /// GET /machine/{uuid}/task/{taskId} - 任务详情页：显示打卡排名和状态网格，支持 Web 打卡
 /// </summary>
-app.MapGet("/machine/{uuid}/task/{taskId}", async (string uuid, string taskId, AppDbContext db) =>
+app.MapGet("/machine/{uuid}/task/{taskId}", async (string uuid, string taskId, AppDbContext db, HttpContext ctx) =>
 {
     var machine = await db.Machines.FindAsync(uuid);
-    if (machine == null) return Results.Content(RenderPage("<div class='card'><h3>设备不存在</h3></div>"), "text/html;charset=utf-8");
+    if (machine == null) return Results.Content(RenderPage("<div class='card'><h3>设备不存在</h3></div>", ctx: ctx), "text/html;charset=utf-8");
 
     var decodedTaskId = HttpUtility.UrlDecode(taskId);
     var latest = await db.AttendanceRecords
@@ -1026,7 +1319,181 @@ app.MapGet("/machine/{uuid}/task/{taskId}", async (string uuid, string taskId, A
     <div class=""card""><h3>打卡排名</h3>{rankTable}</div>
     <div class=""card""><h3>打卡状态</h3><div class=""student-grid"">{gridItems}</div></div>
 </div>";
-    return Results.Content(RenderPage(content, "home"), "text/html;charset=utf-8");
+    return Results.Content(RenderPage(content, "home", ctx), "text/html;charset=utf-8");
+});
+
+// ===== 用户管理页面 =====
+
+/// <summary>
+/// GET /users - 用户管理页面（仅管理员可见）
+/// </summary>
+app.MapGet("/users", async (AppDbContext db, HttpContext ctx) =>
+{
+    if (!IsAdmin(ctx))
+        return Results.Content(RenderPage("<div class='card'><h3>权限不足</h3><p>此页面仅管理员可访问。</p></div>", "home", ctx), "text/html;charset=utf-8");
+
+    var users = await db.Users.OrderBy(u => u.Id).ToListAsync();
+    var rows = new StringBuilder();
+
+    foreach (var u in users)
+    {
+        var roleLabel = u.Role switch
+        {
+            "admin" => "<span class='badge badge-online'>管理员</span>",
+            "operator" => "<span class='badge' style='background:#e8f0fe;color:#1967d2'>操作员</span>",
+            _ => "<span class='badge badge-offline' style='background:#f3e8fd;color:#7c3aed'>查看者</span>"
+        };
+        var statusBadge = u.IsActive
+            ? "<span class='badge badge-online'>启用</span>"
+            : "<span class='badge badge-offline'>禁用</span>";
+
+        rows.Append($@"<tr>
+<td>{u.Id}</td>
+<td>{HttpUtility.HtmlEncode(u.Username)}</td>
+<td>{HttpUtility.HtmlEncode(u.DisplayName)}</td>
+<td>{roleLabel}</td>
+<td>{statusBadge}</td>
+<td>{u.CreatedAt}</td>
+<td>
+<div style=""display:flex;gap:6px;"">
+<button class=""btn btn-sm"" onclick=""openEditUserModal({u.Id},'{HttpUtility.HtmlEncode(u.Username)}','{HttpUtility.HtmlEncode(u.DisplayName)}','{u.Role}',{u.IsActive.ToString().ToLower()})"">编辑</button>
+<button class=""btn btn-sm btn-danger"" onclick=""deleteUser({u.Id},'{HttpUtility.HtmlEncode(u.Username)}')"">删除</button>
+</div>
+</td>
+</tr>");
+    }
+
+    var content = $@"<div class=""page-header""><h2>用户管理</h2>
+<button class=""btn"" onclick=""openCreateUserModal()"">添加用户</button>
+</div>
+<div class=""card"">
+<h3>用户列表</h3>
+{(users.Count > 0 ? $"<table><thead><tr><th>ID</th><th>用户名</th><th>显示名称</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{rows}</tbody></table>" : "<p style='color:var(--text-secondary);padding:20px 0;'>暂无用户</p>")}
+</div>
+<script>
+function openCreateUserModal() {{
+    var html = '<h3>创建用户</h3>' +
+        '<form id=""createUserForm"">' +
+        '<div class=""form-group""><label>用户名</label><input name=""username"" placeholder=""请输入用户名"" required></div>' +
+        '<div class=""form-group""><label>密码</label><input type=""password"" name=""password"" placeholder=""请输入密码"" required></div>' +
+        '<div class=""form-group""><label>显示名称</label><input name=""display_name"" placeholder=""请输入显示名称""></div>' +
+        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""viewer"">查看者</option><option value=""operator"">操作员</option><option value=""admin"">管理员</option></select></div>' +
+        '<div class=""form-actions""><button type=""submit"" class=""btn"">创建</button><button type=""button"" class=""btn btn-ghost"" onclick=""closeModal(\'modal\')"">取消</button></div></form>';
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal').style.display = 'block';
+    document.getElementById('createUserForm').onsubmit = function(e) {{
+        e.preventDefault();
+        var fd = new FormData(e.target);
+        var data = {{ username: fd.get('username'), password: fd.get('password'), display_name: fd.get('display_name'), role: fd.get('role') }};
+        fetch('/api/users', {{ method: 'POST', headers: {{'Content-Type':'application/json'}}, body: JSON.stringify(data) }})
+            .then(r => r.json())
+            .then(d => {{
+                if (d.error) {{ showToast('创建失败: ' + d.error, 'error'); }}
+                else {{ showToast('用户创建成功', 'success'); setTimeout(() => location.reload(), 800); }}
+            }})
+            .catch(() => showToast('网络请求失败', 'error'));
+    }};
+}}
+
+function openEditUserModal(id, username, displayName, role, isActive) {{
+    var activeChecked = isActive ? 'checked' : '';
+    var html = '<h3>编辑用户 - ' + username + '</h3>' +
+        '<form id=""editUserForm"">' +
+        '<div class=""form-group""><label>显示名称</label><input name=""display_name"" value=""' + displayName + '""></div>' +
+        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""viewer""' + (role==='viewer'?' selected':'') + '>查看者</option><option value=""operator""' + (role==='operator'?' selected':'') + '>操作员</option><option value=""admin""' + (role==='admin'?' selected':'') + '>管理员</option></select></div>' +
+        '<div class=""form-group""><label><input type=""checkbox"" name=""is_active"" ' + activeChecked + '> 启用账户</label></div>' +
+        '<div class=""form-actions""><button type=""submit"" class=""btn"">保存</button><button type=""button"" class=""btn btn-ghost"" onclick=""closeModal(\'modal\')"">取消</button></div></form>';
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal').style.display = 'block';
+    document.getElementById('editUserForm').onsubmit = function(e) {{
+        e.preventDefault();
+        var fd = new FormData(e.target);
+        var data = {{ display_name: fd.get('display_name'), role: fd.get('role'), is_active: fd.get('is_active') === 'on' }};
+        fetch('/api/users/' + id, {{ method: 'PUT', headers: {{'Content-Type':'application/json'}}, body: JSON.stringify(data) }})
+            .then(r => r.json())
+            .then(d => {{
+                if (d.error) {{ showToast('更新失败: ' + d.error, 'error'); }}
+                else {{ showToast('用户更新成功', 'success'); setTimeout(() => location.reload(), 800); }}
+            }})
+            .catch(() => showToast('网络请求失败', 'error'));
+    }};
+}}
+
+function deleteUser(id, username) {{
+    if (!confirm('确定要删除用户 "' + username + '" 吗？此操作不可撤销！')) return;
+    fetch('/api/users/' + id, {{ method: 'DELETE' }})
+        .then(r => r.json())
+        .then(d => {{
+            if (d.error) {{ showToast('删除失败: ' + d.error, 'error'); }}
+            else {{ showToast('用户已删除', 'success'); setTimeout(() => location.reload(), 800); }}
+        }})
+        .catch(() => showToast('网络请求失败', 'error'));
+}}
+</script>";
+    return Results.Content(RenderPage(content, "users", ctx), "text/html;charset=utf-8");
+});
+
+/// <summary>
+/// GET /profile - 个人设置页面（修改密码）
+/// </summary>
+app.MapGet("/profile", async (HttpContext ctx, AppDbContext db) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Content(RenderPage("<div class='card'><h3>未登录</h3></div>", "profile", ctx), "text/html;charset=utf-8");
+
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+    if (user == null)
+        return Results.Content(RenderPage("<div class='card'><h3>用户不存在</h3></div>", "profile", ctx), "text/html;charset=utf-8");
+
+    var roleLabel = user.Role switch
+    {
+        "admin" => "管理员",
+        "operator" => "操作员",
+        _ => "查看者"
+    };
+
+    var content = $@"<div class=""page-header""><h2>个人设置</h2></div>
+<div class=""card"" style=""max-width:500px;"">
+<h3>账户信息</h3>
+<ul class=""config-list"">
+<li><span class=""label"">用户名</span><span class=""value"">{HttpUtility.HtmlEncode(user.Username)}</span></li>
+<li><span class=""label"">显示名称</span><span class=""value"">{HttpUtility.HtmlEncode(user.DisplayName)}</span></li>
+<li><span class=""label"">角色</span><span class=""value"">{roleLabel}</span></li>
+<li><span class=""label"">创建时间</span><span class=""value"">{user.CreatedAt}</span></li>
+</ul>
+</div>
+<div class=""card"" style=""max-width:500px;"">
+<h3>修改密码</h3>
+<form id=""changePwdForm"">
+<div class=""form-group""><label>旧密码</label><input type=""password"" id=""oldPwd"" placeholder=""请输入旧密码"" required></div>
+<div class=""form-group""><label>新密码</label><input type=""password"" id=""newPwd"" placeholder=""请输入新密码"" required></div>
+<div class=""form-group""><label>确认新密码</label><input type=""password"" id=""confirmPwd"" placeholder=""请再次输入新密码"" required></div>
+<div class=""form-actions""><button type=""submit"" class=""btn"">修改密码</button></div>
+</form>
+</div>
+<script>
+document.getElementById('changePwdForm').onsubmit = function(e) {{
+    e.preventDefault();
+    var oldPwd = document.getElementById('oldPwd').value;
+    var newPwd = document.getElementById('newPwd').value;
+    var confirmPwd = document.getElementById('confirmPwd').value;
+    if (!oldPwd || !newPwd || !confirmPwd) {{ showToast('请填写所有字段', 'error'); return; }}
+    if (newPwd !== confirmPwd) {{ showToast('两次输入的新密码不一致', 'error'); return; }}
+    fetch('/api/users/change-password', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{ old_password: oldPwd, new_password: newPwd }})
+    }})
+    .then(r => r.json())
+    .then(d => {{
+        if (d.error) {{ showToast('修改失败: ' + d.error, 'error'); }}
+        else {{ showToast('密码修改成功，请重新登录', 'success'); setTimeout(() => location.href = '/logout', 1500); }}
+    }})
+    .catch(() => showToast('网络请求失败', 'error'));
+}};
+</script>";
+    return Results.Content(RenderPage(content, "profile", ctx), "text/html;charset=utf-8");
 });
 
 app.Run();

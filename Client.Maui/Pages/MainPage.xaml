@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CheckIn.Client.Maui.ViewModels"
+             xmlns:models="clr-namespace:CheckIn.Client.Models"
+             xmlns:converters="clr-namespace:CheckIn.Client.Maui.Converters"
+             x:Class="CheckIn.Client.Maui.Pages.MainPage"
+             Title="AgoraIn"
+             BackgroundColor="#F0F2F5">
+
+    <ContentPage.Resources>
+        <converters:RankColorConverter x:Key="RankColorConverter" />
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:BoolToCheckInTextConverter x:Key="BoolToCheckInText" />
+        <converters:BoolToBackgroundConverter x:Key="BoolToBackground" />
+        <converters:StringToColorConverter x:Key="StringToColor" />
+    </ContentPage.Resources>
+
+    <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,*">
+
+        <!-- Top Menu Bar -->
+        <Grid Grid.Row="0" Grid.ColumnSpan="2"
+              BackgroundColor="#FFFFFF"
+              Padding="8,4" ColumnDefinitions="Auto,*,Auto">
+
+            <HorizontalStackLayout Grid.Column="0" Spacing="2">
+                <Button Text="文件" BackgroundColor="Transparent"
+                        TextColor="#333333" FontSize="13"
+                        Clicked="OnMenuFileClicked" />
+                <Button Text="远程" BackgroundColor="Transparent"
+                        TextColor="#333333" FontSize="13"
+                        Clicked="OnMenuRemoteClicked" />
+                <Button Text="设置" BackgroundColor="Transparent"
+                        TextColor="#333333" FontSize="13"
+                        Clicked="OnMenuSettingsClicked" />
+                <Button Text="帮助" BackgroundColor="Transparent"
+                        TextColor="#333333" FontSize="13"
+                        Clicked="OnMenuHelpClicked" />
+            </HorizontalStackLayout>
+
+            <!-- Window Title -->
+            <Label Grid.Column="1" Text="{Binding WindowTitle}"
+                   HorizontalOptions="Center" VerticalOptions="Center"
+                   FontSize="13" TextColor="#999999" />
+
+            <!-- Right Actions -->
+            <HorizontalStackLayout Grid.Column="2" Spacing="4">
+                <Button Text="+" BackgroundColor="#4285f4" TextColor="White"
+                        WidthRequest="32" HeightRequest="32" CornerRadius="6"
+                        FontSize="18" Padding="0"
+                        Clicked="OnAddTabClicked" />
+                <Button Text="签到" BackgroundColor="#34a853" TextColor="White"
+                        WidthRequest="60" HeightRequest="32" CornerRadius="6"
+                        FontSize="12" Padding="0"
+                        Clicked="OnCreateSignInClicked" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!-- Left Sidebar: Task Tree -->
+        <Border Grid.Row="1" Grid.Column="0"
+                BackgroundColor="#FFFFFF"
+                Stroke="#E8E8E8" StrokeThickness="0,1,1,0">
+            <Grid RowDefinitions="Auto,*">
+                <Label Text="我的任务" FontSize="14" FontAttributes="Bold"
+                       TextColor="#333333" Margin="16,12,16,8" />
+                <CollectionView Grid.Row="1"
+                                ItemsSource="{Binding TaskTree}"
+                                SelectionMode="Single"
+                                SelectionChanged="OnTaskTreeSelectionChanged">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TaskTreeNode">
+                            <Grid Padding="16,8">
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="&#x2022;" FontSize="14"
+                                           TextColor="#4285f4"
+                                           VerticalOptions="Center" />
+                                    <Label Text="{Binding DisplayName}"
+                                           FontSize="13" TextColor="#333333"
+                                           VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <!-- Center: Tab content area -->
+        <Grid Grid.Row="1" Grid.Column="1" Padding="12">
+
+            <!-- When no active tab, show placeholder -->
+            <VerticalStackLayout IsVisible="{Binding HasActiveTab, Converter={StaticResource InverseBoolConverter}}"
+                                 VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <Label Text="AgoraIn" FontSize="32" FontAttributes="Bold"
+                       TextColor="#4285f4" HorizontalOptions="Center" />
+                <Label Text="数学打卡系统" FontSize="16"
+                       TextColor="#999999" HorizontalOptions="Center" />
+                <Label Text="点击左侧任务开始使用，或点击 + 创建新任务"
+                       FontSize="12" TextColor="#AAAAAA" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <!-- Active tab content -->
+            <Grid IsVisible="{Binding HasActiveTab}" RowDefinitions="Auto,*,Auto" RowSpacing="8">
+
+                <!-- Tab Header Bar -->
+                <Border Grid.Row="0" BackgroundColor="#FFFFFF"
+                        Stroke="#E8E8E8" StrokeThickness="1"
+                        Padding="12,8" StrokeShape="RoundRectangle 8">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding ActiveTab.TabDisplayName}"
+                                   FontSize="16" FontAttributes="Bold"
+                                   TextColor="#333333" VerticalOptions="Center" />
+                            <Border Padding="6,2" StrokeShape="RoundRectangle 10"
+                                    BackgroundColor="{Binding ActiveTab.StatusColor, Converter={StaticResource StringToColor}}">
+                                <Label Text="{Binding ActiveTab.StatusText}"
+                                       FontSize="10" TextColor="White" />
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding ActiveTab.PunchInfo}"
+                               FontSize="12" TextColor="#666666"
+                               VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- Main content: Ranking + Student Grid -->
+                <Grid Grid.Row="1" ColumnDefinitions="200,*" ColumnSpacing="8">
+
+                    <!-- Left: Ranking -->
+                    <Border Grid.Column="0" BackgroundColor="#FFFFFF"
+                            Stroke="#E8E8E8" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 8">
+                        <Grid RowDefinitions="Auto,*" Padding="8">
+                            <Label Grid.Row="0" Text="打卡排名" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#333333"
+                                   Margin="4,4,4,8" />
+
+                            <CollectionView Grid.Row="1"
+                                            ItemsSource="{Binding ActiveTab.Ranking}"
+                                            SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RankingItem">
+                                        <Grid Padding="8,4" ColumnDefinitions="40,*,60">
+                                            <Border Grid.Column="0"
+                                                    WidthRequest="28" HeightRequest="28"
+                                                    StrokeShape="RoundRectangle 14"
+                                                    BackgroundColor="{Binding Rank, Converter={StaticResource RankColorConverter}}"
+                                                    Stroke="Transparent">
+                                                <Label Text="{Binding Rank}"
+                                                       FontSize="12" TextColor="White"
+                                                       HorizontalOptions="Center"
+                                                       VerticalOptions="Center" />
+                                            </Border>
+                                            <Label Grid.Column="1" Text="{Binding Name}"
+                                                   FontSize="13" TextColor="#333333"
+                                                   VerticalOptions="Center" />
+                                            <Label Grid.Column="2" Text="{Binding Time}"
+                                                   FontSize="12" TextColor="#666666"
+                                                   VerticalOptions="Center"
+                                                   HorizontalOptions="End" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Grid>
+                    </Border>
+
+                    <!-- Right: Student Button Grid -->
+                    <Border Grid.Column="1" BackgroundColor="#FFFFFF"
+                            Stroke="#E8E8E8" StrokeThickness="1"
+                            StrokeShape="RoundRectangle 8">
+                        <Grid RowDefinitions="*,Auto" Padding="8">
+                            <ScrollView Grid.Row="0">
+                                <FlexLayout Direction="Row" Wrap="Wrap"
+                                            JustifyContent="Start"
+                                            AlignItems="Start"
+                                            BindableLayout.ItemsSource="{Binding ActiveTab.Students}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:StudentModel">
+                                            <Border WidthRequest="110" HeightRequest="60"
+                                                    Margin="4"
+                                                    StrokeShape="RoundRectangle 8"
+                                                    BackgroundColor="{Binding IsCheckedIn, Converter={StaticResource BoolToBackground}}"
+                                                    Stroke="#E0E0E0" StrokeThickness="1">
+                                                <Border.GestureRecognizers>
+                                                    <TapGestureRecognizer Tapped="OnStudentTapped" />
+                                                </Border.GestureRecognizers>
+                                                <VerticalStackLayout VerticalOptions="Center"
+                                                                      HorizontalOptions="Center" Spacing="2">
+                                                    <Label Text="{Binding Name}" FontSize="13"
+                                                           TextColor="#333333"
+                                                           HorizontalOptions="Center"
+                                                           MaximumWidthRequest="100"
+                                                           LineBreakMode="TailTruncation" />
+                                                    <Label Text="{Binding Count, StringFormat='打卡: {0}次'}"
+                                                           FontSize="10" TextColor="#888888"
+                                                           HorizontalOptions="Center" />
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </FlexLayout>
+                            </ScrollView>
+
+                            <!-- Action buttons -->
+                            <HorizontalStackLayout Grid.Row="1" Spacing="8"
+                                                    HorizontalOptions="Center" Margin="0,8,0,0">
+                                <Button Text="同步" BackgroundColor="#4285f4" TextColor="White"
+                                        CornerRadius="6" HeightRequest="36" WidthRequest="70"
+                                        FontSize="12"
+                                        Command="{Binding ActiveTab.SyncToServerCommand}" />
+                                <Button Text="加载" BackgroundColor="#34a853" TextColor="White"
+                                        CornerRadius="6" HeightRequest="36" WidthRequest="70"
+                                        FontSize="12"
+                                        Command="{Binding ActiveTab.LoadFromServerCommand}" />
+                                <Button Text="导出" BackgroundColor="#FBBC04" TextColor="White"
+                                        CornerRadius="6" HeightRequest="36" WidthRequest="70"
+                                        FontSize="12"
+                                        Command="{Binding ActiveTab.ExportCommand}" />
+                                <Button Text="导入" BackgroundColor="#EA4335" TextColor="White"
+                                        CornerRadius="6" HeightRequest="36" WidthRequest="70"
+                                        FontSize="12"
+                                        Command="{Binding ActiveTab.ImportCommand}" />
+                                <Button Text="清空" BackgroundColor="#999999" TextColor="White"
+                                        CornerRadius="6" HeightRequest="36" WidthRequest="70"
+                                        FontSize="12"
+                                        Command="{Binding ActiveTab.ClearAllCommand}" />
+                            </HorizontalStackLayout>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Bottom Status Bar -->
+                <Border Grid.Row="2" BackgroundColor="#FFFFFF"
+                        Stroke="#E8E8E8" StrokeThickness="1"
+                        Padding="12,6" StrokeShape="RoundRectangle 6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding ActiveTab.StatusMessage}"
+                               FontSize="11" TextColor="#666666"
+                               VerticalOptions="Center" />
+                        <Label Text="{Binding ActiveTab.LastCheck, StringFormat='最后检查: {0}'}"
+                               FontSize="11" TextColor="#999999"
+                               VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+    </Grid>
+</ContentPage>

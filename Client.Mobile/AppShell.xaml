@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="CheckIn.Client.Mobile.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:CheckIn.Client.Mobile.Pages"
+    xmlns:helpers="clr-namespace:CheckIn.Client.Mobile.Helpers"
+    Shell.FlyoutBehavior="{Binding FlyoutBehavior, Source={x:Static helpers:ResponsiveHelper.Instance}}"
+    Shell.FlyoutWidth="280">
+
+    <!-- Tablet layout: Flyout with side navigation -->
+    <FlyoutItem Title="首页" Icon="home_icon.png" FlyoutDisplayOptions="AsMultipleItems">
+        <ShellContent
+            Title="任务列表"
+            ContentTemplate="{DataTemplate pages:TaskListPage}"
+            Route="tasklist" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="设置" Icon="settings_icon.png">
+        <ShellContent
+            Title="设置"
+            ContentTemplate="{DataTemplate pages:SettingsPage}"
+            Route="settings" />
+    </FlyoutItem>
+
+    <!-- TabBar for phone: bottom tabs -->
+    <TabBar x:Name="PhoneTabBar">
+        <ShellContent
+            Title="首页"
+            Icon="home_icon.png"
+            ContentTemplate="{DataTemplate pages:TaskListPage}"
+            Route="phonetasklist" />
+        <ShellContent
+            Title="设置"
+            Icon="settings_icon.png"
+            ContentTemplate="{DataTemplate pages:SettingsPage}"
+            Route="phonesettings" />
+    </TabBar>
+
+</Shell>

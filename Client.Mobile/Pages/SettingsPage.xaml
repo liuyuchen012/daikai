@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.SettingsPage"
+             Title="Settings"
+             Shell.NavBarIsVisible="True">
+
+    <ScrollView Padding="20,16">
+        <VerticalStackLayout Spacing="20">
+
+            <Label Text="Settings"
+                   Style="{StaticResource PageTitle}" />
+
+            <!-- Server Settings Card -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Server Configuration"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Server IP" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Entry x:Name="ServerIpEntry"
+                               Placeholder="e.g. 192.168.1.100"
+                               Style="{StaticResource FormEntry}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Server Port" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Entry x:Name="ServerPortEntry"
+                               Placeholder="5250"
+                               Keyboard="Numeric"
+                               Text="5250"
+                               Style="{StaticResource FormEntry}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Server Password" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Entry x:Name="ServerPasswordEntry"
+                               Placeholder="Enter server password"
+                               IsPassword="True"
+                               Style="{StaticResource FormEntry}" />
+                    </VerticalStackLayout>
+
+                    <Button Text="Save Server Settings"
+                            Style="{StaticResource PrimaryButton}"
+                            Clicked="OnSaveServerClicked"
+                            Margin="0,8,0,0" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Admin Settings Card -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Admin Settings"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="New Admin Password (leave empty to keep current)" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Entry x:Name="NewPasswordEntry"
+                               Placeholder="New password"
+                               IsPassword="True"
+                               Style="{StaticResource FormEntry}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Confirm Password" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+                        <Entry x:Name="ConfirmAdminPasswordEntry"
+                               Placeholder="Confirm new password"
+                               IsPassword="True"
+                               Style="{StaticResource FormEntry}" />
+                    </VerticalStackLayout>
+
+                    <Button Text="Save Admin Settings"
+                            Style="{StaticResource PrimaryButton}"
+                            Clicked="OnSaveAdminClicked"
+                            Margin="0,8,0,0" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- About Card -->
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Label Text="AgoraIn"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}"
+                           HorizontalOptions="Center" />
+                    <Label Text="v2.7.1"
+                           FontSize="14"
+                           TextColor="{StaticResource TextSecondary}"
+                           HorizontalOptions="Center" />
+                    <Label Text="Developer: 刘宇晨"
+                           FontSize="13"
+                           TextColor="{StaticResource TextTertiary}"
+                           HorizontalOptions="Center" />
+                    <Label Text="liuyuchen032901@outlook.com"
+                           FontSize="12"
+                           TextColor="{StaticResource TextTertiary}"
+                           HorizontalOptions="Center" />
+                    <Label Text="(c) 2026 All Rights Reserved"
+                           FontSize="11"
+                           TextColor="{StaticResource Gray400}"
+                           HorizontalOptions="Center"
+                           Margin="0,8,0,0" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Sign-In button -->
+            <Button Text="Create Sign-In Task"
+                    Style="{StaticResource SecondaryButton}"
+                    Clicked="OnCreateSignInClicked"
+                    HorizontalOptions="Center" />
+
+            <!-- Bottom spacing -->
+            <BoxView HeightRequest="20" Color="Transparent" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

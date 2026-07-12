@@ -65,7 +65,28 @@ public class SignInTaskEntity
 }
 
 /// <summary>
-/// 应用程序数据库上下文，使用 SQLite 存储设备信息和打卡记录
+/// 用户实体：存储 Web 管理面板的用户账号信息
+/// </summary>
+public class UserEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>用户名（唯一）</summary>
+    public string Username { get; set; } = string.Empty;
+    /// <summary>密码哈希（SHA256 十六进制字符串）</summary>
+    public string PasswordHash { get; set; } = string.Empty;
+    /// <summary>角色：admin（管理员）/ operator（操作员）/ viewer（查看者）</summary>
+    public string Role { get; set; } = "viewer";
+    /// <summary>显示名称</summary>
+    public string DisplayName { get; set; } = string.Empty;
+    /// <summary>创建时间（ISO 8601 格式）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+    /// <summary>是否启用</summary>
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// 应用程序数据库上下文，使用 SQLite 存储设备信息、打卡记录和用户信息
 /// </summary>
 public class AppDbContext : DbContext
 {
@@ -77,6 +98,8 @@ public class AppDbContext : DbContext
     public DbSet<AttendanceEntity> AttendanceRecords => Set<AttendanceEntity>();
     /// <summary>签到任务表</summary>
     public DbSet<SignInTaskEntity> SignInTasks => Set<SignInTaskEntity>();
+    /// <summary>用户表</summary>
+    public DbSet<UserEntity> Users => Set<UserEntity>();
 
     /// <summary>
     /// 配置实体映射：设置主键、字段长度限制和索引
@@ -108,6 +131,15 @@ public class AppDbContext : DbContext
             e.Property(s => s.MachineUuid).HasMaxLength(64);
             e.HasIndex(s => s.ShortCode).IsUnique();              // 短链码唯一索引
             e.HasIndex(s => s.MachineUuid);                       // 按设备查询索引
+        });
+
+        // 用户实体配置
+        modelBuilder.Entity<UserEntity>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.Property(u => u.Username).HasMaxLength(64);
+            e.Property(u => u.PasswordHash).HasMaxLength(128);
+            e.HasIndex(u => u.Username).IsUnique();               // 用户名唯一索引
         });
     }
 }

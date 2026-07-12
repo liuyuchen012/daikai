@@ -10,9 +10,10 @@
 - [6. 客户端 API 详解](#6-客户端-api-详解)
 - [7. Web 面板 API 详解](#7-web-面板-api-详解)
 - [8. 签到功能 API 详解（V2.7）](#8-签到功能-api-详解v27-新增)
-- [9. 认证页面接口](#9-认证页面接口)
-- [10. Web 管理面板页面](#10-web-管理面板页面)
-- [11. 调用示例](#11-调用示例)
+- [9. 用户管理 API 详解（V2.8 新增）](#9-用户管理-api-详解v28-新增)
+- [10. 认证页面接口](#10-认证页面接口)
+- [11. Web 管理面板页面](#11-web-管理面板页面)
+- [12. 调用示例](#12-调用示例)
 
 ---
 
@@ -58,20 +59,31 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
 ```json
 {
   "Port": 5250,
-  "AdminUsername": "admin",
-  "AdminPassword": "admin",
   "ServerName": "AgoraIn 集控平台",
-  "ServerPassword": "admin123"
+  "ServerPassword": "admin123",
+  "Users": [
+    {
+      "Username": "admin",
+      "PasswordHash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+      "Role": "admin",
+      "DisplayName": "管理员",
+      "IsActive": true
+    }
+  ]
 }
 ```
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `Port` | int | `5250` | 服务器监听端口 |
-| `AdminUsername` | string | `admin` | Web 管理面板登录用户名 |
-| `AdminPassword` | string | `admin` | Web 管理面板登录密码 |
 | `ServerName` | string | `AgoraIn 集控平台` | 显示在 Web 页面标题栏的名称 |
 | `ServerPassword` | string | `admin123` | 客户端 API 调用的共享密钥 |
+| `Users[]` | array | [admin] | 用户列表（V2.8 新增），首次运行时自动 seed 到数据库 |
+| `Users[].Username` | string | admin | 登录用户名 |
+| `Users[].PasswordHash` | string | SHA256 | SHA256 哈希的密码（可使用在线工具生成） |
+| `Users[].Role` | string | admin | 角色：`admin` / `operator` / `viewer` |
+| `Users[].DisplayName` | string | 管理员 | 显示名称 |
+| `Users[].IsActive` | bool | true | 是否启用
 
 ---
 
@@ -92,21 +104,33 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
 Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**：
 
 1. 用户访问任何页面前必须通过 `/login` 页面认证
-2. 登录成功后，服务器生成格式为 `username:timestamp:signature` 的令牌
+2. 登录成功后，服务器生成格式为 `username:role:timestamp:signature` 的令牌
 3. 令牌通过名为 `sw_session` 的 HttpOnly Cookie 下发给浏览器
 4. 有效期为 **7 天**
 5. 签名使用每个进程启动时随机生成的 `sessionSecret`（进程重启后旧 Cookie 自动失效）
+6. 令牌中包含用户角色，用于 API 权限控制
 
-### 3.3 路由保护规则
+### 3.3 角色权限控制（V2.8 新增）
 
-| 路径前缀 | 是否需要 Web 认证 |
-|----------|-------------------|
-| `/api/*` | 不需要（密码+签名验证） |
-| `/login` | 不需要 |
-| `/logout` | 不需要 |
-| `/static` | 不需要 |
-| `/s/*` | 不需要（公开的学生签到页面） |
-| 其他所有路径 | **需要登录** |
+| 角色 | 查看设备 | 管理设备 | 用户管理 | 修改密码 |
+|------|:---:|:---:|:---:|:---:|
+| `admin` | 是 | 是 | 是 | 是 |
+| `operator` | 是 | 是 | 否 | 是 |
+| `viewer` | 是 | 否 | 否 | 是 |
+
+### 3.4 路由保护规则
+
+| 路径前缀 | 是否需要 Web 认证 | 权限要求 |
+|----------|-------------------|----------|
+| `/api/*` | 不需要（密码+签名验证） | - |
+| `/login` | 不需要 | - |
+| `/logout` | 不需要 | - |
+| `/static` | 不需要 | - |
+| `/s/*` | 不需要（公开的学生签到页面） | - |
+| `/api/users*` | 需要（admin 角色） | admin 专属 |
+| `/users` 页面 | 需要（admin 角色） | admin 专属 |
+| `/profile` 页面 | 需要 | 任意角色 |
+| 其他所有路径 | **需要登录** | 任意角色 |
 
 ---
 
@@ -152,6 +176,20 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | `Status` | string | 任务状态：`active`（进行中）/ `closed`（已关闭） |
 
 > **索引**：`ShortCode` 唯一索引（快速查找签到页面）+ `MachineUuid` 索引（按设备查询任务列表）。
+
+#### UserEntity（用户表）※ V2.8 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Id` | int | 主键，自增 |
+| `Username` | string(64) | 登录用户名，唯一索引 |
+| `PasswordHash` | string(128) | SHA256 哈希密码（小写十六进制） |
+| `Role` | string(16) | 角色：`admin` / `operator` / `viewer` |
+| `DisplayName` | string(64) | 显示名称 |
+| `CreatedAt` | string | 创建时间（ISO 8601 格式） |
+| `IsActive` | bool | 是否启用 |
+
+> **索引**：`Username` 唯一索引（快速登录查找）。
 
 ### 4.2 业务数据模型
 
@@ -237,6 +275,11 @@ Web 管理页面（非 `/api/*` 路径）采用 **HMAC-SHA256 签名 Session**�
 | POST | `/api/signin_result` | ※ 客户端拉取签到结果 | 密码+challenge签名 |
 | GET | `/s/{shortCode}` | ※ 学生签到页面（HTML表单） | 无需认证 |
 | POST | `/s/{shortCode}` | ※ 学生提交签到 | 无需认证 |
+| GET | `/api/users` | ※※ 获取用户列表 | admin Session |
+| POST | `/api/users` | ※※ 创建用户 | admin Session |
+| PUT | `/api/users/{id}` | ※※ 更新用户信息 | admin Session |
+| DELETE | `/api/users/{id}` | ※※ 删除用户 | admin Session |
+| POST | `/api/users/change-password` | ※※ 修改密码 | Session |
 
 > ※ 标记为 V2.7 新增的签到功能接口。
 
@@ -1139,9 +1182,182 @@ curl -X POST http://localhost:5250/s/k7mx9q \
 
 ---
 
-## 9. 认证页面接口
+## 9. 用户管理 API 详解（V2.8 新增）
 
-### 9.1 登录页面
+以下接口供 **Web 管理面板** 调用，需要通过 Cookie Session 认证，且根据角色进行权限控制。
+
+### 9.1 获取用户列表
+
+```
+GET /api/users
+```
+
+**用途**：获取所有用户列表（仅 admin 角色可调用）。
+
+**认证**：需通过 Cookie Session 认证，且角色为 `admin`。
+
+**成功响应**：
+
+```json
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "role": "admin",
+    "display_name": "管理员",
+    "is_active": true,
+    "created_at": "2026-07-12T20:00:00.0000000+08:00"
+  }
+]
+```
+
+**错误响应**：HTTP 401（未登录）或 403（权限不足）
+
+---
+
+### 9.2 创建用户
+
+```
+POST /api/users
+```
+
+**用途**：创建新用户（仅 admin 角色可调用）。
+
+**请求体**（JSON）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `username` | string | 是 | 登录用户名（唯一） |
+| `password` | string | 是 | 明文密码（服务器自动 SHA256 哈希存储） |
+| `role` | string | 是 | 角色：`admin` / `operator` / `viewer` |
+| `display_name` | string | 是 | 显示名称 |
+
+**请求示例**：
+
+```json
+{
+  "username": "zhangsan",
+  "password": "123456",
+  "role": "operator",
+  "display_name": "张老师"
+}
+```
+
+**成功响应**：
+
+```json
+{ "status": "ok", "id": 2 }
+```
+
+**错误响应**：`{"error":"用户名已存在"}` (409)
+
+---
+
+### 9.3 更新用户信息
+
+```
+PUT /api/users/{id}
+```
+
+**用途**：修改用户角色、显示名称、启用状态（仅 admin 角色可调用）。
+
+**路径参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `id` | int | 用户 ID |
+
+**请求体**（JSON）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `role` | string | 否 | 新角色 |
+| `display_name` | string | 否 | 新显示名称 |
+| `is_active` | bool | 否 | 是否启用 |
+
+**成功响应**：`{ "status": "ok" }`
+
+**错误响应**：`{"error":"用户不存在"}` (404) / `{"error":"不能修改自己的角色"}` (400)
+
+---
+
+### 9.4 删除用户
+
+```
+DELETE /api/users/{id}
+```
+
+**用途**：删除用户（仅 admin 角色可调用，不能删除自己）。
+
+**路径参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `id` | int | 用户 ID |
+
+**成功响应**：`{ "status": "ok" }`
+
+**错误响应**：
+- `{"error":"不能删除自己"}` (400)
+- `{"error":"用户不存在"}` (404)
+- `{"error":"不允许删除最后一个管理员"}` (400)
+
+---
+
+### 9.5 修改密码
+
+```
+POST /api/users/change-password
+```
+
+**用途**：修改当前用户或指定用户的密码（admin 可修改他人，普通用户仅可修改自己）。
+
+**请求体**（JSON）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `old_password` | string | 是 | 当前密码（修改自己时必填） |
+| `new_password` | string | 是 | 新密码 |
+| `user_id` | int | 否 | 目标用户 ID（仅 admin 可指定，修改他人时无需 old_password） |
+
+**请求示例**：
+
+```json
+{
+  "old_password": "admin",
+  "new_password": "newSecure123"
+}
+```
+
+**成功响应**：`{ "status": "ok" }`
+
+**错误响应**：`{"error":"旧密码错误"}` (403)
+
+### 9.6 获取当前用户信息
+
+```
+GET /api/users/me
+```
+
+**用途**：获取当前登录用户的个人信息。
+
+**成功响应**：
+
+```json
+{
+  "id": 1,
+  "username": "admin",
+  "role": "admin",
+  "display_name": "管理员",
+  "is_active": true
+}
+```
+
+---
+
+## 10. 认证页面接口
+
+### 10.1 登录页面
 
 ```
 GET /login
@@ -1154,7 +1370,7 @@ GET /login
 **调用方式**：浏览器直接访问 `http://localhost:5250/login`
 
 
-### 9.2 提交登录
+### 10.2 提交登录
 
 ```
 POST /login
@@ -1188,7 +1404,7 @@ curl -X POST http://localhost:5250/login \
 ```
 
 
-### 9.3 退出登录
+### 10.3 退出登录
 
 ```
 GET /logout
@@ -1202,11 +1418,11 @@ GET /logout
 
 ---
 
-## 10. Web 管理面板页面
+## 11. Web 管理面板页面
 
 以下页面在浏览器中展示，**需要先登录**才能访问。
 
-### 10.1 首页 - 设备总览
+### 11.1 首页 - 设备总览
 
 ```
 GET /
@@ -1219,7 +1435,7 @@ GET /
 - 顶部统计卡片：设备总数、在线设备数、离线设备数
 - 设备列表表格：设备名称（文件夹图标）、在线状态徽章、任务数、最后在线时间、操作按钮（查看/删除）
 
-### 10.2 设备详情页
+### 11.2 设备详情页
 
 ```
 GET /machine/{uuid}
@@ -1239,7 +1455,7 @@ GET /machine/{uuid}
 - 设备名称、在线状态、编辑配置按钮、删除设备按钮
 - 任务卡片网格：任务图标、任务名称、总人数/已打卡统计、最后更新时间
 
-### 10.3 任务详情页
+### 11.3 任务详情页
 
 ```
 GET /machine/{uuid}/task/{taskId}
@@ -1262,11 +1478,38 @@ GET /machine/{uuid}/task/{taskId}
 - 学生打卡状态网格：点击可进行打卡或取消打卡操作
 - 清除数据按钮
 
+### 11.4 用户管理页面（V2.8 新增）※ admin 专属
+
+```
+GET /users
+```
+
+**用途**：管理所有用户账号（仅 `admin` 角色可访问）。
+
+**页面内容**：
+- 用户列表表格：用户名、显示名称、角色（admin/operator/viewer）、状态（启用/禁用）、操作按钮
+- 新建用户按钮 → 弹窗表单：用户名、密码、角色、显示名称
+- 编辑按钮 → 弹窗：修改角色、启用/禁用
+- 删除按钮 → 确认框（不可删除自己）
+
+### 11.5 个人设置页面（V2.8 新增）
+
+```
+GET /profile
+```
+
+**用途**：修改当前登录用户的密码（所有角色均可访问）。
+
+**页面内容**：
+- 当前用户信息：用户名、角色
+- 修改密码表单：旧密码 + 新密码 + 确认新密码
+- 保存按钮
+
 ---
 
-## 11. 调用示例
+## 12. 调用示例
 
-### 11.1 完整的客户端工作流
+### 12.1 完整的客户端工作流
 
 ```
 ┌─────────┐                              ┌─────────┐
@@ -1303,7 +1546,7 @@ GET /machine/{uuid}/task/{taskId}
      │                                        │
 ```
 
-### 11.2 签到工作流（V2.7 新增）
+### 12.2 签到工作流（V2.7 新增）
 
 ```
 ┌─────────┐           ┌─────────┐           ┌─────────┐
@@ -1342,7 +1585,7 @@ GET /machine/{uuid}/task/{taskId}
      │                      │                     │
 ```
 
-### 11.3 使用 PowerShell 调用
+### 12.3 使用 PowerShell 调用
 
 ```powershell
 $ServerUrl = "http://localhost:5250"
@@ -1367,7 +1610,7 @@ Write-Host "注册成功，UUID: $Uuid"
 Invoke-RestMethod -Uri "$ServerUrl/api/machines/$Uuid/tasks" | ConvertTo-Json
 ```
 
-### 11.4 使用 Python 调用
+### 12.4 使用 Python 调用
 
 ```python
 import requests
@@ -1402,5 +1645,5 @@ print(resp.json())
 
 ---
 
-> **文档版本**：对应 CheckIn.Net V2.7 分支
-> **最后更新**：2026-07-11
+> **文档版本**：对应 CheckIn.Net V2.8 分支
+> **最后更新**：2026-07-12

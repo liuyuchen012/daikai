@@ -2,10 +2,11 @@
 
 # AgoraIn 课堂签到打卡系统
 
+### 本版本正在开发中，无法正常运行请不要下载
 ### 桌面 + Web 双端打卡解决方案
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blue)
 ![License](https://img.shields.io/badge/license-GPL%20v3-green)
 ![Language](https://img.shields.io/badge/language-C%23-178600)
 ![PRs](https://img.shields.io/badge/PRs-welcome-orange)
@@ -26,6 +27,8 @@
 - [详细使用指南](#详细使用指南)
 - [Web 管理面板](#web-管理面板)
 - [多任务管理（V2.7 新功能）](#多任务管理v27-新功能)
+- [多账户与权限管理（V2.8 新功能）](#多账户与权限管理v28-新功能)
+- [移动客户端（V2.8 新功能）](#移动客户端v28-新功能)
 - [通信安全](#通信安全)
 - [数据存储](#数据存储)
 - [技术栈](#技术栈)
@@ -52,6 +55,9 @@
 | 一键清空 | 管理员三次确认后安全清空所有记录 |
 | RSA 加密通信 | 客户端与服务器之间 RSA-2048 签名验证 |
 | 跨平台服务器 | Linux/macOS 均可运行服务器，浏览器远程管理 |
+| 多账户管理 | 支持 admin/operator/viewer 三级角色权限 |
+| MAUI 桌面客户端 | Windows + macOS 原生桌面客户端 |
+| 移动客户端 | Android + iOS 手机平板自适应客户端 |
 
 ---
 
@@ -94,35 +100,51 @@ check-in-net/
 │       └── MachineInfo.cs                 # 设备信息（UUID/名称/公钥/在线状态）
 │
 ├── Server/                                # ASP.NET Core Web API 服务器
-│   ├── Program.cs                         # Minimal API（设备分组+任务卡片+打卡操作+签到短链）
+│   ├── Program.cs                         # Minimal API（多账户/权限/设备分组/签到短链）
 │   ├── Data/
-│   │   └── AppDbContext.cs                # EF Core + SQLite
+│   │   └── AppDbContext.cs                # EF Core + SQLite（含用户表）
 │   └── wwwroot/
-│       ├── template.html                  # Web 管理面板 HTML
+│       ├── template.html                  # Web 管理面板（含用户管理/个人设置）
 │       └── login.html                     # 登录页面
 │
-└── Client/                                # WPF 桌面客户端（仅 Windows）
-    ├── MainWindow.xaml                    # 左侧任务树 + 标签栏 + 打卡排名 + 学生网格
-    ├── MainWindow.xaml.cs                 # 窗口交互、标签页管理、右键菜单、拖拽
-    ├── ViewModels/
-    │   ├── MainViewModel.cs               # 工作区管理、多标签、后台任务、任务树
-    │   ├── TaskTabViewModel.cs            # 独立数据/配置/服务器连接/后台同步
-    │   └── RelayCommand.cs                # ICommand 实现
+├── Client/                                # WPF 桌面客户端（Windows 专属）
+│   ├── MainWindow.xaml                    # 左侧任务树 + 标签栏 + 打卡排名 + 学生网格
+│   ├── ViewModels/
+│   ├── Services/
+│   └── Models/
+│
+├── Client.Maui/                           # MAUI 桌面客户端（Windows + macOS）※ V2.8 新增
+│   ├── Pages/
+│   │   ├── MainPage.xaml                  # 主界面：任务管理仪表盘
+│   │   ├── TaskDetailPage.xaml            # 任务详情：排名 + 学生网格
+│   │   ├── CreateSignInPage.xaml          # 创建签到任务 + 二维码
+│   │   └── SettingsPage.xaml              # 服务器与全局设置
+│   ├── ViewModels/                        # 从 WPF 客户端迁移的 MVVM
+│   ├── Services/
+│   │   └── ServerService.cs               # RSA-2048 签名 HTTP 通信
+│   └── Platforms/                         # Windows + macOS 平台代码
+│
+└── Client.Mobile/                         # MAUI 移动客户端（Android + iOS）※ V2.8 新增
+    ├── Pages/
+    │   ├── TaskListPage.xaml               # 任务列表（手机：列表 / 平板：网格）
+    │   ├── TaskDetailPage.xaml             # 任务详情（手机：标签页 / 平板：左右分栏）
+    │   ├── StudentGridPage.xaml            # 学生打卡网格
+    │   └── SettingsPage.xaml               # 设置页面
+    ├── ViewModels/                         # 移动端优化的 MVVM
     ├── Services/
-    │   └── ServerService.cs               # RSA-2048 签名 HTTP 通信
-    ├── ModernDialog.cs                    # 对话框组件
-    ├── SplashScreen.xaml                  # 启动闪屏
-    └── icon.ico / logo.svg               # 程序图标
+    └── Platforms/                          # Android + iOS 平台代码
 ```
 
 ### 架构要点
 
+- **多客户端**：WPF（Windows 桌面）、MAUI（Windows + macOS 桌面）、MAUI Mobile（Android + iOS 移动端）
 - **MVVM 模式**：数据绑定、命令绑定，UI 与逻辑分离
 - **标签页架构**：每个 `TaskTabViewModel` 独立管理数据、配置、服务器连接
 - **后台同步**：未激活的标签页自动运行轻量级后台实例
 - **RSA 签名**：所有 HTTP 通信经过 RSA-2048 签名验证
 - **设备分组**：服务器端按 UUID 分组，Web 端文件夹式浏览
 - **签到短链**：6 位字符随机生成短链，Cookie 防重复签到，二维码分享
+- **多账户体系**：admin/operator/viewer 三级角色，Web 端用户管理
 
 ---
 
@@ -133,24 +155,58 @@ check-in-net/
 ### Windows
 
 ```bash
-# 1. 启动服务器
+# 方式一：WPF 桌面客户端（推荐，功能最完整）
+cd release/windows-x64
+AgoraIn-Windows-x64-Client.exe
+
+# 方式二：MAUI 桌面客户端（现代化 UI）
+cd Client.Maui
+dotnet run
+
+# 启动服务器
 cd Server
 CheckIn.Server.exe
-# 浏览器打开 http://localhost:5000
-
-# 2. 启动客户端
-cd Client
-CheckIn.Client.exe
+# 浏览器打开 http://localhost:5250
 ```
 
-### Linux / macOS
+### macOS
 
 ```bash
-# 仅运行服务器（桌面客户端不支持）
-chmod +x CheckIn.Server
-./CheckIn.Server --urls "http://0.0.0.0:5000"
+# 桌面客户端
+cd Client.Maui
+dotnet run -f net10.0-maccatalyst
 
-# 浏览器打开 http://localhost:5000
+# 启动服务器
+chmod +x CheckIn.Server
+./CheckIn.Server --urls "http://0.0.0.0:5250"
+
+# 或解压 zip 包
+unzip AgoraIn-MacOS-x64-Server.zip
+cd macos && ./AgoraIn-MacOS-x64-Server
+```
+
+### Linux
+
+```bash
+# 仅运行服务器
+chmod +x CheckIn.Server
+./CheckIn.Server --urls "http://0.0.0.0:5250"
+
+# 或解压 zip 包
+unzip AgoraIn-Linux-x64-Server.zip
+cd linux && ./AgoraIn-Linux-x64-Server
+```
+
+### 移动端（Android / iOS）
+
+```bash
+cd Client.Mobile
+
+# Android
+dotnet build -t:Run -f net10.0-android
+
+# iOS（需 macOS + Xcode）
+dotnet build -t:Run -f net10.0-ios
 ```
 
 ### 配置远程连接
@@ -276,10 +332,26 @@ http://192.168.1.100:5000      # 局域网访问（替换为实际 IP）
 
 #### 首页 — 设备总览
 
-- 深色渐变侧边栏：品牌标识 + 导航（设备总览）+ 退出登录
+- 深色渐变侧边栏：品牌标识 + 导航（设备总览 / 用户管理 / 个人设置）+ 退出登录
 - 统计卡片：设备总数 / 在线设备（绿色）/ 离线设备（红色）
 - 设备表格：设备名称 + 状态徽章（在线 `#ecfdf5` / 离线 `#fef2f2`）+ 任务数 + 最后在线时间 + 操作按钮（查看/删除）
 - 行级点击：点击设备行进入设备详情页
+
+#### 用户管理页面 ※ V2.8 新增
+
+URL: `/users`（仅 admin 角色可见）
+
+- 用户列表表格：用户名、显示名称、角色、状态、操作按钮
+- 新建用户：填写用户名、密码、角色、显示名称
+- 编辑用户：修改角色、启用/禁用
+- 删除用户：不可删除当前登录用户
+
+#### 个人设置页面 ※ V2.8 新增
+
+URL: `/profile`（所有已登录用户可访问）
+
+- 修改密码：输入旧密码验证 + 新密码确认
+- 显示当前用户信息（用户名、角色）
 
 #### 设备详情页 — 任务卡片
 
@@ -354,6 +426,66 @@ URL: `/machine/{uuid}/task/{taskId}`
 - 每个设备行显示任务数量
 - 点击设备进入 `/machine/{uuid}` 查看任务卡片
 - 点击任务卡片进入 `/machine/{uuid}/task/{taskId}` 查看详情
+
+---
+
+## 多账户与权限管理（V2.8 新功能）
+
+### 角色体系
+
+系统支持三级角色，每位用户拥有独立的用户名/密码和权限：
+
+| 角色 | 权限说明 |
+|------|---------|
+| **admin** (管理员) | 全部权限：管理设备、管理用户、修改配置、清除数据 |
+| **operator** (操作员) | 设备管理：查看设备、远程打卡/取消打卡、清除数据 |
+| **viewer** (查看者) | 只读：只能查看设备和打卡数据，不能修改 |
+
+### 用户管理
+
+管理员登录 Web 面板后，可通过侧边栏"用户管理"页面：
+- 创建新用户（设置用户名、密码、角色、显示名称）
+- 编辑用户信息（修改角色、启用/禁用）
+- 删除用户（不能删除自己）
+- 密码通过 SHA256 哈希安全存储
+
+### 个人设置
+
+每位用户登录后可通过侧边栏"个人设置"页面修改自己的密码。需输入旧密码验证身份后方可设置新密码。
+
+---
+
+## 移动客户端（V2.8 新功能）
+
+### 自适应布局
+
+移动客户端会根据屏幕尺寸自动切换布局：
+
+| 设备类型 | 布局方式 |
+|---------|---------|
+| **手机** (< 600dp) | 单列布局，底部 Tab 导航，全屏内容 |
+| **平板** (>= 600dp) | 双列 Master-Detail，侧边 Flyout 导航 |
+
+### 手机端功能
+
+- **底部导航栏**：首页（任务列表）、设置
+- **任务列表页**：垂直列表，滑动可删除任务
+- **任务详情页**：顶部标签栏切换"排名"和"打卡"
+- **打卡操作**：点击学生按钮完成打卡（变绿），长按取消
+- **下拉刷新**：同步服务器最新数据
+
+### 平板端功能
+
+- **侧边导航**：常驻 Flyout 面板
+- **任务列表**：2-3 列网格卡片布局
+- **任务详情**：左侧 40% 排名列表 + 右侧 60% 打卡网格
+
+### 手势交互
+
+- **点击**：学生打卡
+- **长按**：取消打卡
+- **下拉**：刷新数据
+- **滑动**：删除任务
 
 ---
 
@@ -466,16 +598,15 @@ CREATE INDEX IX_SignInTasks_MachineUuid ON SignInTaskEntity(MachineUuid);
 
 | 组件 | 技术 | 版本 |
 |------|------|------|
-| 桌面客户端 | WPF (.NET) | .NET 10.0 |
+| Windows 桌面客户端 | WPF (.NET) | .NET 10.0 |
+| 跨平台桌面客户端 | .NET MAUI | .NET 10.0 |
+| 移动客户端 | .NET MAUI | .NET 10.0 |
 | 服务器 | ASP.NET Core Minimal API | .NET 10.0 |
 | 数据库 | SQLite (via EF Core) | — |
 | 通信安全 | RSA-2048 签名 (SHA256) + HMAC-SHA256 | — |
-| GUI 样式 | 原生 WPF + 圆角设计 | — |
 | 数据格式 | JSON / CSV | — |
 | 二维码 | QRCoder | 1.6.0 |
-| 依赖注入 | Microsoft.Extensions.DependencyInjection | — |
-| ORM | Entity Framework Core + SQLite | — |
-| 架构 | MVVM (MainViewModel + TaskTabViewModel) | — |
+| 架构 | MVVM (多客户端共享) | — |
 
 ---
 

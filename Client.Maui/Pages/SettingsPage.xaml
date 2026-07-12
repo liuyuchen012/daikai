@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CheckIn.Client.Maui.ViewModels"
+             x:Class="CheckIn.Client.Maui.Pages.SettingsPage"
+             Title="设置"
+             BackgroundColor="#F0F2F5">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="20" MaximumWidthRequest="600">
+
+            <!-- Title -->
+            <Label Text="应用设置" FontSize="24" FontAttributes="Bold"
+                   TextColor="#333333" />
+
+            <!-- Server Settings Section -->
+            <Border BackgroundColor="#FFFFFF" Stroke="#E8E8E8" StrokeThickness="1"
+                    Padding="16" StrokeShape="RoundRectangle 12">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="服务器设置" FontSize="16" FontAttributes="Bold"
+                           TextColor="#333333" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="服务器地址" FontSize="13" TextColor="#666666" />
+                        <Entry Text="{Binding ServerIp}"
+                               Placeholder="如 192.168.1.100" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="服务器端口" FontSize="13" TextColor="#666666" />
+                        <Entry Text="{Binding ServerPort}"
+                               Placeholder="5250" Keyboard="Numeric" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="服务器密码" FontSize="13" TextColor="#666666" />
+                        <Entry Text="{Binding ServerPassword}"
+                               IsPassword="True" Placeholder="连接密码" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="启用在线模式" FontSize="13" TextColor="#666666"
+                               VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding OnlineMode}"
+                                OnColor="#4285f4" />
+                    </Grid>
+
+                    <Button Text="保存服务器设置" BackgroundColor="#4285f4"
+                            TextColor="White" CornerRadius="8" HeightRequest="44"
+                            FontSize="15"
+                            Command="{Binding SaveServerSettingsCommand}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Admin Settings Section -->
+            <Border BackgroundColor="#FFFFFF" Stroke="#E8E8E8" StrokeThickness="1"
+                    Padding="16" StrokeShape="RoundRectangle 12">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="管理员设置" FontSize="16" FontAttributes="Bold"
+                           TextColor="#333333" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="新密码（留空不改）" FontSize="13" TextColor="#666666" />
+                        <Entry Text="{Binding NewPassword}" IsPassword="True"
+                               Placeholder="输入新管理员密码" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="确认密码" FontSize="13" TextColor="#666666" />
+                        <Entry Text="{Binding ConfirmPassword}" IsPassword="True"
+                               Placeholder="再次输入新密码" />
+                    </VerticalStackLayout>
+
+                    <Button Text="保存管理员设置" BackgroundColor="#34a853"
+                            TextColor="White" CornerRadius="8" HeightRequest="44"
+                            FontSize="15"
+                            Command="{Binding SaveAdminSettingsCommand}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Status -->
+            <Label Text="{Binding StatusMessage}"
+                   FontSize="12" TextColor="#4285f4"
+                   HorizontalOptions="Center" />
+
+            <!-- Back Button -->
+            <Button Text="返回" BackgroundColor="#F0F0F0" TextColor="#666666"
+                    CornerRadius="8" HeightRequest="44" FontSize="15"
+                    Command="{Binding GoBackCommand}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
