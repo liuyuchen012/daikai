@@ -1,6 +1,6 @@
 <div align="center">
 
-# SignWave 课堂签到打卡系统
+# AgoraIn 课堂签到打卡系统
 
 ### 桌面 + Web 双端打卡解决方案
 

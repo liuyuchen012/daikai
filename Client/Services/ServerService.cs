@@ -9,7 +9,7 @@ using CheckIn.Shared.Models;
 namespace CheckIn.Client.Services;
 
 /// <summary>
-/// 远程服务器通信服务，负责客户端与 SignWave 集控平台的交互
+/// 远程服务器通信服务，负责客户端与 AgoraIn 集控平台的交互
 /// 功能包括：客户端注册、RSA 签名认证、数据同步与加载、配置同步
 /// </summary>
 public class ServerService

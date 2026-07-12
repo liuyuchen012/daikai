@@ -541,7 +541,7 @@ public partial class MainWindow : Window
                 // 使用全局配置创建临时 ServerService
                 var server = new ServerService();
                 server.Initialize(_vm.Config.ServerIp, _vm.Config.ServerPort, _vm.Config.ServerPassword);
-                await server.RegisterAsync("SignWave签到");
+                await server.RegisterAsync("AgoraIn签到");
 
                 var result = await server.CreateSignInAsync(signPassword, classroom, subject, _signInStudentList);
                 if (result == null)

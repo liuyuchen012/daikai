@@ -57,7 +57,7 @@
             </Border>
 
             <!-- 应用名称（淡入） -->
-            <TextBlock Grid.Row="1" Text="SignWave" FontSize="28" FontWeight="Bold"
+            <TextBlock Grid.Row="1" Text="AgoraIn" FontSize="28" FontWeight="Bold"
                        Foreground="#4285f4" HorizontalAlignment="Center" Margin="0,0,0,8"
                        Opacity="0">
                 <TextBlock.Triggers>

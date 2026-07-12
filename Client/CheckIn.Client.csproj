@@ -7,8 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>icon.ico</ApplicationIcon>
-    <AssemblyName>SignWave</AssemblyName>
-    <Product>SignWave</Product>
+    <AssemblyName>AgoraIn</AssemblyName>
+    <Product>AgoraIn</Product>
   </PropertyGroup>
 
   <ItemGroup>

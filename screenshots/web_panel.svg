@@ -21,7 +21,7 @@
 
   <!-- Tabs -->
   <rect x="10" y="6" width="170" height="28" rx="5" fill="white"/>
-  <text x="20" y="25" fill="#4285f4" font-size="12" font-weight="bold" font-family="Segoe UI">🌐 SignWave 集控平台</text>
+  <text x="20" y="25" fill="#4285f4" font-size="12" font-weight="bold" font-family="Segoe UI">🌐 AgoraIn 集控平台</text>
 
   <!-- URL bar -->
   <rect x="190" y="8" width="420" height="22" rx="11" fill="white" stroke="#dadce0" stroke-width="1"/>
@@ -37,7 +37,7 @@
 
   <!-- Sidebar brand -->
   <rect x="0" y="36" width="240" height="72" fill="transparent"/>
-  <text x="20" y="72" fill="url(#brand-grad)" font-size="22" font-weight="700" font-family="Segoe UI" letter-spacing="0.5">SignWave</text>
+  <text x="20" y="72" fill="url(#brand-grad)" font-size="22" font-weight="700" font-family="Segoe UI" letter-spacing="0.5">AgoraIn</text>
   <text x="20" y="92" fill="rgba(255,255,255,0.4)" font-size="12" font-family="Segoe UI">集控管理平台</text>
   <line x1="20" y1="108" x2="220" y2="108" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
@@ -54,7 +54,7 @@
   <polyline points="36,732 52,724 68,732" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2" stroke-linejoin="round"/>
   <line x1="52" y1="724" x2="52" y2="742" stroke="rgba(255,255,255,0.65)" stroke-width="2"/>
   <text x="74" y="738" fill="rgba(255,255,255,0.65)" font-size="14" font-family="Segoe UI">退出登录</text>
-  <text x="20" y="770" fill="rgba(255,255,255,0.3)" font-size="12" font-family="Segoe UI">SignWave v2.5 · 2026</text>
+  <text x="20" y="770" fill="rgba(255,255,255,0.3)" font-size="12" font-family="Segoe UI">AgoraIn v2.5 · 2026</text>
 
   <!-- ============ MAIN CONTENT ============ -->
   <!-- Page header: 设备总览 -->

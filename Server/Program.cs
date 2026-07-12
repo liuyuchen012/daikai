@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Web;
 
 // =============================================================================
-// SignWave 集控平台 - 服务器端入口
+// AgoraIn 集控平台 - 服务器端入口
 // 功能：设备注册与管理、打卡数据同步、Web 管理面板（含登录认证）
 // =============================================================================
 
@@ -21,7 +21,7 @@ var configJson = File.Exists(configPath) ? JsonDocument.Parse(File.ReadAllText(c
 var cfgPort = configJson.TryGetProperty("Port", out var p) ? p.GetInt32() : 5250;
 var cfgAdminUser = configJson.TryGetProperty("AdminUsername", out var au) ? au.GetString() ?? "admin" : "admin";
 var cfgAdminPwd = configJson.TryGetProperty("AdminPassword", out var ap) ? ap.GetString() ?? "admin" : "admin";
-var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "SignWave 集控平台" : "SignWave 集控平台";
+var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "AgoraIn 集控平台" : "AgoraIn 集控平台";
 var serverPassword = configJson.TryGetProperty("ServerPassword", out var sp) ? sp.GetString() ?? "admin123" : "admin123";
 
 var builder = WebApplication.CreateBuilder(args);
@@ -786,7 +786,7 @@ input:focus{{border-color:#4285f4}}
 <button type=""submit"" class=""btn"">确认签到</button>
 </form>
 </div>
-<div class=""footer"">SignWave 签到系统</div>
+<div class=""footer"">AgoraIn 签到系统</div>
 </div>
 </body></html>";
 }

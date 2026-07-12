@@ -83,7 +83,7 @@ public class MainViewModel : INotifyPropertyChanged
         get
         {
             var tabName = ActiveTab != null ? $" - {ActiveTab.TabDisplayName}" : "";
-            return $"SignWave{tabName} {AppConfig.Version}  作者: 刘宇晨";
+            return $"AgoraIn{tabName} {AppConfig.Version}  作者: 刘宇晨";
         }
     }
 

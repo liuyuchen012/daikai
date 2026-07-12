@@ -1,4 +1,4 @@
-# SignWave 集控平台 - 服务器 API 文档
+# AgoraIn 集控平台 - 服务器 API 文档
 
 ## 目录
 
@@ -18,7 +18,7 @@
 
 ## 1. 概述
 
-SignWave 集控平台是一个轻量级的 **学生打卡管理系统** 服务器，基于 ASP.NET Core Minimal API 构建。提供以下能力：
+AgoraIn 集控平台是一个轻量级的 **学生打卡管理系统** 服务器，基于 ASP.NET Core Minimal API 构建。提供以下能力：
 
 - **客户端管理**：设备注册、RSA 签名验证、打卡数据同步
 - **Web 管理面板**：可视化设备管理、打卡排名查看、远程打卡操作
@@ -60,7 +60,7 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
   "Port": 5250,
   "AdminUsername": "admin",
   "AdminPassword": "admin",
-  "ServerName": "SignWave 集控平台",
+  "ServerName": "AgoraIn 集控平台",
   "ServerPassword": "admin123"
 }
 ```
@@ -70,7 +70,7 @@ nohup dotnet CheckIn.Server.dll > server.log 2>&1 &
 | `Port` | int | `5250` | 服务器监听端口 |
 | `AdminUsername` | string | `admin` | Web 管理面板登录用户名 |
 | `AdminPassword` | string | `admin` | Web 管理面板登录密码 |
-| `ServerName` | string | `SignWave 集控平台` | 显示在 Web 页面标题栏的名称 |
+| `ServerName` | string | `AgoraIn 集控平台` | 显示在 Web 页面标题栏的名称 |
 | `ServerPassword` | string | `admin123` | 客户端 API 调用的共享密钥 |
 
 ---
