@@ -25,7 +25,9 @@ public partial class StudentHistoryPage : ContentPage
     private Task LoadUserInfo()
     {
         lblUsername.Text = _auth.CurrentDisplayName ?? _auth.CurrentUsername ?? "用户";
-        lblRole.Text = _auth.IsAdmin ? "管理员" : "学生";
+        lblRole.Text = _auth.IsAdmin ? "管理员" :
+                       _auth.IsTeacher ? "普通教师" :
+                       _auth.IsParent ? "家长" : "学生";
         return Task.CompletedTask;
     }
 

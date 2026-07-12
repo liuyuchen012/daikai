@@ -16,8 +16,21 @@ public class AuthService
     public string? CurrentRole { get; private set; }
     public string? CurrentDisplayName { get; private set; }
     public bool IsLoggedIn => !string.IsNullOrEmpty(CurrentToken);
-    public bool IsAdmin => CurrentRole == "admin" || CurrentRole == "operator";
-    public bool IsStudent => CurrentRole == "viewer";
+
+    /// <summary>标准化角色名（兼容旧角色）</summary>
+    private string NormalizedRole => CurrentRole switch
+    {
+        "operator" => "teacher",
+        "viewer" => "student",
+        _ => CurrentRole ?? ""
+    };
+
+    public bool IsAdmin => NormalizedRole == "admin";
+    public bool IsTeacher => NormalizedRole == "teacher";
+    public bool IsStudent => NormalizedRole == "student";
+    public bool IsParent => NormalizedRole == "parent";
+    /// <summary>管理员或教师（有管理权限）</summary>
+    public bool IsAdminOrTeacher => NormalizedRole == "admin" || NormalizedRole == "teacher";
 
     public AuthService(ApiService api)
     {

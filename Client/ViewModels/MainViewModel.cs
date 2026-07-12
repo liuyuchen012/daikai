@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using CheckIn.Client.Models;
 using CheckIn.Client.Services;
+using CheckIn.Shared.Models;
 
 namespace CheckIn.Client.ViewModels;
 
@@ -210,6 +211,10 @@ public class MainViewModel : INotifyPropertyChanged
         }
         if (string.IsNullOrEmpty(tab.Config.Name)) tab.Config.Name = $"任务{Tabs.Count + 1}";
         tab.SaveConfig();
+
+        // 订阅服务端推送任务事件
+        tab.PendingTasksReceived += HandlePendingTasks;
+
         // 如果是签到任务，重新初始化服务器连接以使用正确的 TaskId
         if (isSignIn && !string.IsNullOrEmpty(signInTaskId))
         {
@@ -220,6 +225,53 @@ public class MainViewModel : INotifyPropertyChanged
         SaveWorkspace();
         RefreshTaskTree();
         OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    /// <summary>
+    /// 处理服务端推送的新任务配置：创建对应的签到任务标签页
+    /// </summary>
+    private void HandlePendingTasks(List<PendingTaskConfig> pendingTasks)
+    {
+        foreach (var pt in pendingTasks)
+        {
+            // 检查是否已存在相同 TaskId 的任务
+            var existingTab = Tabs.FirstOrDefault(t => t.Config.SignInTaskId == pt.TaskId);
+            if (existingTab == null)
+            {
+                existingTab = _backgroundTasks.FirstOrDefault(t => t.Config.SignInTaskId == pt.TaskId);
+            }
+            if (existingTab != null) continue; // 已存在，跳过
+
+            // 创建新的签到任务标签页
+            var taskName = string.IsNullOrEmpty(pt.TaskName) ? pt.Subject : pt.TaskName;
+            var id = Guid.NewGuid().ToString("N")[..8];
+            var tab = new TaskTabViewModel(id, _baseDir, Config);
+            tab.Config.Name = taskName;
+            tab.Config.Km = pt.Subject;
+            tab.Config.IsSignInTask = true;
+            tab.Config.SignInTaskId = pt.TaskId;
+            tab.SaveConfig();
+
+            // 导入学生名单
+            if (pt.Students.Count > 0)
+            {
+                var namesPath = Path.Combine(_baseDir, "data", "tabs", id, "name.txt");
+                File.WriteAllLines(namesPath, pt.Students);
+                tab.LoadStudentNames();
+            }
+
+            // 订阅推送事件
+            tab.PendingTasksReceived += HandlePendingTasks;
+
+            // 初始化服务器连接（使用后台模式）
+            if (!string.IsNullOrEmpty(Config.ServerIp))
+            {
+                tab.UpdateGlobalServerConfig(Config.ServerIp, Config.ServerPort, Config.ServerPassword, AppConfig.Version);
+            }
+
+            // 添加到后台任务列表（不打开标签页）
+            _backgroundTasks.Add(tab);
+        }
     }
 
     /// <summary>

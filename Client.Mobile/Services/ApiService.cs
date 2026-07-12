@@ -122,4 +122,28 @@ public class ApiService
     {
         return json.TryGetProperty(key, out var val) ? val.GetString() : null;
     }
+
+    /// <summary>
+    /// 发送 PUT JSON 请求
+    /// </summary>
+    public async Task<JsonElement> PutAsync(string endpoint, object? body = null)
+    {
+        var url = $"{_baseUrl}{endpoint}";
+        StringContent? content = null;
+        if (body != null)
+        {
+            var json = JsonSerializer.Serialize(body);
+            content = new StringContent(json, Encoding.UTF8, "application/json");
+        }
+        var response = await _httpClient.PutAsync(url, content);
+        var responseBody = await response.Content.ReadAsStringAsync();
+        try
+        {
+            return JsonDocument.Parse(responseBody).RootElement;
+        }
+        catch
+        {
+            return JsonDocument.Parse("{}").RootElement;
+        }
+    }
 }

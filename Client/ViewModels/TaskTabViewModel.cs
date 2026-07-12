@@ -69,6 +69,13 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     private int _globalServerPort = 5250;
     private string _globalServerPassword = "";
 
+    // 配置版本追踪（检测服务端推送的配置变更）
+    private int _lastAppliedConfigVersion;
+    private DateTime _lastConfigCheck = DateTime.MinValue;
+
+    /// <summary>服务端推送了新任务配置时触发</summary>
+    public event Action<List<PendingTaskConfig>>? PendingTasksReceived;
+
     /// <summary>学生数据集合（绑定到打卡按钮网格）</summary>
     public ObservableCollection<StudentModel> Students { get; } = new();
     /// <summary>打卡排名集合（绑定到左侧排名列表）</summary>
@@ -288,7 +295,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// 启动周期性同步任务：每 5 秒从服务器拉取数据并更新在线状态
+    /// 启动周期性同步任务：每 5 秒从服务器拉取数据、检测配置变更并更新在线状态
     /// </summary>
     private async void StartPeriodicSync()
     {
@@ -304,6 +311,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
 
                 try
                 {
+                    // ① 拉取打卡数据
                     var serverData = await _server.LoadDataAsync();
                     if (serverData != null)
                     {
@@ -319,6 +327,41 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
                         }
                         if (changed) { UpdateRanking(); OnPropertyChanged(nameof(PunchInfo)); }
                     }
+
+                    // ② 检测服务端配置推送（每 15 秒检查一次，避免频繁请求）
+                    var now = DateTime.Now;
+                    if ((now - _lastConfigCheck).TotalSeconds >= 15)
+                    {
+                        _lastConfigCheck = now;
+                        var remoteConfig = await _server.LoadConfigAsync();
+                        if (remoteConfig != null && remoteConfig.ConfigVersion > _lastAppliedConfigVersion)
+                        {
+                            _lastAppliedConfigVersion = remoteConfig.ConfigVersion;
+
+                            // 应用设备名称变更
+                            if (!string.IsNullOrEmpty(remoteConfig.DeviceName) && Config.Name != remoteConfig.DeviceName)
+                            {
+                                Config.Name = remoteConfig.DeviceName;
+                                SaveConfig();
+                                OnPropertyChanged(nameof(Config));
+                                OnPropertyChanged(nameof(TabDisplayName));
+                            }
+
+                            // 处理待推送的任务
+                            if (remoteConfig.PendingTasks is { Count: > 0 })
+                            {
+                                var pendingTasks = remoteConfig.PendingTasks.ToList();
+                                // 通知 MainViewModel 创建新标签页
+                                PendingTasksReceived?.Invoke(pendingTasks);
+
+                                // 确认已应用的任务
+                                var appliedIds = pendingTasks.Select(t => t.TaskId).ToList();
+                                await _server.ConfigAppliedAsync(appliedIds);
+                            }
+                        }
+                    }
+
+                    // ③ 检查在线状态
                     var online = await _server.CheckStatusAsync();
                     if (IsOnline != online) IsOnline = online;
                     LastCheck = DateTime.Now.ToString("MM-dd HH:mm:ss");
@@ -551,7 +594,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>
     /// 加载学生名单（name.txt），如果文件不存在则生成 40 名默认学生
     /// </summary>
-    private void LoadStudentNames()
+    public void LoadStudentNames()
     {
         if (!File.Exists(_nameFile))
             File.WriteAllLines(_nameFile, Enumerable.Range(1, 40).Select(i => $"学生{i}"));

@@ -103,28 +103,43 @@
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="viewmodels:DeviceInfo">
-                            <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
-                                    Padding="12" Stroke="#e8e8e8" StrokeThickness="1"
-                                    Margin="0,0,0,6">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeviceTappedCommand}"
-                                        CommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                                    <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10"
-                                             Fill="{Binding StatusColor}" VerticalOptions="Center" />
-                                    <VerticalStackLayout Grid.Column="1" Spacing="3">
-                                        <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" LineBreakMode="TailTruncation" />
-                                        <Label Text="{Binding StatusText}" FontSize="11" TextColor="{Binding StatusColor}" />
-                                    </VerticalStackLayout>
-                                    <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End">
-                                        <Label Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
-                                               FontSize="12" TextColor="#888888" />
-                                        <Label Text="点击查看 ›" FontSize="10" TextColor="#aaaaaa" HorizontalOptions="End" Margin="0,2,0,0" />
-                                    </VerticalStackLayout>
-                                </Grid>
-                            </Border>
+                            <SwipeView Margin="0,0,0,6">
+                                <SwipeView.RightItems>
+                                    <SwipeItems>
+                                        <SwipeItem Text="查看任务" BackgroundColor="#4285f4"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewDeviceQRCodeCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="重命名" BackgroundColor="#fbbc04"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RenameDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="删除" BackgroundColor="#ea4335"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                    </SwipeItems>
+                                </SwipeView.RightItems>
+
+                                <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                        Padding="12" Stroke="#e8e8e8" StrokeThickness="1">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeviceTappedCommand}"
+                                            CommandParameter="{Binding .}" />
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10"
+                                                 Fill="{Binding StatusColor}" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                            <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" LineBreakMode="TailTruncation" />
+                                            <Label Text="{Binding StatusText}" FontSize="11" TextColor="{Binding StatusColor}" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End">
+                                            <Label Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
+                                                   FontSize="12" TextColor="#888888" />
+                                            <Label Text="‹ 滑动操作" FontSize="10" TextColor="#aaaaaa" HorizontalOptions="End" Margin="0,2,0,0" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </SwipeView>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
                 </CollectionView>

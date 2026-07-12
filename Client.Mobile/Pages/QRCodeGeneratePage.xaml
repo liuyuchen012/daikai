@@ -17,6 +17,22 @@
                     <Label Text="创建签到任务" FontSize="18" FontAttributes="Bold" TextColor="#333333" />
 
                     <VerticalStackLayout Spacing="4">
+                        <Label Text="选择设备 *" FontSize="13" TextColor="#555555" />
+                        <Border BackgroundColor="#f8f9fb" StrokeShape="RoundRectangle 8"
+                                Padding="4" Stroke="#e0e0e0" StrokeThickness="1">
+                            <Picker x:Name="DevicePicker"
+                                    ItemsSource="{Binding DeviceList}"
+                                    ItemDisplayBinding="{Binding DisplayText}"
+                                    SelectedIndex="-1"
+                                    Title="请选择一个设备"
+                                    FontSize="14"
+                                    SelectedIndexChanged="OnDeviceSelected" />
+                        </Border>
+                        <Label Text="{Binding SelectedDeviceHint}" FontSize="12" TextColor="#4285f4"
+                               IsVisible="{Binding IsSelectedDeviceHintVisible}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
                         <Label Text="科目 *" FontSize="13" TextColor="#555555" />
                         <Entry Text="{Binding Subject}" Placeholder="如：高等数学" FontSize="14" />
                     </VerticalStackLayout>
@@ -66,6 +82,8 @@
                         <Label Text="{Binding ResultSubject, StringFormat='科目: {0}'}"
                                FontSize="15" TextColor="#333333" />
                         <Label Text="{Binding ResultClassroom, StringFormat='教室: {0}'}"
+                               FontSize="14" TextColor="#666666" />
+                        <Label Text="{Binding ResultDeviceName, StringFormat='设备: {0}'}"
                                FontSize="14" TextColor="#666666" />
                         <Label Text="{Binding ResultStudentCount, StringFormat='学生人数: {0}'}"
                                FontSize="14" TextColor="#666666" />

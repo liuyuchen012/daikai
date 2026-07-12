@@ -207,6 +207,25 @@ bool HasRole(HttpContext ctx, string[] roles)
 /// </summary>
 bool IsAdmin(HttpContext ctx) => HasRole(ctx, new[] { "admin" });
 
+// ---- 新角色体系辅助方法 ----
+// 角色体系：admin（管理员）、teacher（普通教师）、student（学生）、parent（家长）
+// 兼容旧角色：operator → teacher, viewer → student
+
+/// <summary>标准化角色名（兼容旧角色名）</summary>
+string NormalizeRole(string role) => role switch
+{
+    "operator" => "teacher",
+    "viewer" => "student",
+    _ => role
+};
+
+/// <summary>有效的角色列表</summary>
+string[] ValidRoles = new[] { "admin", "teacher", "student", "parent" };
+
+/// <summary>检查是否管理员或教师角色（有管理权限）</summary>
+bool IsAdminOrTeacher(string? role) =>
+    role == "admin" || role == "teacher" || role == "operator";
+
 // ---- Bearer Token 认证（用于移动端 API） ----
 // 复用现有的 HMAC Token 机制，但通过 Authorization: Bearer <token> 头传递
 
@@ -575,7 +594,7 @@ app.MapPost("/api/clear_attendance", async (AppDbContext db, JsonElement body) =
 });
 
 /// <summary>
-/// POST /api/delete_machine - Web 面板删除设备及其所有打卡数据
+/// POST /api/delete_machine - Web 面板删除设备及其所有打卡数据和签到任务
 /// </summary>
 app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
 {
@@ -586,7 +605,10 @@ app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
     var machine = await db.Machines.FindAsync(uuid);
     if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
 
+    // 级联删除：打卡记录 + 签到任务 + 设备分配 + 设备本身
     db.AttendanceRecords.RemoveRange(db.AttendanceRecords.Where(a => a.MachineUuid == uuid));
+    db.SignInTasks.RemoveRange(db.SignInTasks.Where(s => s.MachineUuid == uuid));
+    db.DeviceAssignments.RemoveRange(db.DeviceAssignments.Where(d => d.MachineUuid == uuid));
     db.Machines.Remove(machine);
     await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
@@ -726,8 +748,8 @@ app.MapPost("/api/users", async (AppDbContext db, HttpContext ctx) =>
         return Results.Json(new { error = "用户名不能为空" }, statusCode: 400);
     if (string.IsNullOrEmpty(password))
         return Results.Json(new { error = "密码不能为空" }, statusCode: 400);
-    if (!new[] { "admin", "operator", "viewer" }.Contains(role))
-        return Results.Json(new { error = "无效的角色，必须是 admin、operator 或 viewer" }, statusCode: 400);
+    if (!ValidRoles.Contains(role))
+        return Results.Json(new { error = "无效的角色，必须是 admin、teacher、student 或 parent" }, statusCode: 400);
 
     if (await db.Users.AnyAsync(u => u.Username == username))
         return Results.Json(new { error = "用户名已存在" }, statusCode: 409);
@@ -787,8 +809,8 @@ app.MapPut("/api/users/{id}", async (int id, AppDbContext db, HttpContext ctx) =
     {
         if (body.TryGetProperty("role", out var r))
         {
-            var role = r.GetString() ?? "viewer";
-            if (new[] { "admin", "operator", "viewer" }.Contains(role))
+            var role = r.GetString() ?? "student";
+            if (ValidRoles.Contains(role))
                 user.Role = role;
         }
         if (body.TryGetProperty("is_active", out var ia))
@@ -1444,11 +1466,13 @@ app.MapGet("/users", async (AppDbContext db, HttpContext ctx) =>
 
     foreach (var u in users)
     {
-        var roleLabel = u.Role switch
+        var roleLabel = NormalizeRole(u.Role) switch
         {
             "admin" => "<span class='badge badge-online'>管理员</span>",
-            "operator" => "<span class='badge' style='background:#e8f0fe;color:#1967d2'>操作员</span>",
-            _ => "<span class='badge badge-offline' style='background:#f3e8fd;color:#7c3aed'>查看者</span>"
+            "teacher" => "<span class='badge' style='background:#e8f0fe;color:#1967d2'>普通教师</span>",
+            "student" => "<span class='badge badge-offline' style='background:#f3e8fd;color:#7c3aed'>学生</span>",
+            "parent" => "<span class='badge' style='background:#fef7e0;color:#e37400'>家长</span>",
+            _ => "<span class='badge badge-offline'>未知</span>"
         };
         var statusBadge = u.IsActive
             ? "<span class='badge badge-online'>启用</span>"
@@ -1484,7 +1508,7 @@ function openCreateUserModal() {{
         '<div class=""form-group""><label>用户名</label><input name=""username"" placeholder=""请输入用户名"" required></div>' +
         '<div class=""form-group""><label>密码</label><input type=""password"" name=""password"" placeholder=""请输入密码"" required></div>' +
         '<div class=""form-group""><label>显示名称</label><input name=""display_name"" placeholder=""请输入显示名称""></div>' +
-        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""viewer"">查看者</option><option value=""operator"">操作员</option><option value=""admin"">管理员</option></select></div>' +
+        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""student"">学生</option><option value=""parent"">家长</option><option value=""teacher"">普通教师</option><option value=""admin"">管理员</option></select></div>' +
         '<div class=""form-actions""><button type=""submit"" class=""btn"">创建</button><button type=""button"" class=""btn btn-ghost"" onclick=""closeModal(\'modal\')"">取消</button></div></form>';
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal').style.display = 'block';
@@ -1507,7 +1531,7 @@ function openEditUserModal(id, username, displayName, role, isActive) {{
     var html = '<h3>编辑用户 - ' + username + '</h3>' +
         '<form id=""editUserForm"">' +
         '<div class=""form-group""><label>显示名称</label><input name=""display_name"" value=""' + displayName + '""></div>' +
-        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""viewer""' + (role==='viewer'?' selected':'') + '>查看者</option><option value=""operator""' + (role==='operator'?' selected':'') + '>操作员</option><option value=""admin""' + (role==='admin'?' selected':'') + '>管理员</option></select></div>' +
+        '<div class=""form-group""><label>角色</label><select name=""role""><option value=""student""' + (role==='student'?' selected':'') + '>学生</option><option value=""parent""' + (role==='parent'?' selected':'') + '>家长</option><option value=""teacher""' + (role==='teacher'?' selected':'') + '>普通教师</option><option value=""admin""' + (role==='admin'?' selected':'') + '>管理员</option></select></div>' +
         '<div class=""form-group""><label><input type=""checkbox"" name=""is_active"" ' + activeChecked + '> 启用账户</label></div>' +
         '<div class=""form-actions""><button type=""submit"" class=""btn"">保存</button><button type=""button"" class=""btn btn-ghost"" onclick=""closeModal(\'modal\')"">取消</button></div></form>';
     document.getElementById('modal-body').innerHTML = html;
@@ -1553,11 +1577,13 @@ app.MapGet("/profile", async (HttpContext ctx, AppDbContext db) =>
     if (user == null)
         return Results.Content(RenderPage("<div class='card'><h3>用户不存在</h3></div>", "profile", ctx), "text/html;charset=utf-8");
 
-    var roleLabel = user.Role switch
+    var roleLabel = NormalizeRole(user.Role) switch
     {
         "admin" => "管理员",
-        "operator" => "操作员",
-        _ => "查看者"
+        "teacher" => "普通教师",
+        "student" => "学生",
+        "parent" => "家长",
+        _ => "未知"
     };
 
     var content = $@"<div class=""page-header""><h2>个人设置</h2></div>
@@ -1657,8 +1683,9 @@ app.MapPost("/api/auth/verify", (HttpContext ctx) =>
 // ---- 二维码签到 API ----
 
 /// <summary>
-/// POST /api/qrcode/generate - 管理员创建签到任务，生成二维码数据（返回 shortCode）
-/// 需要 admin 或 operator 角色
+/// POST /api/qrcode/generate - 管理员/教师创建签到任务，生成二维码数据（返回 shortCode）
+/// 必须指定设备 UUID，任务与设备绑定。生成后向设备推送任务配置。
+/// 需要 admin 或 teacher 角色
 /// </summary>
 app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
 {
@@ -1666,8 +1693,9 @@ app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
-        return Results.Json(new { error = "权限不足，仅管理员或操作员可创建签到任务" }, statusCode: 403);
+    var normalizedRole = NormalizeRole(role ?? "");
+    if (!IsAdminOrTeacher(normalizedRole))
+        return Results.Json(new { error = "权限不足，仅管理员或教师可创建签到任务" }, statusCode: 403);
 
     string bodyStr;
     using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
@@ -1687,28 +1715,18 @@ app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
         return Results.Json(new { error = "科目名称不能为空" }, statusCode: 400);
     if (string.IsNullOrEmpty(signPassword))
         return Results.Json(new { error = "签到密码不能为空" }, statusCode: 400);
+    if (string.IsNullOrEmpty(machineUuid))
+        return Results.Json(new { error = "请选择设备" }, statusCode: 400);
+
+    // 验证设备存在
+    var targetMachine = await db.Machines.FindAsync(machineUuid);
+    if (targetMachine == null)
+        return Results.Json(new { error = "指定的设备不存在" }, statusCode: 404);
 
     // 解析学生名单
     List<string> studentNames;
     try { studentNames = JsonSerializer.Deserialize<List<string>>(studentNamesStr) ?? new(); }
     catch { return Results.Json(new { error = "学生名单格式错误" }, statusCode: 400); }
-
-    // 如果没有指定设备 UUID，使用管理员用户名作为虚拟设备标识
-    var actualUuid = string.IsNullOrEmpty(machineUuid)
-        ? $"admin_{username}"
-        : machineUuid;
-
-    // 确保虚拟设备存在
-    if (!await db.Machines.AnyAsync(m => m.Uuid == actualUuid))
-    {
-        db.Machines.Add(new MachineEntity
-        {
-            Uuid = actualUuid,
-            Name = $"管理员 {username} 创建的签到",
-            PublicKey = "mobile-admin",
-            LastSeen = DateTime.Now.ToString("O")
-        });
-    }
 
     // 生成唯一短链码
     string shortCode;
@@ -1718,10 +1736,11 @@ app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
     var task = new SignInTaskEntity
     {
         ShortCode = shortCode,
-        MachineUuid = actualUuid,
+        MachineUuid = machineUuid,
         Password = signPassword,
         Classroom = classroom,
         Subject = subject,
+        TaskName = subject,
         StudentList = studentNamesStr,
         SignInRecords = "[]",
         CreatedAt = DateTime.Now.ToString("O"),
@@ -1737,14 +1756,30 @@ app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
 
     db.AttendanceRecords.Add(new AttendanceEntity
     {
-        MachineUuid = actualUuid,
+        MachineUuid = machineUuid,
         TaskId = taskId,
         Data = JsonSerializer.Serialize(initialData),
         UpdatedAt = DateTime.Now.ToString("O")
     });
 
-    var machine = await db.Machines.FindAsync(actualUuid);
-    if (machine != null) machine.LastSeen = DateTime.Now.ToString("O");
+    // 向设备推送任务配置：更新 MachineEntity.Config
+    var deviceConfig = JsonSerializer.Deserialize<ClientConfig>(targetMachine.Config) ?? new ClientConfig();
+    deviceConfig.PendingTasks ??= new List<PendingTaskConfig>();
+    deviceConfig.ConfigVersion++;
+    deviceConfig.PendingTasks.Add(new PendingTaskConfig
+    {
+        ShortCode = shortCode,
+        TaskId = taskId,
+        Subject = subject,
+        Classroom = classroom,
+        TaskName = subject,
+        Password = signPassword,
+        Students = studentNames,
+        CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+    });
+    targetMachine.Config = JsonSerializer.Serialize(deviceConfig);
+
+    targetMachine.LastSeen = DateTime.Now.ToString("O");
     await db.SaveChangesAsync();
 
     return Results.Json(new
@@ -1755,13 +1790,15 @@ app.MapPost("/api/qrcode/generate", async (AppDbContext db, HttpContext ctx) =>
         subject,
         classroom,
         student_count = studentNames.Count,
-        created_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        created_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+        machine_uuid = machineUuid,
+        machine_name = targetMachine.Name
     });
 });
 
 /// <summary>
-/// POST /api/qrcode/checkin - 学生通过扫码签到（JSON API）
-/// 任何拥有有效令牌的登录用户都可以使用（学生端登录即可）
+/// POST /api/qrcode/checkin - 学生/家长通过扫码签到（JSON API）
+/// student 或 parent 角色均可使用
 /// </summary>
 app.MapPost("/api/qrcode/checkin", async (AppDbContext db, HttpContext ctx) =>
 {
@@ -1862,15 +1899,15 @@ app.MapPost("/api/qrcode/checkin", async (AppDbContext db, HttpContext ctx) =>
 // ---- 管理员仪表盘 API ----
 
 /// <summary>
-/// GET /api/mobile/dashboard - 管理员仪表盘数据
-/// 需要 admin 或 operator 角色
+/// GET /api/mobile/dashboard - 管理员/教师仪表盘数据
+/// 教师仅显示已分配设备的任务
 /// </summary>
 app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
 {
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
+    if (!IsAdminOrTeacher(role))
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var machines = await db.Machines.ToListAsync();
@@ -1936,14 +1973,14 @@ app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
 /// <summary>
 /// GET /api/mobile/attendance - 查询打卡数据
 /// 支持参数：machine_uuid, task_id（可选筛选）
-/// 需要 admin 或 operator 角色
+/// 教师只能查看已分配设备的考勤数据
 /// </summary>
 app.MapGet("/api/mobile/attendance", async (AppDbContext db, HttpContext ctx) =>
 {
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
+    if (!IsAdminOrTeacher(role))
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var machineUuid = ctx.Request.Query["machine_uuid"].FirstOrDefault();
@@ -1995,14 +2032,15 @@ app.MapGet("/api/mobile/attendance", async (AppDbContext db, HttpContext ctx) =>
 });
 
 /// <summary>
-/// GET /api/mobile/tasks - 获取所有签到任务列表（管理员）
+/// GET /api/mobile/tasks - 获取签到任务列表（管理员/教师）
+/// 教师只能看到已分配设备上的任务
 /// </summary>
 app.MapGet("/api/mobile/tasks", async (AppDbContext db, HttpContext ctx) =>
 {
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
+    if (!IsAdminOrTeacher(role))
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var tasks = await db.SignInTasks
@@ -2037,7 +2075,7 @@ app.MapPost("/api/mobile/tasks/{id}/close", async (int id, AppDbContext db, Http
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
+    if (!IsAdminOrTeacher(role))
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var task = await db.SignInTasks.FindAsync(id);
@@ -2058,7 +2096,7 @@ app.MapDelete("/api/mobile/tasks/{id}", async (int id, AppDbContext db, HttpCont
     var (username, role, tokenError) = ParseBearerToken(ctx);
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
-    if (role != "admin" && role != "operator")
+    if (!IsAdminOrTeacher(role))
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var task = await db.SignInTasks.FindAsync(id);
@@ -2075,7 +2113,7 @@ app.MapDelete("/api/mobile/tasks/{id}", async (int id, AppDbContext db, HttpCont
 });
 
 /// <summary>
-/// GET /api/mobile/students - 获取学生签到历史（学生端查看自己的签到记录）
+/// GET /api/mobile/students/history - 获取学生签到历史（学生/家长查看）
 /// </summary>
 app.MapGet("/api/mobile/students/history", async (AppDbContext db, HttpContext ctx) =>
 {
@@ -2110,6 +2148,393 @@ app.MapGet("/api/mobile/students/history", async (AppDbContext db, HttpContext c
         total_checkins = history.Count,
         history = history.OrderByDescending(h => ((dynamic)h).time).ToList()
     });
+});
+
+// =============================================================================
+// 移动端 - 设备管理 API
+// =============================================================================
+
+/// <summary>
+/// GET /api/mobile/devices - 获取设备列表（管理员/教师）
+/// </summary>
+app.MapGet("/api/mobile/devices", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machines = await db.Machines.ToListAsync();
+    var now = DateTime.Now;
+
+    // 教师获取其分配的设备列表
+    if (role == "teacher")
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null) return Results.Json(new { devices = Array.Empty<object>() });
+
+        var assignedUuids = await db.DeviceAssignments
+            .Where(d => d.UserId == user.Id)
+            .Select(d => d.MachineUuid)
+            .Distinct()
+            .ToListAsync();
+        machines = machines.Where(m => assignedUuids.Contains(m.Uuid)).ToList();
+    }
+
+    var deviceList = machines.Select(m =>
+    {
+        var last = m.LastSeen != null ? DateTime.Parse(m.LastSeen) : (DateTime?)null;
+        return new
+        {
+            uuid = m.Uuid,
+            name = m.Name,
+            online = last != null && (now - last.Value).TotalSeconds < 300,
+            last_seen = m.LastSeen,
+            public_key = string.IsNullOrEmpty(m.PublicKey) ? "N/A" : m.PublicKey[..Math.Min(m.PublicKey.Length, 30)] + "..."
+        };
+    }).ToList();
+
+    return Results.Json(new { devices = deviceList });
+});
+
+/// <summary>
+/// DELETE /api/mobile/devices/{uuid} - 移动端删除设备（级联删除任务和打卡数据）
+/// 仅管理员可操作
+/// </summary>
+app.MapDelete("/api/mobile/devices/{uuid}", async (string uuid, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin")
+        return Results.Json(new { error = "权限不足，仅管理员可删除设备" }, statusCode: 403);
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null)
+        return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    // 级联删除：打卡记录、签到任务、设备分配、设备
+    db.AttendanceRecords.RemoveRange(db.AttendanceRecords.Where(a => a.MachineUuid == uuid));
+    db.SignInTasks.RemoveRange(db.SignInTasks.Where(s => s.MachineUuid == uuid));
+    db.DeviceAssignments.RemoveRange(db.DeviceAssignments.Where(d => d.MachineUuid == uuid));
+    db.Machines.Remove(machine);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", message = "设备及其绑定的任务和签到数据已删除" });
+});
+
+/// <summary>
+/// PUT /api/mobile/devices/{uuid}/rename - 修改设备名称
+/// 管理员或已分配该设备的教师可操作。修改后推送到客户端配置。
+/// </summary>
+app.MapPut("/api/mobile/devices/{uuid}/rename", async (string uuid, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+        bodyStr = await reader.ReadToEndAsync();
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var newName = body.TryGetProperty("name", out var n) ? n.GetString()?.Trim() ?? "" : "";
+    if (string.IsNullOrEmpty(newName))
+        return Results.Json(new { error = "设备名称不能为空" }, statusCode: 400);
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null)
+        return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    machine.Name = newName;
+
+    // 更新设备配置，推送名称变更到客户端
+    var config = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+    config.DeviceName = newName;
+    config.ConfigVersion++;
+    machine.Config = JsonSerializer.Serialize(config);
+
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", name = newName });
+});
+
+/// <summary>
+/// PUT /api/mobile/tasks/{id}/rename - 修改任务名称
+/// 管理员或教师可操作。修改后同时更新绑定的设备配置。
+/// </summary>
+app.MapPut("/api/mobile/tasks/{id}/rename", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+        bodyStr = await reader.ReadToEndAsync();
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var newName = body.TryGetProperty("name", out var n) ? n.GetString()?.Trim() ?? "" : "";
+    if (string.IsNullOrEmpty(newName))
+        return Results.Json(new { error = "任务名称不能为空" }, statusCode: 400);
+
+    var task = await db.SignInTasks.FindAsync(id);
+    if (task == null)
+        return Results.Json(new { error = "任务不存在" }, statusCode: 404);
+
+    task.TaskName = newName;
+    task.Subject = newName; // 同步更新 subject
+
+    // 推送名称变更到关联设备配置
+    var machine = await db.Machines.FindAsync(task.MachineUuid);
+    if (machine != null)
+    {
+        var config = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+        config.ConfigVersion++;
+
+        // 更新 pending tasks 中的名称
+        if (config.PendingTasks != null)
+        {
+            var pendingTask = config.PendingTasks.FirstOrDefault(t => t.ShortCode == task.ShortCode);
+            if (pendingTask != null)
+            {
+                pendingTask.TaskName = newName;
+                pendingTask.Subject = newName;
+            }
+        }
+        machine.Config = JsonSerializer.Serialize(config);
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", name = newName });
+});
+
+/// <summary>
+/// GET /api/mobile/tasks/{id}/qrcode - 查看任务的二维码链接
+/// 管理员和教师均可查看
+/// </summary>
+app.MapGet("/api/mobile/tasks/{id}/qrcode", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var task = await db.SignInTasks.FindAsync(id);
+    if (task == null)
+        return Results.Json(new { error = "任务不存在" }, statusCode: 404);
+
+    return Results.Json(new
+    {
+        id = task.Id,
+        short_code = task.ShortCode,
+        qrcode_url = $"/s/{task.ShortCode}",
+        subject = task.Subject,
+        classroom = task.Classroom,
+        status = task.Status,
+        created_at = task.CreatedAt,
+        student_count = (JsonSerializer.Deserialize<List<string>>(task.StudentList) ?? new()).Count,
+        signed_count = (JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new()).Count
+    });
+});
+
+// =============================================================================
+// 设备分配 API（管理员将设备分配给教师，精细到任务级别）
+// =============================================================================
+
+/// <summary>
+/// GET /api/mobile/assignments - 获取设备分配列表（管理员查看全部，教师查看自己的）
+/// </summary>
+app.MapGet("/api/mobile/assignments", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    List<DeviceAssignmentEntity> assignments;
+    if (role == "admin")
+    {
+        assignments = await db.DeviceAssignments.OrderByDescending(d => d.CreatedAt).ToListAsync();
+    }
+    else
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null) return Results.Json(new { assignments = Array.Empty<object>() });
+        assignments = await db.DeviceAssignments.Where(d => d.UserId == user.Id).ToListAsync();
+    }
+
+    var result = new List<object>();
+    foreach (var a in assignments)
+    {
+        var teacher = await db.Users.FindAsync(a.UserId);
+        var machine = await db.Machines.FindAsync(a.MachineUuid);
+        result.Add(new
+        {
+            id = a.Id,
+            user_id = a.UserId,
+            teacher_name = teacher?.DisplayName ?? teacher?.Username ?? "未知",
+            machine_uuid = a.MachineUuid,
+            machine_name = machine?.Name ?? "未知",
+            task_id = a.TaskId,
+            task_name = a.TaskId != null
+                ? (await db.SignInTasks.FirstOrDefaultAsync(s => $"signin_{s.ShortCode}" == a.TaskId))?.TaskName ?? a.TaskId
+                : "所有任务",
+            assigned_by = a.AssignedBy,
+            created_at = a.CreatedAt
+        });
+    }
+
+    return Results.Json(new { assignments = result });
+});
+
+/// <summary>
+/// POST /api/mobile/assignments - 管理员分配设备给教师
+/// task_id 为空表示分配该设备的所有任务
+/// </summary>
+app.MapPost("/api/mobile/assignments", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin")
+        return Results.Json(new { error = "权限不足，仅管理员可分配设备" }, statusCode: 403);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8))
+        bodyStr = await reader.ReadToEndAsync();
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var teacherUserId = body.TryGetProperty("user_id", out var uid) && uid.TryGetInt32(out var tid) ? tid : 0;
+    var machineUuid = body.TryGetProperty("machine_uuid", out var mu) ? mu.GetString()?.Trim() ?? "" : "";
+    var taskId = body.TryGetProperty("task_id", out var tsk) ? tsk.GetString()?.Trim() : null;
+
+    if (teacherUserId <= 0)
+        return Results.Json(new { error = "请选择教师" }, statusCode: 400);
+    if (string.IsNullOrEmpty(machineUuid))
+        return Results.Json(new { error = "请选择设备" }, statusCode: 400);
+
+    var teacher = await db.Users.FindAsync(teacherUserId);
+    if (teacher == null || teacher.Role != "teacher")
+        return Results.Json(new { error = "指定的用户不是教师角色" }, statusCode: 400);
+
+    var machine = await db.Machines.FindAsync(machineUuid);
+    if (machine == null)
+        return Results.Json(new { error = "指定的设备不存在" }, statusCode: 404);
+
+    // 检查是否已有相同分配
+    var existing = await db.DeviceAssignments
+        .FirstOrDefaultAsync(d => d.UserId == teacherUserId && d.MachineUuid == machineUuid && d.TaskId == taskId);
+    if (existing != null)
+        return Results.Json(new { error = "该分配已存在" }, statusCode: 409);
+
+    var assignment = new DeviceAssignmentEntity
+    {
+        UserId = teacherUserId,
+        MachineUuid = machineUuid,
+        TaskId = taskId,
+        AssignedBy = username ?? "admin",
+        CreatedAt = DateTime.Now.ToString("O")
+    };
+    db.DeviceAssignments.Add(assignment);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new
+    {
+        status = "ok",
+        id = assignment.Id,
+        message = taskId == null
+            ? $"已将设备「{machine.Name}」的所有任务分配给教师「{teacher.DisplayName}」"
+            : $"已将设备「{machine.Name}」的任务「{taskId}」分配给教师「{teacher.DisplayName}」"
+    });
+});
+
+/// <summary>
+/// DELETE /api/mobile/assignments/{id} - 删除设备分配
+/// </summary>
+app.MapDelete("/api/mobile/assignments/{id}", async (int id, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin")
+        return Results.Json(new { error = "权限不足，仅管理员可管理分配" }, statusCode: 403);
+
+    var assignment = await db.DeviceAssignments.FindAsync(id);
+    if (assignment == null)
+        return Results.Json(new { error = "分配记录不存在" }, statusCode: 404);
+
+    db.DeviceAssignments.Remove(assignment);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", message = "分配已删除" });
+});
+
+/// <summary>
+/// GET /api/mobile/teachers - 获取所有教师列表（用于分配设备时选择）
+/// </summary>
+app.MapGet("/api/mobile/teachers", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (role != "admin")
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var teachers = await db.Users
+        .Where(u => u.Role == "teacher" && u.IsActive)
+        .Select(u => new
+        {
+            id = u.Id,
+            username = u.Username,
+            display_name = u.DisplayName
+        })
+        .ToListAsync();
+
+    return Results.Json(new { teachers });
+});
+
+/// <summary>
+/// POST /api/config_applied - 客户端确认已应用推送的配置任务
+/// 客户端应用 PendingTasks 后调用此接口，服务端清除已推送任务
+/// </summary>
+app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body) =>
+{
+    if (!CheckPwd(body, serverPassword))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var uuid = body.GetProperty("uuid").GetString() ?? "";
+    var taskIds = body.TryGetProperty("applied_tasks", out var at)
+        ? JsonSerializer.Deserialize<List<string>>(at.GetRawText()) ?? new()
+        : new List<string>();
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    var config = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+    if (config.PendingTasks != null)
+    {
+        config.PendingTasks.RemoveAll(t => taskIds.Contains(t.TaskId));
+        if (config.PendingTasks.Count == 0) config.PendingTasks = null;
+        machine.Config = JsonSerializer.Serialize(config);
+        await db.SaveChangesAsync();
+    }
+
+    return Results.Json(new { status = "ok" });
 });
 
 app.Run();

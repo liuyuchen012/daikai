@@ -38,7 +38,7 @@ public class AdminUsersViewModel : INotifyPropertyChanged
     public bool HasMessage => !string.IsNullOrEmpty(Message);
 
     public ObservableCollection<UserItem> Users { get; } = new();
-    public List<string> RoleOptions { get; } = new() { "viewer", "operator", "admin" };
+    public List<string> RoleOptions { get; } = new() { "student", "parent", "teacher", "admin" };
 
     public ICommand RefreshCommand { get; }
     public ICommand CreateUserCommand { get; }
@@ -217,15 +217,22 @@ public class UserItem
     public string RoleText => Role switch
     {
         "admin" => "管理员",
-        "operator" => "操作员",
-        _ => "学生"
+        "operator" => "教师",
+        "teacher" => "普通教师",
+        "student" => "学生",
+        "viewer" => "学生",
+        "parent" => "家长",
+        _ => "未知"
     };
 
     public Color RoleColor => Role switch
     {
         "admin" => Color.FromArgb("#ea4335"),
+        "teacher" => Color.FromArgb("#4285f4"),
         "operator" => Color.FromArgb("#4285f4"),
-        _ => Color.FromArgb("#34a853")
+        "student" => Color.FromArgb("#34a853"),
+        "parent" => Color.FromArgb("#e37400"),
+        _ => Color.FromArgb("#888888")
     };
 
     public string StatusText => IsActive ? "启用" : "禁用";

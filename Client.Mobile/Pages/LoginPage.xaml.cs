@@ -1,3 +1,4 @@
+using CheckIn.Client.Mobile.Services;
 using CheckIn.Client.Mobile.ViewModels;
 
 namespace CheckIn.Client.Mobile.Pages;
@@ -5,11 +6,13 @@ namespace CheckIn.Client.Mobile.Pages;
 public partial class LoginPage : ContentPage
 {
     private readonly LoginViewModel _viewModel;
+    private readonly AuthService _auth;
 
-    public LoginPage(LoginViewModel viewModel)
+    public LoginPage(LoginViewModel viewModel, AuthService auth)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _auth = auth;
         BindingContext = viewModel;
     }
 
@@ -65,7 +68,10 @@ public partial class LoginPage : ContentPage
         {
             try
             {
-                await Shell.Current.GoToAsync("//main");
+                if (_auth.IsAdminOrTeacher)
+                    await Shell.Current.GoToAsync("//main");
+                else
+                    await Shell.Current.GoToAsync("//student");
             }
             catch (Exception ex)
             {

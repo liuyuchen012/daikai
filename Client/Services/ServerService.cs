@@ -241,4 +241,18 @@ public class ServerService
     /// 获取服务器基础 URL（用于构建签到链接）
     /// </summary>
     public string BaseUrl => _baseUrl;
+
+    /// <summary>
+    /// 客户端确认已应用推送的配置任务
+    /// </summary>
+    /// <param name="taskIds">已应用的任务 ID 列表</param>
+    public async Task ConfigAppliedAsync(List<string> taskIds)
+    {
+        try
+        {
+            var body = new { uuid = _clientUuid, applied_tasks = taskIds, password = _password };
+            await _http.PostAsJsonAsync($"{_baseUrl}/api/config_applied", body);
+        }
+        catch { }
+    }
 }

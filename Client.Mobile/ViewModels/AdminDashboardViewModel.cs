@@ -8,7 +8,7 @@ using CheckIn.Client.Mobile.Services;
 namespace CheckIn.Client.Mobile.ViewModels;
 
 /// <summary>
-/// 管理员仪表盘 ViewModel
+/// 管理员/教师仪表盘 ViewModel
 /// </summary>
 public class AdminDashboardViewModel : INotifyPropertyChanged
 {
@@ -40,6 +40,9 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
     public ICommand NavigateToTasksCommand { get; }
     public ICommand NavigateToQRCodeCommand { get; }
     public ICommand DeviceTappedCommand { get; }
+    public ICommand RenameDeviceCommand { get; }
+    public ICommand DeleteDeviceCommand { get; }
+    public ICommand ViewDeviceQRCodeCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action<string>? NavigateRequested;
@@ -61,6 +64,21 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
             if (item != null)
                 DeviceTapped?.Invoke(item.Uuid, item.Name);
         });
+        RenameDeviceCommand = new Command<DeviceInfo>(async (item) =>
+        {
+            try { await RenameDeviceAsync(item); }
+            catch { }
+        });
+        DeleteDeviceCommand = new Command<DeviceInfo>(async (item) =>
+        {
+            try { await DeleteDeviceAsync(item); }
+            catch { }
+        });
+        ViewDeviceQRCodeCommand = new Command<DeviceInfo>(async (item) =>
+        {
+            try { await ViewDeviceTasksAsync(item); }
+            catch { }
+        });
     }
 
     public async Task LoadDashboardAsync()
@@ -80,7 +98,6 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
                 ActiveTasks = GetInt(summary, "active_signin_tasks");
             }
 
-            // 设备列表
             Devices.Clear();
             if (result.TryGetProperty("devices", out var devices) && devices.ValueKind == JsonValueKind.Array)
             {
@@ -96,7 +113,6 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
                 }
             }
 
-            // 活跃任务
             ActiveTaskList.Clear();
             if (result.TryGetProperty("active_signin_tasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array)
             {
@@ -121,6 +137,69 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
         {
             IsLoading = false;
         }
+    }
+
+    private async Task RenameDeviceAsync(DeviceInfo? item)
+    {
+        if (item == null) return;
+        var newName = await Shell.Current.DisplayPromptAsync("重命名设备",
+            $"请输入设备「{item.Name}」的新名称：", "确定", "取消",
+            placeholder: "新设备名称", initialValue: item.Name);
+        if (string.IsNullOrWhiteSpace(newName) || newName == item.Name) return;
+
+        IsLoading = true;
+        try
+        {
+            var result = await _api.PutAsync($"/api/mobile/devices/{Uri.EscapeDataString(item.Uuid)}/rename",
+                new { name = newName.Trim() });
+            var error = ApiService.GetError(result);
+            if (error != null)
+            {
+                await Shell.Current.DisplayAlertAsync("重命名失败", error, "确定");
+            }
+            else
+            {
+                item.Name = newName.Trim();
+                await LoadDashboardAsync(); // 刷新列表
+            }
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("重命名失败", $"网络错误: {ex.Message}", "确定");
+        }
+        finally { IsLoading = false; }
+    }
+
+    private async Task DeleteDeviceAsync(DeviceInfo? item)
+    {
+        if (item == null) return;
+        if (!await Shell.Current.DisplayAlertAsync("确认删除",
+            $"确定要删除设备「{item.Name}」吗？\n所有绑定的任务和签到数据也将被删除，此操作不可撤销！",
+            "删除", "取消"))
+            return;
+
+        IsLoading = true;
+        try
+        {
+            var result = await _api.DeleteAsync($"/api/mobile/devices/{Uri.EscapeDataString(item.Uuid)}");
+            var error = ApiService.GetError(result);
+            if (error != null)
+                await Shell.Current.DisplayAlertAsync("删除失败", error, "确定");
+            else
+                await LoadDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("删除失败", $"网络错误: {ex.Message}", "确定");
+        }
+        finally { IsLoading = false; }
+    }
+
+    private async Task ViewDeviceTasksAsync(DeviceInfo? item)
+    {
+        if (item == null) return;
+        // 导航到考勤详情页面，查看该设备下的所有任务
+        DeviceTapped?.Invoke(item.Uuid, item.Name);
     }
 
     private static int GetInt(JsonElement json, string key) =>

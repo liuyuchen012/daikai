@@ -25,7 +25,13 @@
                     <SwipeView Margin="16,4">
                         <SwipeView.RightItems>
                             <SwipeItems>
-                                <SwipeItem Text="关闭" BackgroundColor="#fbbc04"
+                                <SwipeItem Text="二维码" BackgroundColor="#4285f4"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewQRCodeCommand}"
+                                           CommandParameter="{Binding .}" />
+                                <SwipeItem Text="重命名" BackgroundColor="#fbbc04"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RenameTaskCommand}"
+                                           CommandParameter="{Binding .}" />
+                                <SwipeItem Text="关闭" BackgroundColor="#9c27b0"
                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CloseTaskCommand}"
                                            CommandParameter="{Binding Id}" />
                                 <SwipeItem Text="删除" BackgroundColor="#ea4335"

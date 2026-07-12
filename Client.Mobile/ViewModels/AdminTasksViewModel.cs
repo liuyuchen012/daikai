@@ -22,9 +22,11 @@ public class AdminTasksViewModel : INotifyPropertyChanged
     public ICommand CloseTaskCommand { get; }
     public ICommand DeleteTaskCommand { get; }
     public ICommand ViewAttendanceCommand { get; }
+    public ICommand RenameTaskCommand { get; }
+    public ICommand ViewQRCodeCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
-    public event Action<string, string>? ViewAttendanceRequested; // taskId, subject
+    public event Action<string, string>? ViewAttendanceRequested; // shortCode, subject
 
     public AdminTasksViewModel(ApiService api)
     {
@@ -48,6 +50,16 @@ public class AdminTasksViewModel : INotifyPropertyChanged
         {
             if (item != null)
                 ViewAttendanceRequested?.Invoke(item.ShortCode, item.Subject);
+        });
+        RenameTaskCommand = new Command<TaskItem>(async (item) =>
+        {
+            try { await RenameTaskAsync(item); }
+            catch { }
+        });
+        ViewQRCodeCommand = new Command<TaskItem>(async (item) =>
+        {
+            try { await ViewTaskQRCodeAsync(item); }
+            catch { }
         });
     }
 
@@ -102,8 +114,70 @@ public class AdminTasksViewModel : INotifyPropertyChanged
     {
         try
         {
+            if (!await Shell.Current.DisplayAlertAsync("确认删除", "确定要删除该签到任务吗？", "删除", "取消"))
+                return;
             await _api.DeleteAsync($"/api/mobile/tasks/{id}");
             await LoadTasksAsync();
+        }
+        catch { }
+    }
+
+    private async Task RenameTaskAsync(TaskItem? item)
+    {
+        if (item == null) return;
+        var newName = await Shell.Current.DisplayPromptAsync("重命名任务",
+            $"请输入任务的新名称：", "确定", "取消",
+            placeholder: "新任务名称", initialValue: item.Subject);
+        if (string.IsNullOrWhiteSpace(newName) || newName == item.Subject) return;
+
+        IsLoading = true;
+        try
+        {
+            var result = await _api.PutAsync($"/api/mobile/tasks/{item.Id}/rename",
+                new { name = newName.Trim() });
+            var error = ApiService.GetError(result);
+            if (error != null)
+                await Shell.Current.DisplayAlertAsync("重命名失败", error, "确定");
+            else
+                await LoadTasksAsync();
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("重命名失败", $"网络错误: {ex.Message}", "确定");
+        }
+        finally { IsLoading = false; }
+    }
+
+    private async Task ViewTaskQRCodeAsync(TaskItem? item)
+    {
+        if (item == null) return;
+        try
+        {
+            var result = await _api.GetAsync($"/api/mobile/tasks/{item.Id}/qrcode");
+            var error = ApiService.GetError(result);
+            if (error != null)
+            {
+                await Shell.Current.DisplayAlertAsync("错误", error, "确定");
+                return;
+            }
+
+            var shortCode = ApiService.GetString(result, "short_code") ?? "";
+            var baseUrl = Preferences.Get("server_url", "http://localhost:5250");
+            var url = $"{baseUrl}/s/{shortCode}";
+            var subject = ApiService.GetString(result, "subject") ?? "";
+            var status = ApiService.GetString(result, "status") ?? "";
+            var signedCount = GetInt(result, "signed_count");
+            var studentCount = GetInt(result, "student_count");
+
+            var action = await Shell.Current.DisplayAlertAsync(
+                "签到二维码",
+                $"任务: {subject}\n状态: {(status == "active" ? "进行中" : "已关闭")}\n签到: {signedCount}/{studentCount}",
+                "复制链接", "关闭");
+            if (action)
+            {
+                await Clipboard.Default.SetTextAsync(url);
+                await Shell.Current.DisplayAlertAsync("已复制", "签到链接已复制到剪贴板", "确定");
+            }
         }
         catch { }
     }
