@@ -9,6 +9,7 @@
 ![License](https://img.shields.io/badge/license-GPL%20v3-green)
 ![Language](https://img.shields.io/badge/language-C%23-178600)
 ![PRs](https://img.shields.io/badge/PRs-welcome-orange)
+[![文档](https://img.shields.io/badge/📖%20文档-doc.615mc.top-blue)](https://doc.615mc.top)
 
 ![主界面](screenshots/01.png)
 
@@ -126,6 +127,8 @@ check-in-net/
 ---
 
 ## 🚀 快速开始
+
+> 📖 **详细文档**：[https://doc.615mc.top](https://doc.615mc.top) — 包含完整的安装配置、使用教程、API 说明和常见问题解答。
 
 ### 🪟 Windows
 
@@ -594,7 +597,7 @@ Linux 上运行服务器后，浏览器打开 `http://localhost:5250` 即可查�
 
 ### ⭐ 如果这个项目对你有帮助，请给一个 Star！
 
-[GitHub](https://github.com/liuyuchen012/check-in) · [提交 Issue](https://github.com/liuyuchen012/check-in/issues) · [下载 Release](https://github.com/liuyuchen012/check-in/releases)
+[GitHub](https://github.com/liuyuchen012/check-in) · [文档](https://doc.615mc.top) · [提交 Issue](https://github.com/liuyuchen012/check-in/issues) · [下载 Release](https://github.com/liuyuchen012/check-in/releases)
 
 **Made with ❤️ by 刘宇晨**
 
