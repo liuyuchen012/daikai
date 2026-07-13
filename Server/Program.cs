@@ -97,8 +97,19 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .SetIsOriginAllowed(origin => new Uri(origin).IsLoopback)  // 仅允许本地回环地址
     .AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 
+// ---- 版本常量（供 /api/version、启动横幅与更新检查器使用） ----
+const string ServerVersion = "2.8.0";
+const string LatestClientVersion = "v2.8.34";
+const string ClientDownloadUrl = "https://github.com/liuyuchen012/daikai/releases";
+
+// ---- 注册集控平台版本更新检查器（后台定时检查 GitHub 最新发布） ----
+builder.Services.AddSingleton(sp => new ServerUpdateChecker(
+    sp.GetRequiredService<ILogger<ServerUpdateChecker>>(), ServerVersion, ClientDownloadUrl));
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerUpdateChecker>());
+
 var app = builder.Build();
 app.UseCors();
+var serverUpdateChecker = app.Services.GetRequiredService<ServerUpdateChecker>();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -280,6 +291,27 @@ string RenderPage(string content, string activeNav = "home", HttpContext? ctx = 
     var isAdminUser = ctx != null && IsAdmin(ctx);
     var username = ctx != null ? GetUsername(ctx) ?? "" : "";
 
+    // 仅对管理员：若后台检测到集控平台有新版本，注入弹窗（每个会话仅提示一次）
+    var updateModal = string.Empty;
+    if (isAdminUser && serverUpdateChecker.Info.HasUpdate)
+    {
+        var latest = serverUpdateChecker.Info.LatestVersion;
+        var url = serverUpdateChecker.Info.DownloadUrl;
+        updateModal =
+            "<div id='serverUpdateModal' class='modal-overlay'>" +
+              "<div class='modal-box'>" +
+                "<span class='modal-close' onclick=\"closeModal('serverUpdateModal');sessionStorage.setItem('serverUpdateDismissed','" + latest + "')\">&times;</span>" +
+                "<h3>🎉 集控平台发现新版本</h3>" +
+                "<p style='font-size:14px;color:var(--text-secondary);line-height:1.6;'>检测到集控管理平台有新版本 <strong>" + latest + "</strong>（当前 " + ServerVersion + "）。<br>建议管理员前往下载更新，以获得最新功能与修复。</p>" +
+                "<div class='form-actions'>" +
+                  "<a class='btn' href='" + url + "' target='_blank' onclick=\"sessionStorage.setItem('serverUpdateDismissed','" + latest + "')\">前往下载</a>" +
+                  "<button class='btn btn-ghost' onclick=\"closeModal('serverUpdateModal');sessionStorage.setItem('serverUpdateDismissed','" + latest + "')\">稍后提醒</button>" +
+                "</div>" +
+              "</div>" +
+            "</div>" +
+            "<script>if(sessionStorage.getItem('serverUpdateDismissed')!=='" + latest + "'){document.getElementById('serverUpdateModal').style.display='block';}</script>";
+    }
+
     return templateContent
         .Replace("{TITLE}", HttpUtility.HtmlEncode(serverName))
         .Replace("{NAV_HOME}", activeNav == "home" ? "active" : "")
@@ -287,7 +319,8 @@ string RenderPage(string content, string activeNav = "home", HttpContext? ctx = 
         .Replace("{NAV_PROFILE}", activeNav == "profile" ? "active" : "")
         .Replace("{USERS_VISIBLE}", isAdminUser ? "block" : "none")
         .Replace("{CURRENT_USER}", HttpUtility.HtmlEncode(username))
-        .Replace("{CONTENT}", content);
+        .Replace("{CONTENT}", content)
+        .Replace("{UPDATE_MODAL}", updateModal);
 }
 
 /// <summary>
@@ -387,6 +420,39 @@ app.MapGet("/api/status", async (AppDbContext db) =>
     }).ToList();
 
     return Results.Json(groupedMachines);
+});
+
+/// <summary>
+/// GET /api/version - 返回服务端版本与最新客户端版本，供客户端"检查更新"功能使用
+/// </summary>
+app.MapGet("/api/version", (ServerUpdateChecker checker) =>
+{
+    var info = checker.Info;
+    return Results.Json(new
+    {
+        server_version = ServerVersion,
+        latest_client_version = info.HasUpdate ? info.LatestVersion : LatestClientVersion,
+        download_url = ClientDownloadUrl,
+        server_update_available = info.HasUpdate,
+        server_latest_version = info.LatestVersion
+    });
+});
+
+/// <summary>
+/// GET /api/server_update - 返回集控平台自身是否有新版本（后台定时检查 GitHub 的结果），
+/// 供 WPF 客户端轮询并弹窗通知管理员用户
+/// </summary>
+app.MapGet("/api/server_update", (ServerUpdateChecker checker) =>
+{
+    var info = checker.Info;
+    return Results.Json(new
+    {
+        has_update = info.HasUpdate,
+        latest_version = info.LatestVersion,
+        current_version = info.CurrentVersion,
+        download_url = info.DownloadUrl,
+        last_checked = info.LastChecked
+    });
 });
 
 /// <summary>
@@ -2537,6 +2603,31 @@ app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body) =>
     return Results.Json(new { status = "ok" });
 });
 
+// ---- 启动横幅（命令行艺术字） ----
+void PrintBanner()
+{
+    string ESC(int f, int b, int style) => $"\u001b[{style};{f};{b}m";
+    var R = "\u001b[0m"; // 重置
+    var art = new[]
+    {
+        ESC(37,40,0) + "    " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀▀▀▀▀▀▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + "              " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▀▀▀▀▀" + ESC(97,47,1) + "▄▄" + ESC(90,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "     " + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀▀▀▀▀▄▄" + ESC(90,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▀▀▀▀▀▀▀▀▀▀▄▄" + ESC(90,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "        " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀▀▀▀▀▀▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + "          " + ESC(97,40,1) + "▄▄▄▄▄▄▄▄" + ESC(37,40,0) + "▄▄" + ESC(90,40,1) + "▄" + ESC(97,40,1) + "█" + ESC(97,47,1) + "▀▀▀▀▀▀▀▀▀▀▄▄" + ESC(90,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "    " + R,
+        ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + "▀  " + ESC(93,40,1) + "▄▄■" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(90,40,1) + "▄" + ESC(37,40,0) + "          " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▀        " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▀   " + ESC(93,40,1) + "■" + ESC(37,40,0) + " " + ESC(93,40,1) + "▄▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█      " + ESC(93,40,1) + "■" + ESC(37,40,0) + " " + ESC(93,40,1) + "▄▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + "▀  " + ESC(93,40,1) + "▄▄■" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(90,40,1) + "▄" + ESC(37,40,0) + "        " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█▀▀▀▀▀" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█      " + ESC(93,40,1) + "■" + ESC(37,40,0) + " " + ESC(93,40,1) + "▄▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "  " + R,
+        ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(93,40,1) + "▄▀" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "        " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█  " + ESC(93,40,1) + "▄■·" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█         " + ESC(93,40,1) + "▀▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "▄         " + ESC(93,40,1) + "▀▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(93,40,1) + "▄▀" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "       " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(93,40,1) + "▄■" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "░" + ESC(37,40,0) + "        " + ESC(93,40,1) + "▀▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "  " + R,
+        ESC(37,40,0) + "  " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(93,40,1) + "▐" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▄" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "      " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(93,40,1) + "▄▀" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀▀" + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌    " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + "▄   " + ESC(93,40,1) + "▌" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▐" + ESC(90,40,1) + "▌" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌   " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + "▄   " + ESC(93,40,1) + "▌" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▐" + ESC(90,40,1) + "▌" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(93,40,1) + "▐" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▄" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "      " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(93,40,1) + "▐" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(31,40,0) + "▒▒░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + "▄ " + ESC(31,40,0) + "░" + ESC(37,40,0) + " " + ESC(93,40,1) + "▌" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▐" + ESC(90,40,1) + "▌" + R,
+        ESC(37,40,0) + "  " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(93,40,1) + "│" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(97,40,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(93,40,1) + "▌" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀▀" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█   " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▀" + ESC(37,40,0) + "   " + ESC(97,40,1) + "▄█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(37,40,0) + "   " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(93,40,1) + "│" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(97,40,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█  " + ESC(91,40,1) + "▄▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(31,40,0) + "▓▓▓▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "▒" + ESC(91,41,1) + "░" + ESC(31,40,0) + "▓▒░" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+        ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(97,40,1) + "▐▌" + ESC(91,40,1) + "▄" + ESC(37,40,0) + "  " + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(97,40,1) + "█▀▀▀▀█" + ESC(37,40,0) + "▄  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "▓▒░" + ESC(37,40,0) + " " + ESC(31,40,0) + "░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄█" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄" + ESC(37,40,0) + "     " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(97,40,1) + "▐▌" + ESC(91,40,1) + "▄" + ESC(37,40,0) + "  " + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(91,40,1) + "▓" + ESC(91,41,1) + "▓▒" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(31,40,0) + "█" + ESC(91,41,1) + "░░" + ESC(31,40,0) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "░▒░" + ESC(31,40,0) + "█▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+        ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(91,40,1) + "▐" + ESC(91,41,1) + "▒" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌▄" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(91,40,1) + "▀▄" + ESC(91,41,1) + "▒" + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(91,40,1) + "▄██" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(97,40,1) + "█▄" + ESC(37,40,0) + " " + ESC(93,40,1) + "■" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(90,47,1) + "░▒" + ESC(90,40,1) + "▄" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█  " + ESC(31,40,0) + "▄" + ESC(91,40,1) + "▄" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(97,47,1) + " " + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "▐" + ESC(91,40,1) + "██▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(31,40,0) + "█" + ESC(91,40,1) + "▄▌" + ESC(97,40,1) + "█" + ESC(97,43,1) + "▀" + ESC(97,40,1) + "▄" + ESC(31,40,0) + "▒" + ESC(91,41,1) + "░" + ESC(91,40,1) + "█" + ESC(97,43,1) + "▀" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(37,40,0) + "    " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(91,40,1) + "▐" + ESC(91,41,1) + "▒" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌▄" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(91,40,1) + "▀▄" + ESC(91,41,1) + "▒" + ESC(91,40,1) + "▄" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(91,41,1) + "▒░" + ESC(31,40,0) + "█" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(91,41,1) + "░░▒▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(97,47,1) + " " + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "░" + ESC(91,40,1) + "██" + ESC(31,40,0) + "██" + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + R,
+        ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(91,41,1) + "▒░" + ESC(31,40,0) + "▄" + ESC(97,40,1) + "▀" + ESC(37,40,0) + "█▀▀" + ESC(31,40,0) + "▄" + ESC(91,41,1) + "░▒░▒░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(91,40,1) + "░" + ESC(91,41,1) + "▒▓" + ESC(31,40,0) + "▌" + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "█" + ESC(31,40,0) + "▐▓▌" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▓" + ESC(90,40,1) + "█" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(91,41,1) + "░▒▓▒" + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄▀" + ESC(37,40,0) + "▀" + ESC(31,40,0) + "█" + ESC(91,40,1) + "█▓" + ESC(91,41,1) + "▒" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▐" + ESC(90,40,1) + "▌" + ESC(37,40,0) + " " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(91,41,1) + "░▓▒" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "▒" + ESC(91,40,1) + "█▓" + ESC(91,41,1) + "▒" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▐" + ESC(90,40,1) + "▌" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌" + ESC(91,41,1) + "▒░" + ESC(31,40,0) + "▄" + ESC(97,40,1) + "▀" + ESC(37,40,0) + "█▀▀" + ESC(31,40,0) + "▄" + ESC(91,41,1) + "░▒░▒░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,47,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "██▒" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(91,41,1) + "░░▒▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "▒" + ESC(91,40,1) + "█▓" + ESC(91,41,1) + "▒" + ESC(31,40,0) + "█" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+        ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "▒░▒█" + ESC(37,40,0) + " " + ESC(31,40,0) + "▀▀" + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(31,40,0) + "▀█▒" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(97,40,1) + "▐" + ESC(97,47,1) + "▌" + ESC(37,40,0) + "▌ " + ESC(91,40,1) + "░▒" + ESC(91,41,1) + "▒░" + ESC(31,40,0) + "▄▄▓▒▌" + ESC(97,40,1) + "█" + ESC(90,47,1) + "░▓" + ESC(90,40,1) + "█" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(31,40,0) + "█" + ESC(91,41,1) + "▓▒░" + ESC(31,40,0) + "▄▄" + ESC(37,40,0) + " " + ESC(31,40,0) + "▓" + ESC(91,41,1) + "░▒░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(91,41,1) + "░▓▒░" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "░▒░░" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "▒░▒█" + ESC(37,40,0) + " " + ESC(31,40,0) + "▀▀" + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▄" + ESC(31,40,0) + "▀█▒" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(90,47,1) + "▀" + ESC(90,40,1) + "▄" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█ " + ESC(31,40,0) + "░░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "█" + ESC(37,40,0) + "█" + ESC(91,41,1) + "░▒▓▒" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "▓█▓▒░" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+        ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(31,40,0) + "░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀▀▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + " " + ESC(31,40,0) + "▒░" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + " " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "▄ " + ESC(31,40,0) + "▀" + ESC(91,41,1) + "░" + ESC(31,40,0) + "██▓▒░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(90,47,1) + "▓" + ESC(90,40,1) + "█" + ESC(37,40,0) + "  " + ESC(97,40,1) + "▀" + ESC(97,47,1) + "▄" + ESC(37,40,0) + "▄" + ESC(31,40,0) + "█▓▒░" + ESC(37,40,0) + " " + ESC(31,40,0) + "▒░▓▀" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "▀" + ESC(31,40,0) + "▄" + ESC(91,41,1) + "░" + ESC(31,40,0) + "█▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "█" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "░▓▀" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(31,40,0) + "░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "▄▄" + ESC(97,47,1) + "▀▀▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄" + ESC(37,40,0) + " " + ESC(31,40,0) + "▒░" + ESC(97,40,1) + "▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(97,40,1) + "█" + ESC(97,47,1) + " " + ESC(37,40,0) + " " + ESC(31,40,0) + "░░░" + ESC(37,40,0) + " " + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "█" + ESC(37,40,0) + "█" + ESC(91,41,1) + "░▒▓▓" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(91,41,1) + "░▒░" + ESC(31,40,0) + "█░" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+        ESC(97,40,1) + "█" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄▄" + ESC(90,40,1) + "▀▀▀" + ESC(37,40,0) + "   " + ESC(97,40,1) + "▀▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + "     " + ESC(97,40,1) + "▀▀" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄" + ESC(97,47,1) + "▀" + ESC(97,40,1) + "▄▄▄█" + ESC(90,47,1) + "░" + ESC(37,40,0) + "▀     " + ESC(97,40,1) + "▀▀" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄▄▄" + ESC(97,47,1) + "▀▀" + ESC(90,47,1) + "▄" + ESC(37,40,0) + "▀" + ESC(90,40,1) + "▀" + ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄▄▄▄█" + ESC(37,40,0) + "█" + ESC(97,40,1) + "█▄" + ESC(97,47,1) + "▀▀" + ESC(90,47,1) + "▄" + ESC(37,40,0) + "▀" + ESC(90,40,1) + "▀" + ESC(37,40,0) + "   " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄" + ESC(97,47,1) + "▀" + ESC(37,40,0) + "█" + ESC(90,47,1) + "▄▄" + ESC(90,40,1) + "▀▀▀" + ESC(37,40,0) + "   " + ESC(97,40,1) + "▀▄" + ESC(97,47,1) + "▀ " + ESC(90,47,1) + "▄" + ESC(90,40,1) + "▀" + ESC(37,40,0) + "  " + ESC(97,40,1) + "█" + ESC(97,47,1) + "▄" + ESC(97,40,1) + "▄▄▄▄▄█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(31,40,0) + "█" + ESC(97,47,1) + "▄" + ESC(97,41,1) + "▄▄▄▄" + ESC(97,40,1) + "█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + ESC(97,40,1) + "█" + ESC(97,41,1) + "▄▄▄▄" + ESC(97,40,1) + "▄█" + ESC(37,40,0) + "██" + ESC(90,40,1) + "█" + R,
+    };
+    foreach (var line in art) Console.WriteLine(line);
+    Console.WriteLine($"\u001b[0;97;1;42m version={ServerVersion} \u001b[0m");
+    Console.WriteLine();
+}
+
+PrintBanner();
 app.Run();
 
 /// <summary>
@@ -2547,4 +2638,95 @@ public class SignInRecord
     public string Name { get; set; } = "";
     public string Time { get; set; } = "";
     public string Device { get; set; } = "";
+}
+
+// ---- 集控平台版本更新检查器：后台定时查询 GitHub 最新发布 ----
+/// <summary>集控平台版本更新信息（由后台服务填充）</summary>
+public class ServerUpdateInfo
+{
+    public bool HasUpdate { get; set; }
+    public string LatestVersion { get; set; } = "";
+    public string CurrentVersion { get; set; } = "";
+    public string DownloadUrl { get; set; } = "";
+    public DateTime LastChecked { get; set; }
+}
+
+/// <summary>
+/// 后台托管服务：启动时及之后每 30 分钟检查一次 GitHub Releases 最新版本，
+/// 与当前集控平台版本比较，发现新版本时写入 ServerUpdateInfo 供 Web 与客户端读取
+/// </summary>
+public class ServerUpdateChecker : IHostedService
+{
+    private readonly ILogger<ServerUpdateChecker> _logger;
+    private readonly string _currentVersion;
+    private readonly string _downloadUrl;
+    public ServerUpdateInfo Info { get; }
+    private Timer? _timer;
+
+    public ServerUpdateChecker(ILogger<ServerUpdateChecker> logger, string currentVersion, string downloadUrl)
+    {
+        _logger = logger;
+        _currentVersion = currentVersion;
+        _downloadUrl = downloadUrl;
+        Info = new ServerUpdateInfo { CurrentVersion = currentVersion, DownloadUrl = downloadUrl };
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = CheckNowAsync();
+        _timer = new Timer(_ => _ = CheckNowAsync(), null, TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(30));
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _timer?.Dispose();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>立即向 GitHub 查询最新发布版本并更新状态</summary>
+    public async Task CheckNowAsync()
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Server");
+            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/daikai/releases/latest");
+            if (!resp.IsSuccessStatusCode) return;
+            var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            var tag = json.GetProperty("tag_name").GetString() ?? "";
+            if (string.IsNullOrEmpty(tag)) return;
+            var latest = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+            Info.LatestVersion = latest;
+            Info.HasUpdate = CompareVersion(latest, _currentVersion) > 0;
+            Info.LastChecked = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "检查 GitHub 版本更新失败");
+        }
+    }
+
+    /// <summary>比较两个版本号，a &gt; b 返回 1，相等 0，否则 -1</summary>
+    private static int CompareVersion(string a, string b)
+    {
+        var pa = ParseVersion(a);
+        var pb = ParseVersion(b);
+        for (var i = 0; i < 3; i++)
+        {
+            var c = pa[i].CompareTo(pb[i]);
+            if (c != 0) return c;
+        }
+        return 0;
+    }
+
+    /// <summary>将版本字符串解析为 [major, minor, patch] 三个整数</summary>
+    private static int[] ParseVersion(string v)
+    {
+        var parts = v.Trim().TrimStart('v', 'V').Split('.');
+        var nums = new int[3];
+        for (var i = 0; i < 3; i++)
+            if (i < parts.Length && int.TryParse(parts[i], out var n)) nums[i] = n;
+        return nums;
+    }
 }

@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
@@ -132,7 +134,7 @@ public class MainViewModel : INotifyPropertyChanged
         SyncToServerCommand = new RelayCommand(async _ => await SyncToServerAsync());
         ShowAdminSettingsCommand = new RelayCommand(_ => ShowAdminSettings());
         OpenGithubCommand = new RelayCommand(_ => OpenUrl("https://github.com/liuyuchen012/daikai"));
-        CheckVersionCommand = new RelayCommand(_ => OpenUrl("https://github.com/liuyuchen012/daikai/releases"));
+        CheckVersionCommand = new RelayCommand(async _ => await CheckForUpdateAsync());
         ShowAboutCommand = new RelayCommand(_ => ShowAbout());
 
         LoadWorkspace();
@@ -214,6 +216,8 @@ public class MainViewModel : INotifyPropertyChanged
 
         // 订阅服务端推送任务事件
         tab.PendingTasksReceived += HandlePendingTasks;
+        // 订阅集控平台新版本通知（管理员弹窗）
+        tab.ServerUpdateAvailable += HandleServerUpdate;
 
         // 如果是签到任务，重新初始化服务器连接以使用正确的 TaskId
         if (isSignIn && !string.IsNullOrEmpty(signInTaskId))
@@ -262,6 +266,8 @@ public class MainViewModel : INotifyPropertyChanged
 
             // 订阅推送事件
             tab.PendingTasksReceived += HandlePendingTasks;
+            // 订阅集控平台新版本通知（管理员弹窗）
+            tab.ServerUpdateAvailable += HandleServerUpdate;
 
             // 初始化服务器连接（使用后台模式）
             if (!string.IsNullOrEmpty(Config.ServerIp))
@@ -272,6 +278,14 @@ public class MainViewModel : INotifyPropertyChanged
             // 添加到后台任务列表（不打开标签页）
             _backgroundTasks.Add(tab);
         }
+    }
+
+    /// <summary>
+    /// 处理集控平台自身的新版本通知：向管理员用户弹窗提示
+    /// </summary>
+    private void HandleServerUpdate(string latestVersion, string downloadUrl)
+    {
+        ModernDialog.ServerUpdateAvailable(latestVersion, downloadUrl);
     }
 
     /// <summary>
@@ -627,6 +641,76 @@ public class MainViewModel : INotifyPropertyChanged
     {
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch { }
+    }
+
+    // ---- 检查更新 ----
+    /// <summary>
+    /// 检查客户端自身更新：直接查询 GitHub Releases 最新版本（不经过集控平台），比较后提示用户
+    /// </summary>
+    private async Task CheckForUpdateAsync()
+    {
+        StatusMessage = "正在检查更新...";
+        string? latest = null;
+        var downloadUrl = "https://github.com/liuyuchen012/daikai/releases";
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Client");
+            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/daikai/releases/latest");
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+                var tag = json.GetProperty("tag_name").GetString();
+                if (!string.IsNullOrEmpty(tag))
+                    latest = tag!.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+            }
+        }
+        catch { }
+
+        if (latest == null)
+        {
+            ModernDialog.Alert("无法获取更新信息，请稍后重试或前往发布页查看。", "检查更新");
+            StatusMessage = "检查更新失败";
+            return;
+        }
+
+        if (IsNewerVersion(latest, AppConfig.Version))
+        {
+            ModernDialog.UpdateAvailable(latest, AppConfig.Version, downloadUrl);
+            StatusMessage = $"发现新版本 {latest}";
+        }
+        else
+        {
+            ModernDialog.Alert($"当前已是最新版本 {AppConfig.Version}", "检查更新");
+            StatusMessage = "已是最新版本";
+        }
+    }
+
+    /// <summary>判断 latest 是否比 current 更新（语义化版本比较，支持 vX.Y.Z）</summary>
+    private static bool IsNewerVersion(string latest, string current) => CompareVersion(latest, current) > 0;
+
+    /// <summary>比较两个版本号，latest &gt; current 返回 1，相等返回 0，否则 -1</summary>
+    private static int CompareVersion(string a, string b)
+    {
+        var pa = ParseVersion(a);
+        var pb = ParseVersion(b);
+        for (var i = 0; i < 3; i++)
+        {
+            var c = pa[i].CompareTo(pb[i]);
+            if (c != 0) return c;
+        }
+        return 0;
+    }
+
+    /// <summary>将版本字符串解析为 [major, minor, patch] 三个整数</summary>
+    private static int[] ParseVersion(string v)
+    {
+        var parts = v.Trim().TrimStart('v', 'V').Split('.');
+        var nums = new int[3];
+        for (var i = 0; i < 3; i++)
+            if (i < parts.Length && int.TryParse(parts[i], out var n)) nums[i] = n;
+        return nums;
     }
 
     /// <summary>验证管理员密码（如果未设置密码则直接通过）</summary>

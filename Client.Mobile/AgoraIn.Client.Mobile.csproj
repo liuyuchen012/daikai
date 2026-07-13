@@ -16,7 +16,7 @@
     <ApplicationId>com.agorain.checkin</ApplicationId>
 
     <!-- Versions -->
-    <ApplicationDisplayVersion>2.8.0</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>2.8.34</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>

@@ -255,4 +255,23 @@ public class ServerService
         }
         catch { }
     }
+
+    /// <summary>
+    /// 查询集控平台自身是否有新版本（服务器后台定时检查 GitHub 的结果）
+    /// </summary>
+    /// <returns>元组 (hasUpdate, latestVersion, downloadUrl)，失败返回 null</returns>
+    public async Task<(bool hasUpdate, string latestVersion, string downloadUrl)?> GetServerUpdateAsync()
+    {
+        try
+        {
+            var res = await _http.GetAsync($"{_baseUrl}/api/server_update");
+            if (!res.IsSuccessStatusCode) return null;
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            var hasUpdate = json.GetProperty("has_update").GetBoolean();
+            var latestVersion = json.GetProperty("latest_version").GetString() ?? "";
+            var downloadUrl = json.GetProperty("download_url").GetString() ?? "";
+            return (hasUpdate, latestVersion, downloadUrl);
+        }
+        catch { return null; }
+    }
 }

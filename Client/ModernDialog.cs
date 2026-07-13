@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -115,6 +116,133 @@ public static class ModernDialog
 
         Grid.SetRow(btnPanel, 2);
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.Children.Add(btnPanel);
+
+        win.Content = new Border
+        {
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0)),
+            BorderThickness = new Thickness(1),
+            Child = grid
+        };
+        win.ShowDialog();
+    }
+
+    /// <summary>
+    /// 显示"发现新版本"对话框：告知最新版本与当前版本，并提供前往下载按钮
+    /// </summary>
+    /// <param name="latest">最新版本号（如 v2.8.34）</param>
+    /// <param name="current">当前版本号</param>
+    /// <param name="downloadUrl">下载/发布页地址</param>
+    public static void UpdateAvailable(string latest, string current, string downloadUrl)
+    {
+        var win = CreateWindow("发现新版本", 420, 250);
+
+        var grid = new Grid { Margin = new Thickness(24) };
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        grid.Children.Add(new TextBlock
+        {
+            Text = "发现新版本", FontSize = 16, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(0, 0, 0, 12)
+        });
+
+        grid.Children.Add(new TextBlock
+        {
+            Text = $"最新版本：{latest}\n当前版本：{current}\n\n建议前往下载更新，以获得最新功能与修复。",
+            FontSize = 14, TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+            Margin = new Thickness(0, 0, 0, 16)
+        });
+        Grid.SetRow(grid.Children[^1], 1);
+
+        var laterBtn = NewBtn("稍后", new SolidColorBrush(Color.FromRgb(0xf0, 0xf0, 0xf0)),
+            new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)));
+        var downloadBtn = NewBtn("前往下载", new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)));
+
+        laterBtn.Click += (_, _) => win.Close();
+        downloadBtn.Click += (_, _) =>
+        {
+            try { Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true }); } catch { }
+            win.Close();
+        };
+
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        btnPanel.Children.Add(laterBtn);
+        btnPanel.Children.Add(downloadBtn);
+        Grid.SetRow(btnPanel, 2);
+        grid.Children.Add(btnPanel);
+
+        win.Content = new Border
+        {
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0)),
+            BorderThickness = new Thickness(1),
+            Child = grid
+        };
+        win.ShowDialog();
+    }
+
+    /// <summary>
+    /// 显示"集控平台发现新版本"对话框：告知管理员平台有新版本，并提供前往下载按钮
+    /// </summary>
+    /// <param name="latestVersion">最新版本号（如 v2.8.35）</param>
+    /// <param name="downloadUrl">下载/发布页地址</param>
+    public static void ServerUpdateAvailable(string latestVersion, string downloadUrl)
+    {
+        var win = CreateWindow("集控平台更新", 420, 250);
+
+        var grid = new Grid { Margin = new Thickness(24) };
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        grid.Children.Add(new TextBlock
+        {
+            Text = "集控平台发现新版本", FontSize = 16, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            Margin = new Thickness(0, 0, 0, 12)
+        });
+
+        grid.Children.Add(new TextBlock
+        {
+            Text = $"检测到集控管理平台有新版本 {latestVersion}。\n建议通知管理员前往下载更新，以获得最新功能与修复。",
+            FontSize = 14, TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+            Margin = new Thickness(0, 0, 0, 16)
+        });
+        Grid.SetRow(grid.Children[^1], 1);
+
+        var laterBtn = NewBtn("稍后", new SolidColorBrush(Color.FromRgb(0xf0, 0xf0, 0xf0)),
+            new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)));
+        var downloadBtn = NewBtn("前往下载", new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
+            new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)));
+
+        laterBtn.Click += (_, _) => win.Close();
+        downloadBtn.Click += (_, _) =>
+        {
+            try { Process.Start(new ProcessStartInfo(downloadUrl) { UseShellExecute = true }); } catch { }
+            win.Close();
+        };
+
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        btnPanel.Children.Add(laterBtn);
+        btnPanel.Children.Add(downloadBtn);
+        Grid.SetRow(btnPanel, 2);
         grid.Children.Add(btnPanel);
 
         win.Content = new Border

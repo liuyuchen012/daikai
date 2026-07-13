@@ -29,5 +29,5 @@ public class AppConfig
     /// <summary>管理员密码的 SHA256 哈希值（空表示无密码）</summary>
     public string AdminPasswordHash { get; set; } = "";
     /// <summary>当前应用版本号（编译时常量，不参与序列化）</summary>
-    public const string Version = "v2.7.1";
+    public const string Version = "v2.8.34";
 }

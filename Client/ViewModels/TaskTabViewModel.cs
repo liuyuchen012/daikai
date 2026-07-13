@@ -72,9 +72,14 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     // 配置版本追踪（检测服务端推送的配置变更）
     private int _lastAppliedConfigVersion;
     private DateTime _lastConfigCheck = DateTime.MinValue;
+    // 集控平台更新弹窗去重：记录已提示过的版本，避免重复弹窗
+    private string _serverUpdateShownVersion = "";
 
     /// <summary>服务端推送了新任务配置时触发</summary>
     public event Action<List<PendingTaskConfig>>? PendingTasksReceived;
+
+    /// <summary>集控平台自身检测到新版本时触发（用于向管理员弹窗）</summary>
+    public event Action<string, string>? ServerUpdateAvailable;
 
     /// <summary>学生数据集合（绑定到打卡按钮网格）</summary>
     public ObservableCollection<StudentModel> Students { get; } = new();
@@ -358,6 +363,14 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
                                 var appliedIds = pendingTasks.Select(t => t.TaskId).ToList();
                                 await _server.ConfigAppliedAsync(appliedIds);
                             }
+                        }
+
+                        // ③ 检查集控平台自身是否有新版本（每 15 秒轮询一次）
+                        var upd = await _server.GetServerUpdateAsync();
+                        if (upd != null && upd.Value.hasUpdate && upd.Value.latestVersion != _serverUpdateShownVersion)
+                        {
+                            _serverUpdateShownVersion = upd.Value.latestVersion;
+                            ServerUpdateAvailable?.Invoke(upd.Value.latestVersion, upd.Value.downloadUrl);
                         }
                     }
 
