@@ -554,13 +554,11 @@ static bool CheckPwd(JsonElement body, string expected)
 app.MapGet("/api/status", async (AppDbContext db) =>
 {
     var machines = await db.Machines.ToListAsync();
-    // 仅加载必要字段，避免全表 JSON 数据加载
-    var taskGroups = await db.AttendanceRecords
-        .Select(a => new { a.MachineUuid, a.TaskId })
-        .Distinct()
-        .ToListAsync();
-    var taskLookup = taskGroups.GroupBy(x => x.MachineUuid)
-        .ToDictionary(g => g.Key, g => g.Select(x => x.TaskId).ToList());
+    // BUG FIX: 任务数以 SignInTasks 为准，避免无打卡记录的任务被漏算
+    var signInTasks = await db.SignInTasks.ToListAsync();
+    var taskLookup = signInTasks
+        .GroupBy(s => s.MachineUuid)
+        .ToDictionary(g => g.Key, g => g.Select(x => $"signin_{x.ShortCode}").ToList());
     var now = DateTime.Now;
 
     var groupedMachines = machines.Select(m =>
@@ -2541,6 +2539,89 @@ app.MapPut("/api/mobile/tasks/{id}/rename", async (int id, AppDbContext db, Http
     await db.SaveChangesAsync();
 
     return Results.Json(new { status = "ok", name = newName });
+});
+
+// =============================================================================
+// 移动端 - 普通任务管理 API（创建/删除设备上的普通签到任务）
+// =============================================================================
+
+/// <summary>
+/// POST /api/mobile/devices/{uuid}/tasks - 为设备创建普通任务（推送任务配置到设备）
+/// 管理员或已分配该设备的教师可操作
+/// </summary>
+app.MapPost("/api/mobile/devices/{uuid}/tasks", async (string uuid, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null) return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role)) return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    string bodyStr;
+    using (var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8)) bodyStr = await reader.ReadToEndAsync();
+    JsonElement body;
+    try { body = JsonDocument.Parse(bodyStr).RootElement; }
+    catch { return Results.Json(new { error = "无效的 JSON 格式" }, statusCode: 400); }
+
+    var subject = body.TryGetProperty("subject", out var s) ? s.GetString()?.Trim() ?? "" : "";
+    var classroom = body.TryGetProperty("classroom", out var cr) ? cr.GetString()?.Trim() ?? "" : "";
+    var taskName = body.TryGetProperty("task_name", out var tn) ? tn.GetString()?.Trim() ?? subject : subject;
+    var password = body.TryGetProperty("password", out var pw) ? pw.GetString() ?? "" : "";
+    var students = new List<string>();
+    if (body.TryGetProperty("students", out var st) && st.ValueKind == JsonValueKind.Array)
+        students = st.EnumerateArray().Select(e => e.GetString() ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList();
+
+    if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(taskName))
+        return Results.Json(new { error = "subject/task_name 不能为空" }, statusCode: 400);
+
+    var cfg = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+    cfg.PendingTasks ??= new List<PendingTaskConfig>();
+    var taskId = $"signin_{GenerateShortCode()}";
+    cfg.PendingTasks.Add(new PendingTaskConfig
+    {
+        TaskId = taskId,
+        ShortCode = taskId["signin_".Length..],
+        Subject = subject,
+        Classroom = classroom,
+        TaskName = taskName,
+        Password = password,
+        Students = students,
+        CreatedAt = DateTime.Now.ToString("O")
+    });
+    cfg.ConfigVersion++;
+    machine.Config = JsonSerializer.Serialize(cfg);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", task_id = taskId, message = "任务已推送至设备" });
+});
+
+/// <summary>
+/// DELETE /api/mobile/devices/{uuid}/tasks/{taskId} - 删除设备上的普通任务
+/// 管理员或已分配该设备的教师可操作。删除设备的 PendingTasks 配置和对应打卡记录。
+/// </summary>
+app.MapDelete("/api/mobile/devices/{uuid}/tasks/{taskId}", async (string uuid, string taskId, AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null) return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role)) return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    var cfg = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+    if (cfg.PendingTasks != null)
+    {
+        cfg.PendingTasks.RemoveAll(pt => pt.TaskId == taskId);
+        cfg.ConfigVersion++;
+        machine.Config = JsonSerializer.Serialize(cfg);
+    }
+
+    // 删除关联的打卡记录
+    db.AttendanceRecords.RemoveRange(db.AttendanceRecords.Where(a => a.MachineUuid == uuid && a.TaskId == taskId));
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", message = "任务已删除" });
 });
 
 /// <summary>

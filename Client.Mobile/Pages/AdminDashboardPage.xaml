@@ -104,6 +104,16 @@
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="viewmodels:DeviceInfo">
                             <SwipeView Margin="0,0,0,6">
+                                <SwipeView.LeftItems>
+                                    <SwipeItems>
+                                        <SwipeItem Text="创建任务" BackgroundColor="#34a853"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CreateTaskForDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="删任务" BackgroundColor="#ea4335"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteTaskForDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                    </SwipeItems>
+                                </SwipeView.LeftItems>
                                 <SwipeView.RightItems>
                                     <SwipeItems>
                                         <SwipeItem Text="查看任务" BackgroundColor="#4285f4"

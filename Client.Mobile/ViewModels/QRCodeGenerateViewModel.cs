@@ -34,9 +34,10 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
     public bool IsLoading { get => _isLoading; set { _isLoading = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerate)); } }
 
     private bool _generated;
-    public bool Generated { get => _generated; set { _generated = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowForm)); } }
+    public bool Generated { get => _generated; set { _generated = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowForm)); OnPropertyChanged(nameof(ShowResult)); } }
 
     public bool ShowForm => !Generated;
+    public bool ShowResult => Generated;
     public bool CanGenerate => !IsLoading && !string.IsNullOrWhiteSpace(Subject)
         && !string.IsNullOrWhiteSpace(SignPassword) && !string.IsNullOrWhiteSpace(SelectedDeviceUuid);
 
@@ -84,10 +85,17 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
     private string _baseUrl = "";
     public string SignInUrl => string.IsNullOrEmpty(_baseUrl) ? "" : $"{_baseUrl}/s/{ResultShortCode}";
 
+    private ImageSource? _qrCodeImage;
+    public ImageSource? QrCodeImage { get => _qrCodeImage; set { _qrCodeImage = value; OnPropertyChanged(); } }
+
+    private bool _hasQrImage;
+    public bool HasQrImage { get => _hasQrImage; set { _hasQrImage = value; OnPropertyChanged(); } }
+
     public ICommand GenerateCommand { get; }
     public ICommand ResetCommand { get; }
     public ICommand CopyUrlCommand { get; }
     public ICommand DeviceSelectedCommand { get; }
+    public ICommand SaveQrCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -103,6 +111,8 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
         ResetCommand = new Command(() =>
         {
             Generated = false;
+            QrCodeImage = null;
+            HasQrImage = false;
             Subject = ""; Classroom = ""; SignPassword = ""; StudentListText = "";
             SelectedDeviceUuid = ""; SelectedDeviceName = "";
         });
@@ -125,6 +135,11 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
                 SelectedDeviceUuid = item.Uuid;
                 SelectedDeviceName = item.DisplayText;
             }
+        });
+        SaveQrCommand = new Command(async () =>
+        {
+            try { await SaveQrAsync(); }
+            catch (Exception ex) { await Shell.Current.DisplayAlertAsync("保存失败", ex.Message, "确定"); }
         });
     }
 
@@ -212,6 +227,19 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
             _baseUrl = Preferences.Get("server_url", "http://localhost:5250");
             OnPropertyChanged(nameof(SignInUrl));
 
+            // 生成二维码图片（使用在线 API，跨平台兼容）
+            try
+            {
+                var url = SignInUrl;
+                if (!string.IsNullOrEmpty(url))
+                {
+                    var qrApiUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(url)}";
+                    QrCodeImage = ImageSource.FromUri(new Uri(qrApiUrl));
+                    HasQrImage = true;
+                }
+            }
+            catch { /* QR 生成失败不影响任务创建结果 */ }
+
             Generated = true;
         }
         catch (Exception ex)
@@ -221,6 +249,30 @@ public class QRCodeGenerateViewModel : INotifyPropertyChanged
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private async Task SaveQrAsync()
+    {
+        if (string.IsNullOrEmpty(SignInUrl)) return;
+        try
+        {
+            var qrApiUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=600x600&data={Uri.EscapeDataString(SignInUrl)}";
+            using var client = new HttpClient();
+            var bytes = await client.GetByteArrayAsync(qrApiUrl);
+            var fileName = $"二维码签到_{ResultSubject}_{DateTime.Now:yyyyMMddHHmmss}.png";
+            var localPath = Path.Combine(FileSystem.CacheDirectory, fileName);
+            await File.WriteAllBytesAsync(localPath, bytes);
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "保存签到二维码",
+                File = new ShareFile(localPath)
+            });
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("保存失败", $"无法保存二维码: {ex.Message}", "确定");
         }
     }
 

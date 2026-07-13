@@ -43,6 +43,8 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
     public ICommand RenameDeviceCommand { get; }
     public ICommand DeleteDeviceCommand { get; }
     public ICommand ViewDeviceQRCodeCommand { get; }
+    public ICommand CreateTaskForDeviceCommand { get; }
+    public ICommand DeleteTaskForDeviceCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action<string>? NavigateRequested;
@@ -77,6 +79,16 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
         ViewDeviceQRCodeCommand = new Command<DeviceInfo>(async (item) =>
         {
             try { await ViewDeviceTasksAsync(item); }
+            catch { }
+        });
+        CreateTaskForDeviceCommand = new Command<DeviceInfo>(async (item) =>
+        {
+            try { await CreateTaskForDeviceAsync(item); }
+            catch { }
+        });
+        DeleteTaskForDeviceCommand = new Command<DeviceInfo>(async (item) =>
+        {
+            try { await DeleteTaskForDeviceAsync(item); }
             catch { }
         });
     }
@@ -200,6 +212,101 @@ public class AdminDashboardViewModel : INotifyPropertyChanged
         if (item == null) return;
         // 导航到考勤详情页面，查看该设备下的所有任务
         DeviceTapped?.Invoke(item.Uuid, item.Name);
+    }
+
+    private async Task CreateTaskForDeviceAsync(DeviceInfo? item)
+    {
+        if (item == null) return;
+        var subject = await Shell.Current.DisplayPromptAsync("创建普通任务",
+            $"为设备「{item.Name}」创建新任务\n请输入科目名称：", "下一步", "取消",
+            placeholder: "如：语文");
+        if (string.IsNullOrWhiteSpace(subject)) return;
+
+        var classroom = await Shell.Current.DisplayPromptAsync("创建普通任务",
+            $"科目「{subject.Trim()}」\n请输入教室（可选）：", "创建", "取消",
+            placeholder: "如：三年(1)班");
+        if (classroom == null) return; // 取消
+
+        IsLoading = true;
+        try
+        {
+            var result = await _api.PostAsync($"/api/mobile/devices/{Uri.EscapeDataString(item.Uuid)}/tasks",
+                new { subject = subject.Trim(), classroom = (classroom.Trim() ?? ""), task_name = subject.Trim() });
+            var error = ApiService.GetError(result);
+            if (error != null)
+                await Shell.Current.DisplayAlertAsync("创建失败", error, "确定");
+            else
+            {
+                await Shell.Current.DisplayAlertAsync("创建成功", $"任务「{subject.Trim()}」已推送至设备「{item.Name}」", "确定");
+                await LoadDashboardAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("创建失败", $"网络错误: {ex.Message}", "确定");
+        }
+        finally { IsLoading = false; }
+    }
+
+    private async Task DeleteTaskForDeviceAsync(DeviceInfo? item)
+    {
+        if (item == null) return;
+        try
+        {
+            var statusResult = await _api.GetAsync("/api/status");
+            if (statusResult.ValueKind != JsonValueKind.Array) { await LoadDashboardAsync(); return; }
+            var statusList = new List<JsonElement>();
+            foreach (var e in statusResult.EnumerateArray()) statusList.Add(e);
+
+            var deviceStatus = statusList.FirstOrDefault(d =>
+                ApiService.GetString(d, "uuid") == item.Uuid);
+            if (deviceStatus.ValueKind != JsonValueKind.Object) { await LoadDashboardAsync(); return; }
+
+            var tasks = new List<string>();
+            if (deviceStatus.TryGetProperty("tasks", out var taskArr) && taskArr.ValueKind == JsonValueKind.Array)
+                tasks = taskArr.EnumerateArray().Select(t => t.GetString() ?? "").Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+            if (tasks.Count == 0)
+            {
+                await Shell.Current.DisplayAlertAsync("提示", $"设备「{item.Name}」上暂无任务", "确定");
+                return;
+            }
+
+            string targetTaskId;
+            if (tasks.Count == 1)
+            {
+                targetTaskId = tasks[0];
+                if (!await Shell.Current.DisplayAlertAsync("确认删除",
+                    $"确定要删除设备「{item.Name}」上的唯一任务吗？\n相关打卡数据也将被删除。", "删除", "取消"))
+                    return;
+            }
+            else
+            {
+                var taskStr = await Shell.Current.DisplayPromptAsync("删除任务",
+                    $"设备「{item.Name}」上有 {tasks.Count} 个任务\n输入要删除的任务索引 (1-{tasks.Count})：", "删除", "取消",
+                    placeholder: "1",
+                    keyboard: Keyboard.Numeric);
+                if (string.IsNullOrWhiteSpace(taskStr) || !int.TryParse(taskStr, out var idx) || idx < 1 || idx > tasks.Count)
+                    return;
+                targetTaskId = tasks[idx - 1];
+            }
+
+            IsLoading = true;
+            var result = await _api.DeleteAsync($"/api/mobile/devices/{Uri.EscapeDataString(item.Uuid)}/tasks/{Uri.EscapeDataString(targetTaskId)}");
+            var error = ApiService.GetError(result);
+            if (error != null)
+                await Shell.Current.DisplayAlertAsync("删除失败", error, "确定");
+            else
+            {
+                await Shell.Current.DisplayAlertAsync("删除成功", $"已从设备「{item.Name}」删除任务", "确定");
+                await LoadDashboardAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlertAsync("操作失败", $"网络错误: {ex.Message}", "确定");
+        }
+        finally { IsLoading = false; }
     }
 
     private static int GetInt(JsonElement json, string key) =>

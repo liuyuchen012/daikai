@@ -72,7 +72,7 @@
             <!-- 生成结果 -->
             <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
                    Padding="20" Stroke="#e8e8e8" StrokeThickness="1"
-                   IsVisible="{Binding Generated}">
+                   IsVisible="{Binding ShowResult}">
                 <VerticalStackLayout Spacing="16" HorizontalOptions="Center">
 
                     <Label Text="签到任务已创建！" FontSize="18" FontAttributes="Bold"
@@ -89,6 +89,16 @@
                                FontSize="14" TextColor="#666666" />
                     </VerticalStackLayout>
 
+                    <!-- 二维码图片 -->
+                    <Border BackgroundColor="#f8f9fb" StrokeShape="RoundRectangle 8"
+                           Padding="8" Stroke="#e0e0e0" StrokeThickness="1"
+                           IsVisible="{Binding HasQrImage}"
+                           HorizontalOptions="Center">
+                        <Image Source="{Binding QrCodeImage}"
+                               WidthRequest="240" HeightRequest="240"
+                               HorizontalOptions="Center" />
+                    </Border>
+
                     <!-- 签到链接 -->
                     <Border BackgroundColor="#f0f4f8" StrokeShape="RoundRectangle 8"
                            Padding="12" Stroke="#e0e0e0" StrokeThickness="1">
@@ -99,10 +109,17 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <Button Text="复制签到链接"
-                            Command="{Binding CopyUrlCommand}"
-                            BackgroundColor="#34a853" TextColor="White"
-                            CornerRadius="10" HeightRequest="44" FontSize="14" />
+                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                        <Button Text="保存到相册"
+                                Command="{Binding SaveQrCommand}"
+                                BackgroundColor="#4285f4" TextColor="White"
+                                CornerRadius="10" HeightRequest="44" FontSize="14"
+                                IsVisible="{Binding HasQrImage}" />
+                        <Button Text="复制链接"
+                                Command="{Binding CopyUrlCommand}"
+                                BackgroundColor="#34a853" TextColor="White"
+                                CornerRadius="10" HeightRequest="44" FontSize="14" />
+                    </HorizontalStackLayout>
 
                     <Button Text="创建新的签到"
                             Command="{Binding ResetCommand}"

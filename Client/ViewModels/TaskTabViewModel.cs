@@ -292,6 +292,12 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
                     stu.Count = sa.Count;
                     stu.History = sa.History;
                 }
+                else
+                {
+                    // BUG FIX: 添加服务器有但本地没有的学生（新签到学生）
+                    var newStu = new StudentModel { Name = name, FirstTime = sa.FirstTime, Count = sa.Count, History = sa.History };
+                    Students.Add(newStu);
+                }
             }
             SaveAttendanceData();
             UpdateRanking();
@@ -611,6 +617,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     {
         if (!File.Exists(_nameFile))
             File.WriteAllLines(_nameFile, Enumerable.Range(1, 40).Select(i => $"学生{i}"));
+        Students.Clear(); // BUG FIX: 清空已有的学生列表，避免多次调用导致追加而非替换
         foreach (var name in File.ReadAllLines(_nameFile).Select(l => l.Trim()).Where(l => l.Length > 0))
             Students.Add(new StudentModel { Name = name });
     }
