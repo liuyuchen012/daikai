@@ -116,6 +116,167 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
+    // 确保新表/新列存在：EF 的 EnsureCreated 不会为“已存在的旧库”补建缺失的表与列，
+    // 这里显式补建（幂等），否则旧库会因缺少 SignInTasks 等表导致迁移与查询失败。
+    try
+    {
+        await EnsureSchemaAsync(db);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[WARN] 数据库结构补建失败（不影响服务启动）：{ex}");
+    }
+
+    // ===== 兼容旧版数据库（旧版仅有 Machines + AttendanceRecords，且无 TaskId 列、无 SignInTasks 表） =====
+    // 迁移失败不应阻断服务器启动，记录日志后继续（不影响已有功能）
+    try
+    {
+        await MigrateLegacyDataAsync(db);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[WARN] 旧数据兼容迁移失败（不影响服务启动）：{ex}");
+    }
+
+/// <summary>
+/// 旧版数据兼容迁移（幂等，可重复执行）：
+/// 1) 为 AttendanceRecords 补充 TaskId 列（旧数据置为 'default'），避免新代码查询 TaskId 报错；
+/// 2) 将旧的打卡记录（按 设备+任务 分组）与机器配置中的 PendingTasks 回填为 SignInTaskEntity，
+///    使“旧平台创建的签到任务”在新版中可被识别与展示；
+/// 3) 合并同名设备：旧版“一台设备 = 一个任务”，导致一台设备的多个任务被存为多台设备，
+///    此处按设备名称合并为一台，并迁移其任务与打卡数据。
+/// </summary>
+async Task MigrateLegacyDataAsync(AppDbContext db)
+{
+    // 注意：TaskId 列与 SignInTasks/Users/DeviceAssignments 表已由 EnsureSchemaAsync 补齐，这里不再处理。
+
+    // 1) 回填：旧 AttendanceRecords（按 设备+任务 分组）转为 SignInTaskEntity
+    foreach (var grp in await db.AttendanceRecords
+                 .GroupBy(a => new { a.MachineUuid, a.TaskId }).ToListAsync())
+    {
+        var latest = grp.OrderByDescending(a => a.UpdatedAt).First();
+        var data = JsonSerializer.Deserialize<Dictionary<string, StudentAttendance>>(latest.Data) ?? new();
+        var shortCode = grp.Key.TaskId.StartsWith("signin_", StringComparison.OrdinalIgnoreCase)
+            ? grp.Key.TaskId["signin_".Length..]
+            : LegacyShortCode(db);
+        if (await db.SignInTasks.AnyAsync(s => s.ShortCode == shortCode)) continue;
+
+        var studentNames = data.Keys.ToList();
+        var signInRecords = data.Where(kv => kv.Value.FirstTime != null)
+            .Select(kv => new SignInRecord { Name = kv.Key, Time = kv.Value.FirstTime! }).ToList();
+        var machine = await db.Machines.FindAsync(grp.Key.MachineUuid);
+        db.SignInTasks.Add(new SignInTaskEntity
+        {
+            ShortCode = shortCode,
+            MachineUuid = grp.Key.MachineUuid,
+            Password = "",
+            Classroom = "",
+            Subject = machine?.Name ?? "默认任务",
+            TaskName = machine?.Name ?? "默认任务",
+            StudentList = JsonSerializer.Serialize(studentNames),
+            SignInRecords = JsonSerializer.Serialize(signInRecords),
+            CreatedAt = latest.UpdatedAt,
+            Status = "active"
+        });
+    }
+    await db.SaveChangesAsync();
+
+    // 2b) 回填：machine.Config.PendingTasks 中尚未建表的任务
+    foreach (var machine in await db.Machines.ToListAsync())
+    {
+        var cfg = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new();
+        if (cfg.PendingTasks == null) continue;
+        foreach (var pt in cfg.PendingTasks)
+        {
+            if (string.IsNullOrEmpty(pt.ShortCode)) continue;
+            if (await db.SignInTasks.AnyAsync(s => s.ShortCode == pt.ShortCode)) continue;
+            db.SignInTasks.Add(new SignInTaskEntity
+            {
+                ShortCode = pt.ShortCode,
+                MachineUuid = machine.Uuid,
+                Password = pt.Password,
+                Classroom = pt.Classroom,
+                Subject = pt.Subject,
+                TaskName = pt.TaskName,
+                StudentList = JsonSerializer.Serialize(pt.Students),
+                SignInRecords = "[]",
+                CreatedAt = DateTime.Now.ToString("O"),
+                Status = "active"
+            });
+        }
+    }
+    await db.SaveChangesAsync();
+
+    // 3) 合并同名设备：将同名设备的任务与打卡数据迁移到最近活跃的一台，其余删除
+    var dupGroups = await db.Machines.GroupBy(m => m.Name).Where(g => g.Count() > 1).ToListAsync();
+    foreach (var g in dupGroups)
+    {
+        var canonical = g.OrderByDescending(m => m.LastSeen).First();
+        foreach (var dup in g.Where(m => m.Uuid != canonical.Uuid).ToList())
+        {
+            await db.AttendanceRecords.Where(a => a.MachineUuid == dup.Uuid)
+                .ExecuteUpdateAsync(a => a.SetProperty(x => x.MachineUuid, canonical.Uuid));
+            await db.SignInTasks.Where(s => s.MachineUuid == dup.Uuid)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.MachineUuid, canonical.Uuid));
+            await db.DeviceAssignments.Where(d => d.MachineUuid == dup.Uuid)
+                .ExecuteUpdateAsync(d => d.SetProperty(x => x.MachineUuid, canonical.Uuid));
+            db.Machines.Remove(dup);
+        }
+    }
+    await db.SaveChangesAsync();
+}
+
+/// <summary>
+/// 显式补齐缺失的表与列（幂等）。EF 的 EnsureCreated 在“数据库文件已存在”时不会补建模型中新增的表/列，
+/// 旧版数据库（仅有 Machines + AttendanceRecords）缺少 SignInTasks / Users / DeviceAssignments 表以及
+/// AttendanceRecords.TaskId 列，必须在迁移前补齐，否则后续读写会报“no such table/column”。
+/// 列类型使用 SQLite 宽松亲和类型即可，EF 在 SQLite 下不做严格的运行时结构校验。
+/// </summary>
+async Task EnsureSchemaAsync(AppDbContext db)
+{
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "SignInTasks" (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "ShortCode" TEXT, "MachineUuid" TEXT, "Password" TEXT,
+            "Classroom" TEXT, "Subject" TEXT, "TaskName" TEXT,
+            "StudentList" TEXT, "SignInRecords" TEXT, "CreatedAt" TEXT, "Status" TEXT)
+        """);
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "Users" (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "Username" TEXT, "PasswordHash" TEXT, "Role" TEXT,
+            "DisplayName" TEXT, "CreatedAt" TEXT, "IsActive" INTEGER)
+        """);
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "DeviceAssignments" (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "UserId" INTEGER, "MachineUuid" TEXT, "TaskId" TEXT,
+            "AssignedBy" TEXT, "CreatedAt" TEXT)
+        """);
+    await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_SignInTasks_ShortCode" ON "SignInTasks" ("ShortCode")""");
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_SignInTasks_MachineUuid" ON "SignInTasks" ("MachineUuid")""");
+    await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username")""");
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId" ON "DeviceAssignments" ("UserId")""");
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId_MachineUuid" ON "DeviceAssignments" ("UserId", "MachineUuid")""");
+
+    // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，ADD COLUMN 会失败，忽略即可）
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "AttendanceRecords" ADD COLUMN "TaskId" TEXT NOT NULL DEFAULT 'default'""");
+    }
+    catch { /* 列已存在则忽略 */ }
+    await db.Database.ExecuteSqlRawAsync("""UPDATE "AttendanceRecords" SET "TaskId"='default' WHERE "TaskId" IS NULL OR "TaskId"=''""");
+}
+
+/// <summary>生成一个不重复的 6 位短链码（用于旧数据回填）</summary>
+string LegacyShortCode(AppDbContext db)
+{
+    string code;
+    do { code = GenerateShortCode(); }
+    while (db.SignInTasks.Any(s => s.ShortCode == code));
+    return code;
+}
+
     // ---- 从 config.json 种子用户数据（仅在 Users 表为空时） ----
     if (!db.Users.Any() && configJson.TryGetProperty("Users", out var usersArr))
     {
@@ -1977,14 +2138,11 @@ app.MapGet("/api/mobile/dashboard", async (AppDbContext db, HttpContext ctx) =>
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var machines = await db.Machines.ToListAsync();
-    // 仅加载必要字段，避免全表 JSON 数据加载
-    var taskGroups = await db.AttendanceRecords
-        .Select(a => new { a.MachineUuid, a.TaskId })
-        .Distinct()
-        .ToListAsync();
-    var taskLookup = taskGroups.GroupBy(x => x.MachineUuid)
-        .ToDictionary(g => g.Key, g => g.Select(x => x.TaskId).Distinct().Count());
     var signInTasks = await db.SignInTasks.ToListAsync();
+    // 任务数以 SignInTasks 为准（与任务列表页一致），避免因无打卡记录而漏算
+    var taskLookup = signInTasks
+        .GroupBy(s => s.MachineUuid)
+        .ToDictionary(g => g.Key, g => g.Count());
     var now = DateTime.Now;
 
     // 设备统计
