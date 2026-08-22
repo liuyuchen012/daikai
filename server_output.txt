@@ -1,0 +1,127 @@
+从 Server\Properties\launchSettings.json 使用启动设置...
+[调试] DebugMode 已启用 - 可通过 X-Debug-Auth 头绕过鉴权
+
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (11ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT COUNT(*) FROM "sqlite_master" WHERE "type" = 'table' AND "rootpage" IS NOT NULL;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "SignInTasks" (
+    "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "ShortCode" TEXT, "MachineUuid" TEXT, "Password" TEXT,
+    "Classroom" TEXT, "Subject" TEXT, "TaskName" TEXT,
+    "StudentList" TEXT, "SignInRecords" TEXT, "CreatedAt" TEXT, "Status" TEXT)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "Users" (
+    "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "Username" TEXT, "PasswordHash" TEXT, "Role" TEXT,
+    "DisplayName" TEXT, "CreatedAt" TEXT, "IsActive" INTEGER)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "DeviceAssignments" (
+    "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "UserId" INTEGER, "MachineUuid" TEXT, "TaskId" TEXT,
+    "AssignedBy" TEXT, "CreatedAt" TEXT)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE UNIQUE INDEX IF NOT EXISTS "IX_SignInTasks_ShortCode" ON "SignInTasks" ("ShortCode")
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_SignInTasks_MachineUuid" ON "SignInTasks" ("MachineUuid")
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username")
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId" ON "DeviceAssignments" ("UserId")
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId_MachineUuid" ON "DeviceAssignments" ("UserId", "MachineUuid")
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      ALTER TABLE "AttendanceRecords" ADD COLUMN "TaskId" TEXT NOT NULL DEFAULT 'default'
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@shortCode='?' (Size = 6)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "SignInTasks" AS "s"
+          WHERE "s"."ShortCode" = @shortCode)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@p='?' (Size = 36)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Uuid", "m"."Config", "m"."LastSeen", "m"."Name", "m"."PublicKey"
+      FROM "Machines" AS "m"
+      WHERE "m"."Uuid" = @p
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@p0='?', @p1='?' (Size = 33), @p2='?' (Size = 36), @p3='?', @p4='?' (Size = 6), @p5='?' (Size = 133), @p6='?' (Size = 6), @p7='?' (Size = 672), @p8='?' (Size = 4), @p9='?' (Size = 4)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "SignInTasks" ("Classroom", "CreatedAt", "MachineUuid", "Password", "ShortCode", "SignInRecords", "Status", "StudentList", "Subject", "TaskName")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9)
+      RETURNING "Id";
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Uuid", "m"."Config", "m"."LastSeen", "m"."Name", "m"."PublicKey"
+      FROM "Machines" AS "m"
+[WARN] 旧数据兼容迁移失败（不影响服务启动）：System.InvalidOperationException: The LINQ expression 'DbSet<MachineEntity>()
+    .GroupBy(m => m.Name)
+    .Where(g => g
+        .AsQueryable()
+        .Count() > 1)' could not be translated. Either rewrite the query in a form that can be translated, or switch to client evaluation explicitly by inserting a call to 'AsEnumerable', 'AsAsyncEnumerable', 'ToList', or 'ToListAsync'. See https://go.microsoft.com/fwlink/?linkid=2101038 for more information.
+   at Microsoft.EntityFrameworkCore.Query.Internal.NavigationExpandingExpressionVisitor.Expand(Expression query)
+   at Microsoft.EntityFrameworkCore.Query.QueryTranslationPreprocessor.Process(Expression query)
+   at Microsoft.EntityFrameworkCore.Query.QueryCompilationContext.CreateQueryExecutorExpression[TResult](Expression query)
+   at Microsoft.EntityFrameworkCore.Query.QueryCompilationContext.CreateQueryExecutor[TResult](Expression query)
+   at Microsoft.EntityFrameworkCore.Storage.Database.CompileQuery[TResult](Expression query, Boolean async)
+   at Microsoft.EntityFrameworkCore.Query.Internal.QueryCompiler.CompileQueryCore[TResult](IDatabase database, Expression query, IModel model, Boolean async)
+   at Microsoft.EntityFrameworkCore.Query.Internal.QueryCompiler.<>c__DisplayClass11_0`1.<ExecuteCore>b__0()
+   at Microsoft.EntityFrameworkCore.Query.Internal.CompiledQueryCache.GetOrAddQuery[TResult](Object cacheKey, Func`1 compiler)
+   at Microsoft.EntityFrameworkCore.Query.Internal.QueryCompiler.ExecuteCore[TResult](Expression query, Boolean async, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.QueryCompiler.ExecuteAsync[TResult](Expression query, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryProvider.ExecuteAsync[TResult](Expression expression, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryable`1.GetAsyncEnumerator(CancellationToken cancellationToken)
+   at System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable`1.GetAsyncEnumerator()
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+   at Program.<<Main>$>g__MigrateLegacyDataAsync|0_88(AppDbContext db) in C:\Users\liuyu\Desktop\数学打卡\check-in-net\Server\Program.cs:line 219
+   at Program.<Main>$(String[] args) in C:\Users\liuyu\Desktop\数学打卡\check-in-net\Server\Program.cs:line 142
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "Users" AS "u")
+[0;37;40m    [1;97;40m▄[1;97;47m▀▀▀▀▀▀▀[1;97;40m▄[0;37;40m              [1;97;40m▄[1;97;47m▀[1;97;40m▀▀▀▀▀[1;97;47m▄▄[1;90;47m▀[0;37;40m▄[1;90;40m▄[0;37;40m     [1;97;40m▄▄[1;97;47m▀▀▀▀▀▄▄[1;90;47m▀[0;37;40m▄[1;90;40m▄[0;37;40m    [1;97;40m█[1;97;47m▀▀▀▀▀▀▀▀▀▀▄▄[1;90;47m▀[0;37;40m▄[1;90;40m▄[0;37;40m        [1;97;40m▄[1;97;47m▀▀▀▀▀▀▀[1;97;40m▄[0;37;40m          [1;97;40m▄▄▄▄▄▄▄▄[0;37;40m▄▄[1;90;40m▄[1;97;40m█[1;97;47m▀▀▀▀▀▀▀▀▀▀▄▄[1;90;47m▀[0;37;40m▄[1;90;40m▄[0;37;40m    [0m
+[0;37;40m   [1;97;40m█[1;97;47m [0;37;40m▀  [1;93;40m▄▄■[0;37;40m [1;97;40m█[1;97;47m [1;90;40m▄[0;37;40m          [1;97;40m▄[1;97;47m▀[0;37;40m▀        [1;97;40m█[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m  [1;97;40m▄[1;97;47m▀[0;37;40m▀   [1;93;40m■[0;37;40m [1;93;40m▄▄[0;37;40m [1;97;40m▀[1;97;47m▄[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m  [1;97;40m█[0;37;40m█      [1;93;40m■[0;37;40m [1;93;40m▄▄[0;37;40m [1;97;40m▀[1;97;47m▄[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m     [1;97;40m█[1;97;47m [0;37;40m▀  [1;93;40m▄▄■[0;37;40m [1;97;40m█[1;97;47m [1;90;40m▄[0;37;40m        [1;97;40m█[0;37;40m█▀▀▀▀▀[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█      [1;93;40m■[0;37;40m [1;93;40m▄▄[0;37;40m [1;97;40m▀[1;97;47m▄[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m  [0m
+[0;37;40m   [1;97;40m█[1;97;47m [0;37;40m [1;93;40m▄▀[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m        [1;97;40m█[0;37;40m█  [1;93;40m▄■·[0;37;40m     [1;97;40m█[1;97;47m [0;37;40m█[1;90;40m█[0;37;40m [1;97;40m█[0;37;40m█         [1;93;40m▀▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m [1;97;40m▀[1;97;47m▄[0;37;40m▄         [1;93;40m▀▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m    [1;97;40m█[1;97;47m [0;37;40m [1;93;40m▄▀[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m       [1;97;40m█[0;37;40m█ [1;93;40m▄■[0;37;40m  [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█ [0;31;40m░[0;37;40m        [1;93;40m▀▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m  [0m
+[0;37;40m  [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;93;40m▐[0;37;40m  [1;97;40m▄[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m      [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;93;40m▄▀[0;37;40m  [1;97;40m▄[1;97;47m▀▀[1;97;40m▄▄[1;97;47m▀[0;37;40m█[1;90;47m▄[1;90;40m▀[0;37;40m [1;97;40m▐[1;97;47m▌[0;37;40m▌    [1;97;40m▄[1;97;47m▀[1;97;40m▄[0;37;40m▄   [1;93;40m▌[1;97;40m▐[1;97;47m▌[0;37;40m█[1;90;47m▐[1;90;40m▌[0;37;40m [1;97;40m▐[1;97;47m▌[0;37;40m▌   [1;97;40m█[1;97;47m▀[1;97;40m▄[0;37;40m▄   [1;93;40m▌[1;97;40m▐[1;97;47m▌[0;37;40m█[1;90;47m▐[1;90;40m▌[0;37;40m  [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;93;40m▐[0;37;40m  [1;97;40m▄[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m      [1;97;40m█[1;97;47m [1;93;40m▐[0;37;40m    [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█[0;31;40m▒▒░░[0;37;40m [1;97;40m▄[1;97;47m▀[1;97;40m▄[0;37;40m▄ [0;31;40m░[0;37;40m [1;93;40m▌[1;97;40m▐[1;97;47m▌[0;37;40m█[1;90;47m▐[1;90;40m▌[0m
+[0;37;40m  [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;93;40m│[0;37;40m [1;97;40m▐[1;97;47m▌[1;97;40m█[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m     [1;97;40m█[0;37;40m█ [1;93;40m▌[0;37;40m  [1;97;40m█[0;37;40m██[1;90;47m▄[1;90;40m▀▀[0;37;40m     [1;97;40m█[0;37;40m█    [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m     [1;97;40m█[0;37;40m██[1;90;40m█[0;37;40m  [1;97;40m█[0;37;40m█   [1;97;40m█[1;97;47m▄[1;97;40m▄▀[0;37;40m   [1;97;40m▄█[0;37;40m██[1;90;40m█[0;37;40m   [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;93;40m│[0;37;40m [1;97;40m▐[1;97;47m▌[1;97;40m█[0;37;40m     [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m     [1;97;40m█[0;37;40m█  [1;91;40m▄▄[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█[0;31;40m▓▓▓▓[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;31;40m▒[1;91;41m░[0;31;40m▓▒░[1;97;40m█[0;37;40m██[1;90;40m█[0m
+[0;37;40m  [1;97;40m█[1;97;47m [0;37;40m [1;91;40m▄[0;37;40m [1;97;40m█[1;97;47m [1;97;40m▐▌[1;91;40m▄[0;37;40m  [1;91;40m▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m    [1;97;40m█[0;37;40m█    [1;97;40m█[0;37;40m█[1;97;40m█▀▀▀▀█[0;37;40m▄  [1;97;40m█[0;37;40m█    [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m     [1;97;40m█[0;37;40m██[1;90;40m█[0;37;40m  [1;97;40m█[0;37;40m█ [0;31;40m▓▒░[0;37;40m [0;31;40m░░[0;37;40m [1;97;40m▄█[1;97;47m▀[0;37;40m█[1;90;47m▄[0;37;40m     [1;97;40m█[1;97;47m [0;37;40m [1;91;40m▄[0;37;40m [1;97;40m█[1;97;47m [1;97;40m▐▌[1;91;40m▄[0;37;40m  [1;91;40m▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m    [1;97;40m█[0;37;40m█ [1;91;40m▓[1;91;41m▓▒[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█[0;31;40m█[1;91;41m░░[0;31;40m█[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[1;91;41m░▒░[0;31;40m█▓[1;97;40m█[0;37;40m██[1;90;40m█[0m
+[0;37;40m  [1;97;40m█[1;97;47m [1;91;40m▐[1;91;41m▒[1;97;40m▐[1;97;47m▌▄[1;97;40m▄[1;97;47m▀[0;37;40m▄[1;91;40m▀▄[1;91;41m▒[1;91;40m▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m   [1;97;40m█[0;37;40m█ [1;91;40m▄██[1;97;40m▐[1;97;47m▌[1;97;40m█▄[0;37;40m [1;93;40m■[0;37;40m [1;97;40m█[1;90;47m░▒[1;90;40m▄[1;97;40m█[0;37;40m█  [0;31;40m▄[1;91;40m▄[1;97;40m█[0;37;40m█[1;97;47m [1;90;40m█[1;97;40m█[0;31;40m▐[1;91;40m██▄[0;37;40m [1;97;40m█[1;97;47m [0;37;40m█[1;90;40m█[0;37;40m [1;97;40m▐[1;97;47m▌[0;37;40m▌[0;31;40m█[1;91;40m▄▌[1;97;40m█[1;97;43m▀[1;97;40m▄[0;31;40m▒[1;91;41m░[1;91;40m█[1;97;43m▀[1;97;40m█[0;37;40m█[1;90;47m▀[1;90;40m▄[0;37;40m    [1;97;40m█[1;97;47m [1;91;40m▐[1;91;41m▒[1;97;40m▐[1;97;47m▌▄[1;97;40m▄[1;97;47m▀[0;37;40m▄[1;91;40m▀▄[1;91;41m▒[1;91;40m▄[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m   [1;97;40m█[0;37;40m█ [1;91;41m▒░[0;31;40m█[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█[1;91;41m░░▒▓[1;97;40m█[0;37;40m█[1;97;47m [1;90;40m█[1;97;40m█[1;91;41m░[1;91;40m██[0;31;40m██[1;97;40m█[1;97;47m [0;37;40m█[1;90;40m█[0m
+[0;37;40m [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;91;41m▒░[0;31;40m▄[1;97;40m▀[0;37;40m█▀▀[0;31;40m▄[1;91;41m░▒░▒░[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m  [1;97;40m█[0;37;40m█ [1;91;40m░[1;91;41m▒▓[0;31;40m▌[1;97;40m▀[1;97;47m▄[1;97;40m█[0;31;40m▐▓▌[1;97;40m█[0;37;40m█[1;90;47m▓[1;90;40m█[1;97;40m▐[1;97;47m▌[0;37;40m▌[1;91;41m░▒▓▒[1;97;40m▀[1;97;47m▄▀[0;37;40m▀[0;31;40m█[1;91;40m█▓[1;91;41m▒[1;97;40m▐[1;97;47m▌[0;37;40m█[1;90;47m▐[1;90;40m▌[0;37;40m [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;91;41m░▓▒[1;97;40m█[0;37;40m█[1;90;40m█[1;97;40m█[1;91;41m▒[1;91;40m█▓[1;91;41m▒[1;97;40m█[0;37;40m█[1;90;47m▐[1;90;40m▌[0;37;40m  [1;97;40m▐[1;97;47m▌[0;37;40m▌[1;91;41m▒░[0;31;40m▄[1;97;40m▀[0;37;40m█▀▀[0;31;40m▄[1;91;41m░▒░▒░[0;37;40m [1;97;40m█[0;37;40m█[1;90;47m█[0;37;40m  [1;97;40m█[0;37;40m█ [0;31;40m██▒[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;37;40m█[1;91;41m░░▒▓[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[1;91;41m▒[1;91;40m█▓[1;91;41m▒[0;31;40m█[1;97;40m█[0;37;40m██[1;90;40m█[0m
+[1;97;40m▄[1;97;47m▀[0;37;40m█ [0;31;40m▒░▒█[0;37;40m [0;31;40m▀▀[1;97;40m▄▄[1;97;47m▀[0;37;40m▄[0;31;40m▀█▒[0;37;40m [1;97;40m▀[1;97;47m▄[1;90;47m▀[1;90;40m▄[1;97;40m▐[1;97;47m▌[0;37;40m▌ [1;91;40m░▒[1;91;41m▒░[0;31;40m▄▄▓▒▌[1;97;40m█[1;90;47m░▓[1;90;40m█[0;37;40m [1;97;40m█[0;37;40m█[0;31;40m█[1;91;41m▓▒░[0;31;40m▄▄[0;37;40m [0;31;40m▓[1;91;41m░▒░[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[0;37;40m  [1;97;40m█[0;37;40m█[1;91;41m░▓▒░[1;97;40m█[0;37;40m█[1;90;40m█[1;97;40m█[1;91;41m░▒░░[1;97;40m█[0;37;40m██[1;90;40m█[0;37;40m [1;97;40m▄[1;97;47m▀[0;37;40m█ [0;31;40m▒░▒█[0;37;40m [0;31;40m▀▀[1;97;40m▄▄[1;97;47m▀[0;37;40m▄[0;31;40m▀█▒[0;37;40m [1;97;40m▀[1;97;47m▄[1;90;47m▀[1;90;40m▄[1;97;40m█[0;37;40m█ [0;31;40m░░░[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;31;40m█[0;37;40m█[1;91;41m░▒▓▒[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[1;91;41m▓█▓▒░[1;97;40m█[0;37;40m██[1;90;40m█[0m
+[1;97;40m█[1;97;47m [0;37;40m [0;31;40m░░[0;37;40m [1;97;40m▄▄[1;97;47m▀▀▀[0;37;40m█[1;90;47m▄[1;97;47m▀[1;97;40m▄[0;37;40m [0;31;40m▒░[1;97;40m▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[0;37;40m [1;97;40m▀[1;97;47m▄[0;37;40m▄ [0;31;40m▀[1;91;41m░[0;31;40m██▓▒░[0;37;40m [1;97;40m█[1;97;47m [1;90;47m▓[1;90;40m█[0;37;40m  [1;97;40m▀[1;97;47m▄[0;37;40m▄[0;31;40m█▓▒░[0;37;40m [0;31;40m▒░▓▀[1;97;40m▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[0;37;40m [1;97;40m▄[1;97;47m▀[0;37;40m▀[0;31;40m▄[1;91;41m░[0;31;40m█▓[1;97;40m█[0;37;40m█[1;90;40m█[1;97;40m█[0;31;40m░▓▀[1;97;40m▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[0;37;40m [1;97;40m█[1;97;47m [0;37;40m [0;31;40m░░[0;37;40m [1;97;40m▄▄[1;97;47m▀▀▀[0;37;40m█[1;90;47m▄[1;97;47m▀[1;97;40m▄[0;37;40m [0;31;40m▒░[1;97;40m▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[1;97;40m█[1;97;47m [0;37;40m [0;31;40m░░░[0;37;40m [1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[0;31;40m█[0;37;40m█[1;91;41m░▒▓▓[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[1;91;41m░▒░[0;31;40m█░[1;97;40m█[0;37;40m██[1;90;40m█[0m
+[1;97;40m█[1;97;47m▄[1;97;40m▄▄▄[1;97;47m▀[0;37;40m█[1;90;47m▄▄[1;90;40m▀▀▀[0;37;40m   [1;97;40m▀▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[0;37;40m     [1;97;40m▀▀[1;97;47m▄[1;97;40m▄▄▄[1;97;47m▀[1;97;40m▄▄▄█[1;90;47m░[0;37;40m▀     [1;97;40m▀▀[1;97;47m▄[1;97;40m▄▄▄▄▄[1;97;47m▀▀[1;90;47m▄[0;37;40m▀[1;90;40m▀[0;37;40m   [1;97;40m█[1;97;47m▄[1;97;40m▄▄▄▄▄▄█[0;37;40m█[1;97;40m█▄[1;97;47m▀▀[1;90;47m▄[0;37;40m▀[1;90;40m▀[0;37;40m   [1;97;40m█[1;97;47m▄[1;97;40m▄▄▄[1;97;47m▀[0;37;40m█[1;90;47m▄▄[1;90;40m▀▀▀[0;37;40m   [1;97;40m▀▄[1;97;47m▀ [1;90;47m▄[1;90;40m▀[0;37;40m  [1;97;40m█[1;97;47m▄[1;97;40m▄▄▄▄▄█[0;37;40m██[1;90;40m█[1;97;40m█[0;31;40m█[1;97;47m▄[1;97;41m▄▄▄▄[1;97;40m█[0;37;40m██[1;90;40m█[1;97;40m█[1;97;41m▄▄▄▄[1;97;40m▄█[0;37;40m██[1;90;40m█[0m
+[0;97;1;42m version=2.8.0 [0m
+
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://0.0.0.0:5250
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\liuyu\Desktop\数学打卡\check-in-net\Server
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Uuid", "m"."Config", "m"."LastSeen", "m"."Name", "m"."PublicKey"
+      FROM "Machines" AS "m"
+fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]
+      An unhandled exception has occurred while executing the request.
+      System.Collections.Generic.KeyNotFoundException: The given key was not present in the dictionary.
+         at System.Text.Json.JsonElement.GetProperty(String propertyName)
+         at Program.<>c__DisplayClass0_0.<<<Main>$>b__34>d.MoveNext() in C:\Users\liuyu\Desktop\数学打卡\check-in-net\Server\Program.cs:line 807
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+         at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Program.<>c__DisplayClass0_0.<<<Main>$>b__23>d.MoveNext() in C:\Users\liuyu\Desktop\数学打卡\check-in-net\Server\Program.cs:line 575
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)

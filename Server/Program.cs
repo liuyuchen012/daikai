@@ -88,6 +88,14 @@ else
     File.WriteAllText(sessionSecretFile, sessionSecret);
 }
 
+// ---- 调试模式配置（生产环境请设为 false） ----
+var debugMode = configJson.ValueKind != JsonValueKind.Undefined &&
+                configJson.TryGetProperty("DebugMode", out var dm) &&
+                dm.ValueKind == JsonValueKind.True && dm.GetBoolean();
+if (debugMode)
+    Console.WriteLine("[调试] DebugMode 已启用 - 可通过 X-Debug-Auth 头绕过鉴权");
+Console.WriteLine();
+
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{cfgPort}");
 
@@ -339,6 +347,8 @@ bool ValidateToken(string token)
 /// </summary>
 bool IsAuthenticated(HttpContext ctx)
 {
+    // 调试模式：sw_session=debug 视为已认证
+    if (HasDebugCookie(ctx)) return true;
     if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token)) return false;
     return ValidateToken(token);
 }
@@ -348,6 +358,10 @@ bool IsAuthenticated(HttpContext ctx)
 /// </summary>
 string? GetUsername(HttpContext ctx)
 {
+    // 调试模式
+    var (debugUser, _) = GetDebugCookieUser(ctx);
+    if (debugUser != null) return debugUser;
+
     if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token)) return null;
     if (!ValidateToken(token)) return null;
     var parts = token.Split(':');
@@ -359,6 +373,10 @@ string? GetUsername(HttpContext ctx)
 /// </summary>
 string? GetUserRole(HttpContext ctx)
 {
+    // 调试模式
+    var (_, debugRole) = GetDebugCookieUser(ctx);
+    if (debugRole != null) return debugRole;
+
     if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token)) return null;
     if (!ValidateToken(token)) return null;
     var parts = token.Split(':');
@@ -406,6 +424,14 @@ bool IsAdminOrTeacher(string? role) =>
 /// </summary>
 (string? Username, string? Role, string? Error) ParseBearerToken(HttpContext ctx)
 {
+    // 调试模式：通过 X-Debug-Auth 头绕过 Bearer Token 验证
+    if (debugMode)
+    {
+        var (debugUser, debugRole) = GetDebugUser(ctx);
+        if (debugRole != null)
+            return (debugUser, debugRole, null);
+    }
+
     var authHeader = ctx.Request.Headers.Authorization.FirstOrDefault();
     if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         return (null, null, "缺少认证令牌");
@@ -435,6 +461,49 @@ bool IsAdminOrTeacher(string? role) =>
 string MakeLoginToken(string username, string role)
 {
     return MakeToken(username, role);
+}
+
+// ---- 调试鉴权辅助（Debug Auth Helpers） ----
+// 当 config.json 中 DebugMode=true 时生效。通过 X-Debug-Auth 请求头可绕过正常鉴权。
+// 用法：
+//   Cookie 认证绕过: 请求页面时带上 Cookie: sw_session=debug 即可
+//   Bearer 认证绕过: Header X-Debug-Auth: admin（角色名）
+//                     Header X-Debug-Auth: teacher1:teacher（用户名:角色）
+
+/// <summary>
+/// 从 X-Debug-Auth 头提取调试用户信息。仅在 DebugMode=true 时有效。
+/// 格式: "role"（仅角色）或 "username:role"
+/// </summary>
+(string? Username, string? Role) GetDebugUser(HttpContext ctx)
+{
+    if (!debugMode) return (null, null);
+    var debugHeader = ctx.Request.Headers["X-Debug-Auth"].FirstOrDefault();
+    if (string.IsNullOrEmpty(debugHeader)) return (null, null);
+    var parts = debugHeader.Split(':');
+    if (parts.Length >= 2)
+        return (parts[0], parts[1]);
+    return ("debug", debugHeader.Trim());
+}
+
+/// <summary>
+/// 检查是否有有效的调试 Cookie（sw_session=debug）。仅在 DebugMode=true 时有效。
+/// </summary>
+bool HasDebugCookie(HttpContext ctx)
+{
+    if (!debugMode) return false;
+    ctx.Request.Cookies.TryGetValue(CookieName, out var token);
+    return token == "debug";
+}
+
+/// <summary>
+/// 根据调试 Cookie/Header 返回模拟用户信息
+/// </summary>
+(string? Username, string? Role) GetDebugCookieUser(HttpContext ctx)
+{
+    if (!HasDebugCookie(ctx)) return (null, null);
+    // 同时检查 X-Debug-Auth 头以确定角色
+    var (username, role) = GetDebugUser(ctx);
+    return (username ?? "debug_admin", role ?? "admin");
 }
 
 // ---- 加载 HTML 模板文件（template.html 和 login.html） ----
@@ -537,14 +606,98 @@ string? GetPublicKey(AppDbContext db, string uuid) =>
     db.Machines.Where(m => m.Uuid == uuid).Select(m => m.PublicKey).FirstOrDefault();
 
 /// <summary>
-/// 验证请求中的密码是否与服务器密码一致
+/// 验证请求中的密码是否与服务器密码一致。调试模式下接受 X-Debug-Auth 头绕过。
 /// </summary>
-static bool CheckPwd(JsonElement body, string expected)
+bool CheckPwd(JsonElement body, string expected, HttpContext? ctx = null)
 {
+    // 调试模式：存在 X-Debug-Auth 头时跳过密码验证
+    if (ctx != null && debugMode)
+    {
+        var debugHeader = ctx.Request.Headers["X-Debug-Auth"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(debugHeader))
+            return true;
+    }
+
     if (!body.TryGetProperty("password", out var p) || p.ValueKind != JsonValueKind.String)
         return false;
     return p.GetString() == expected;
 }
+
+// ===== 调试 API 端点（仅在 DebugMode=true 时可用） =====
+
+/// <summary>
+/// GET /api/debug/status - 查看调试模式状态和可用角色
+/// </summary>
+app.MapGet("/api/debug/status", () =>
+{
+    if (!debugMode)
+        return Results.Json(new { debug_mode = false, message = "调试模式未启用，请在 config.json 中设置 DebugMode: true" });
+
+    return Results.Json(new
+    {
+        debug_mode = true,
+        message = "调试模式已启用，以下方式可绕过鉴权：",
+        usage = new
+        {
+            cookie = "设置 Cookie: sw_session=debug，同时可选 Header X-Debug-Auth: admin/teacher/student/parent",
+            bearer = "设置 Header X-Debug-Auth: admin（仅角色）或 X-Debug-Auth: username:role",
+            token = "GET /api/debug/token?role=admin 生成标准 Bearer Token",
+            roles = new[] { "admin", "teacher", "student", "parent" }
+        }
+    });
+});
+
+/// <summary>
+/// GET /api/debug/token - 生成一个有效的 Bearer Token（调试用）
+/// Query: ?role=admin 指定角色（默认 admin）
+/// Query: ?username=test&role=teacher 指定用户名和角色
+/// </summary>
+app.MapGet("/api/debug/token", (HttpContext ctx) =>
+{
+    if (!debugMode)
+        return Results.Json(new { error = "调试模式未启用" }, statusCode: 403);
+
+    var role = ctx.Request.Query["role"].FirstOrDefault() ?? "admin";
+    var username = ctx.Request.Query["username"].FirstOrDefault() ?? $"debug_{role}";
+
+    // 验证角色有效性
+    var validRoles = new[] { "admin", "teacher", "student", "parent" };
+    if (!validRoles.Contains(role))
+        return Results.Json(new { error = $"无效角色: {role}，可用角色: {string.Join(", ", validRoles)}" }, statusCode: 400);
+
+    var token = MakeToken(username, role);
+    return Results.Json(new
+    {
+        token,
+        user = new { username, role, display_name = $"调试{role}" },
+        usage = "使用 Authorization: Bearer <token> 头，或 X-Debug-Auth: <role> 头"
+    });
+});
+
+/// <summary>
+/// POST /api/debug/login - 模拟任意用户登录，返回 Bearer Token
+/// Body: { "role": "admin", "username": "optional" }
+/// </summary>
+app.MapPost("/api/debug/login", (JsonElement body) =>
+{
+    if (!debugMode)
+        return Results.Json(new { error = "调试模式未启用" }, statusCode: 403);
+
+    var role = body.TryGetProperty("role", out var r) ? r.GetString()?.Trim() ?? "admin" : "admin";
+    var username = body.TryGetProperty("username", out var un) ? un.GetString()?.Trim() : null;
+    username = string.IsNullOrEmpty(username) ? $"debug_{role}" : username;
+
+    var validRoles = new[] { "admin", "teacher", "student", "parent" };
+    if (!validRoles.Contains(role))
+        return Results.Json(new { error = $"无效角色: {role}，可用角色: {string.Join(", ", validRoles)}" }, statusCode: 400);
+
+    var token = MakeLoginToken(username, role);
+    return Results.Json(new
+    {
+        token,
+        user = new { username, role, display_name = $"调试{role}" }
+    });
+});
 
 // ===== API 端点 =====
 
@@ -646,9 +799,9 @@ app.MapGet("/api/machines/{uuid}/tasks", async (string uuid, AppDbContext db) =>
 /// <summary>
 /// POST /api/register - 客户端注册：上传公钥和设备信息，获取 UUID
 /// </summary>
-app.MapPost("/api/register", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var pubKey = body.GetProperty("public_key").GetString() ?? "";
@@ -678,9 +831,9 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body) =>
 /// <summary>
 /// POST /api/sync_data - 客户端同步打卡数据到服务器（需 RSA 签名验证）
 /// </summary>
-app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -707,9 +860,9 @@ app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body) =>
 /// <summary>
 /// POST /api/load_data - 客户端从服务器加载最新打卡数据（需 challenge-签名验证）
 /// </summary>
-app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -737,9 +890,9 @@ app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body) =>
 /// <summary>
 /// POST /api/get_config - 客户端获取存储在服务器上的任务配置
 /// </summary>
-app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -761,9 +914,9 @@ app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body) =>
 /// <summary>
 /// POST /api/update_config - 客户端更新存储在服务器上的任务配置
 /// </summary>
-app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -1145,9 +1298,9 @@ string GenerateShortCode()
 /// <summary>
 /// POST /api/create_signin - 教师客户端创建签到任务，返回短链供学生访问
 /// </summary>
-app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -1195,6 +1348,23 @@ app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body) =>
         Data = JsonSerializer.Serialize(initialData),
         UpdatedAt = DateTime.Now.ToString("O")
     });
+
+    // 向设备推送任务配置（PendingTasks），客户端轮询时自动拉取
+    var deviceConfig = JsonSerializer.Deserialize<ClientConfig>(machine.Config) ?? new ClientConfig();
+    deviceConfig.PendingTasks ??= new List<PendingTaskConfig>();
+    deviceConfig.ConfigVersion++;
+    deviceConfig.PendingTasks.Add(new PendingTaskConfig
+    {
+        ShortCode = shortCode,
+        TaskId = taskId,
+        Subject = subject,
+        Classroom = classroom,
+        TaskName = subject,
+        Password = signPassword,
+        Students = studentNames,
+        CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+    });
+    machine.Config = JsonSerializer.Serialize(deviceConfig);
     await db.SaveChangesAsync();
 
     return Results.Json(new
@@ -1208,9 +1378,9 @@ app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body) =>
 /// POST /api/signin_result - 客户端拉取签到结果（含 challenge-签名验证）
 /// 返回该设备下所有活跃签到任务的签到记录
 /// </summary>
-app.MapPost("/api/signin_result", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/signin_result", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -2335,7 +2505,9 @@ app.MapDelete("/api/mobile/tasks/{id}", async (int id, AppDbContext db, HttpCont
 });
 
 /// <summary>
-/// GET /api/mobile/students/history - 获取学生签到历史（学生/家长查看）
+/// GET /api/mobile/students/history - 获取签到历史
+/// 学生/家长：查看自己作为学生的签到记录
+/// 管理员/教师：查看所有设备的签到任务汇总
 /// </summary>
 app.MapGet("/api/mobile/students/history", async (AppDbContext db, HttpContext ctx) =>
 {
@@ -2343,33 +2515,71 @@ app.MapGet("/api/mobile/students/history", async (AppDbContext db, HttpContext c
     if (tokenError != null)
         return Results.Json(new { error = tokenError }, statusCode: 401);
 
-    // 查询该用户作为学生的签到记录（在所有签到任务中搜索）
-    var signInTasks = await db.SignInTasks.ToListAsync();
+    var normalizedRole = NormalizeRole(role ?? "");
     var history = new List<object>();
 
-    foreach (var task in signInTasks)
+    if (normalizedRole == "admin" || normalizedRole == "teacher")
     {
-        var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
-        var userRecord = records.FirstOrDefault(r => r.Name.Equals(username, StringComparison.OrdinalIgnoreCase));
-        if (userRecord != null)
+        // 管理员/教师：汇总所有设备的签到任务
+        var signInTasks = await db.SignInTasks.ToListAsync();
+        foreach (var task in signInTasks)
         {
+            var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
+            var studentNames = JsonSerializer.Deserialize<List<string>>(task.StudentList) ?? new();
             history.Add(new
             {
                 subject = task.Subject,
                 classroom = task.Classroom,
                 short_code = task.ShortCode,
-                time = userRecord.Time,
-                status = task.Status
+                task_name = task.TaskName ?? task.Subject,
+                student_count = studentNames.Count,
+                signed_count = records.Count,
+                status = task.Status,
+                created_at = task.CreatedAt,
+                records = records.Select(r => new
+                {
+                    name = r.Name,
+                    time = r.Time
+                }).ToList()
             });
         }
-    }
 
-    return Results.Json(new
+        return Results.Json(new
+        {
+            role = normalizedRole,
+            total_tasks = history.Count,
+            total_checkins = history.Sum(h => ((dynamic)h).signed_count),
+            history = history.OrderByDescending(h => ((dynamic)h).created_at).ToList()
+        });
+    }
+    else
     {
-        student_name = username,
-        total_checkins = history.Count,
-        history = history.OrderByDescending(h => ((dynamic)h).time).ToList()
-    });
+        // 学生/家长：查询该用户作为学生的签到记录
+        var signInTasks = await db.SignInTasks.ToListAsync();
+        foreach (var task in signInTasks)
+        {
+            var records = JsonSerializer.Deserialize<List<SignInRecord>>(task.SignInRecords) ?? new();
+            var userRecord = records.FirstOrDefault(r => r.Name.Equals(username, StringComparison.OrdinalIgnoreCase));
+            if (userRecord != null)
+            {
+                history.Add(new
+                {
+                    subject = task.Subject,
+                    classroom = task.Classroom,
+                    short_code = task.ShortCode,
+                    time = userRecord.Time,
+                    status = task.Status
+                });
+            }
+        }
+
+        return Results.Json(new
+        {
+            student_name = username,
+            total_checkins = history.Count,
+            history = history.OrderByDescending(h => ((dynamic)h).time).ToList()
+        });
+    }
 });
 
 // =============================================================================
@@ -2591,6 +2801,34 @@ app.MapPost("/api/mobile/devices/{uuid}/tasks", async (string uuid, AppDbContext
     });
     cfg.ConfigVersion++;
     machine.Config = JsonSerializer.Serialize(cfg);
+
+    // 同步创建 SignInTaskEntity（使网页端可查看和管理该任务）
+    db.SignInTasks.Add(new SignInTaskEntity
+    {
+        ShortCode = taskId["signin_".Length..],
+        MachineUuid = uuid,
+        Password = password,
+        Classroom = classroom,
+        Subject = subject,
+        TaskName = taskName,
+        StudentList = JsonSerializer.Serialize(students),
+        SignInRecords = "[]",
+        CreatedAt = DateTime.Now.ToString("O"),
+        Status = "active"
+    });
+
+    // 同步创建 attendance 记录（使客户端能加载打卡数据）
+    var initialData = new Dictionary<string, StudentAttendance>();
+    foreach (var name in students)
+        initialData[name] = new StudentAttendance { Name = name };
+    db.AttendanceRecords.Add(new AttendanceEntity
+    {
+        MachineUuid = uuid,
+        TaskId = taskId,
+        Data = JsonSerializer.Serialize(initialData),
+        UpdatedAt = DateTime.Now.ToString("O")
+    });
+
     await db.SaveChangesAsync();
 
     return Results.Json(new { status = "ok", task_id = taskId, message = "任务已推送至设备" });
@@ -2817,9 +3055,9 @@ app.MapGet("/api/mobile/teachers", async (AppDbContext db, HttpContext ctx) =>
 /// POST /api/config_applied - 客户端确认已应用推送的配置任务
 /// 客户端应用 PendingTasks 后调用此接口，服务端清除已推送任务
 /// </summary>
-app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword))
+    if (!CheckPwd(body, serverPassword, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";

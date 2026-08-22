@@ -41,6 +41,19 @@ public class ApiService
     }
 
     /// <summary>
+    /// 调试模式：使用 X-Debug-Auth 头模拟任意角色登录，仅用于开发测试
+    /// 需要服务端 config.json 中 DebugMode=true
+    /// </summary>
+    public void SetDebugToken(string role = "admin", string? username = null)
+    {
+        _token = $"debug_{role}";
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
+        _httpClient.DefaultRequestHeaders.Remove("X-Debug-Auth");
+        var debugValue = string.IsNullOrEmpty(username) ? role : $"{username}:{role}";
+        _httpClient.DefaultRequestHeaders.Add("X-Debug-Auth", debugValue);
+    }
+
+    /// <summary>
     /// 发送 POST JSON 请求
     /// </summary>
     public async Task<JsonElement> PostAsync(string endpoint, object? body = null)

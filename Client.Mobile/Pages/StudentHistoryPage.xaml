@@ -23,12 +23,14 @@
             </Grid>
         </Border>
 
-        <!-- 统计 -->
+        <!-- 统计（管理员/教师显示任务数和签到数，学生显示签到次数） -->
         <Border Grid.Row="1" BackgroundColor="#e8f0fe" StrokeShape="RoundRectangle 10"
-               Padding="12" Stroke="Transparent" StrokeThickness="0">
+               Padding="12" Stroke="Transparent" StrokeThickness="0"
+               x:Name="statsBorder">
             <HorizontalStackLayout Spacing="4" HorizontalOptions="Center">
-                <Label Text="总签到次数：" FontSize="14" TextColor="#4285f4" />
+                <Label x:Name="lblStatsLabel" Text="总签到次数：" FontSize="14" TextColor="#4285f4" />
                 <Label x:Name="lblTotal" Text="0" FontSize="18" FontAttributes="Bold" TextColor="#4285f4" />
+                <Label x:Name="lblStatsExtra" Text="" FontSize="14" TextColor="#4285f4" />
             </HorizontalStackLayout>
         </Border>
 

@@ -217,8 +217,8 @@ public class UserItem
     public string RoleText => Role switch
     {
         "admin" => "管理员",
-        "operator" => "教师",
         "teacher" => "普通教师",
+        "operator" => "普通教师",
         "student" => "学生",
         "viewer" => "学生",
         "parent" => "家长",
@@ -231,6 +231,7 @@ public class UserItem
         "teacher" => Color.FromArgb("#4285f4"),
         "operator" => Color.FromArgb("#4285f4"),
         "student" => Color.FromArgb("#34a853"),
+        "viewer" => Color.FromArgb("#34a853"),
         "parent" => Color.FromArgb("#e37400"),
         _ => Color.FromArgb("#888888")
     };

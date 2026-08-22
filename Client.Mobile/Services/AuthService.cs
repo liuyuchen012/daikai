@@ -128,4 +128,30 @@ public class AuthService
         Preferences.Remove(TokenKey);
         Preferences.Remove(UserKey);
     }
+
+    /// <summary>
+    /// 调试模式登录：使用 X-Debug-Auth 头模拟任意角色，跳过正常认证流程
+    /// 需要服务端 config.json 中 DebugMode=true
+    /// </summary>
+    public void DebugLogin(string baseUrl, string role = "admin", string? username = null)
+    {
+        _api.BaseUrl = baseUrl;
+        var displayName = $"调试{role}";
+        var actualUsername = username ?? $"debug_{role}";
+
+        _api.SetDebugToken(role, actualUsername);
+        CurrentUsername = actualUsername;
+        CurrentRole = role;
+        CurrentDisplayName = displayName;
+
+        // 保存到本地
+        Preferences.Set(TokenKey, $"debug_{role}");
+        var userInfo = JsonSerializer.Serialize(new
+        {
+            username = actualUsername,
+            role,
+            display_name = displayName
+        });
+        Preferences.Set(UserKey, userInfo);
+    }
 }

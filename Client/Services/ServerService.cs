@@ -40,6 +40,20 @@ public class ServerService
     }
 
     /// <summary>
+    /// 调试模式初始化：使用 X-Debug-Auth 头绕过密码验证，仅用于开发测试
+    /// 需要服务端 config.json 中 DebugMode=true
+    /// </summary>
+    public void DebugInitialize(string ip, int port, string role = "admin")
+    {
+        _baseUrl = $"http://{ip}:{port}";
+        _password = "debug";
+        _http.DefaultRequestHeaders.Remove("X-Server-Password");
+        _http.DefaultRequestHeaders.Add("X-Server-Password", _password);
+        _http.DefaultRequestHeaders.Remove("X-Debug-Auth");
+        _http.DefaultRequestHeaders.Add("X-Debug-Auth", role);
+    }
+
+    /// <summary>
     /// 构造函数：初始化 HttpClient 并加载或创建 RSA 密钥对
     /// </summary>
     public ServerService()
@@ -56,23 +70,28 @@ public class ServerService
         var keyFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "client_key.pem");
         var uuidFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "client_uuid.txt");
 
-        if (File.Exists(keyFile) && File.Exists(uuidFile))
+        // 使用文件锁防止并发实例创建重复密钥
+        var lockFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "client_key.lock");
+        using (var fs = new FileStream(lockFile, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
         {
-            // 从磁盘加载已有的密钥和UUID
-            _rsa = RSA.Create();
-            var keyPem = File.ReadAllText(keyFile);
-            _rsa.ImportFromPem(keyPem);
-            _clientUuid = File.ReadAllText(uuidFile).Trim();
-        }
-        else
-        {
-            // 生成新的 RSA 2048 密钥对和 UUID
-            _rsa = RSA.Create(2048);
-            var privKey = _rsa.ExportRSAPrivateKey();
-            var pem = PemEncoding.Write("RSA PRIVATE KEY", privKey);
-            File.WriteAllText(keyFile, pem);
-            _clientUuid = Guid.NewGuid().ToString();
-            File.WriteAllText(uuidFile, _clientUuid);
+            if (File.Exists(keyFile) && File.Exists(uuidFile))
+            {
+                // 从磁盘加载已有的密钥和UUID
+                _rsa = RSA.Create();
+                var keyPem = File.ReadAllText(keyFile);
+                _rsa.ImportFromPem(keyPem);
+                _clientUuid = File.ReadAllText(uuidFile).Trim();
+            }
+            else
+            {
+                // 生成新的 RSA 2048 密钥对和 UUID
+                _rsa = RSA.Create(2048);
+                var privKey = _rsa.ExportRSAPrivateKey();
+                var pem = PemEncoding.Write("RSA PRIVATE KEY", privKey);
+                File.WriteAllText(keyFile, pem);
+                _clientUuid = Guid.NewGuid().ToString();
+                File.WriteAllText(uuidFile, _clientUuid);
+            }
         }
         _publicKeyPem = _rsa.ExportSubjectPublicKeyInfoPem();
     }
