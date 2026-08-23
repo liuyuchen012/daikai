@@ -10,8 +10,8 @@ namespace CheckIn.Client;
 
 /// <summary>
 /// 控制中心（控制模式）：UI 风格与大屏模式保持一致（蓝色标题栏 + 统一状态栏与选中高亮）。
-/// 「划课」页直接嵌入课时划消界面（ClassHoursPanelControl），不再弹出独立窗口，
-/// 修复「打开划课中心」按钮点击闪退问题，实现进入控制中心即可直接打卡/划课。
+/// 「划课」页直接嵌入课时划消界面（ClassHoursPanelControl），进入控制中心即可直接打卡/划课。
+/// 标题栏支持拖动窗口；所有按钮统一圆角样式；左侧导航栏加宽至 220px 保证标签文字完整显示。
 /// </summary>
 public sealed class ControlCenterView : Grid
 {
@@ -22,10 +22,14 @@ public sealed class ControlCenterView : Grid
     private readonly TextBlock _totalTasks = StatValue();
     private readonly TextBlock _onlineDevices = StatValue();
     private readonly TextBlock _status = new() { Foreground = Brushes.Gray, Margin = new Thickness(12, 0, 0, 0) };
-    private readonly TextBox _name = new() { Text = "集控平台" };
-    private readonly TextBox _url = new() { Text = "http://192.168.1.100:5000" };
-    private readonly TextBox _username = new();
-    private readonly PasswordBox _password = new();
+
+    // 集控平台表单值：控件每次切换页面时重建，值保存在字符串字段中，
+    // 避免同一控件实例重复加入视觉树触发"元素已是另一个元素的逻辑子元素"异常（error.log 崩溃根因）
+    private string _platformName = "集控平台";
+    private string _platformUrl = "http://192.168.1.100:5000";
+    private string _platformUsername = "";
+    private string _platformPassword = "";
+
     private readonly TabControl _navigation = new();
     private readonly ContentControl _content = new();
     private ClassHoursPanelControl? _hoursControl;
@@ -41,8 +45,14 @@ public sealed class ControlCenterView : Grid
         RowDefinitions.Add(new RowDefinition());
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
 
-        // ===== 标题栏（与大屏模式一致的蓝色 #4285f4） =====
+        // ===== 标题栏（与大屏模式一致的蓝色 #4285f4，支持拖动窗口） =====
         var title = new Grid { Background = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)) };
+        title.MouseLeftButtonDown += (_, e) =>
+        {
+            // 点击按钮不触发拖动，其余标题栏区域可拖动窗口
+            if (e.ChangedButton == MouseButton.Left && !IsInsideButton(e.OriginalSource))
+                Window.GetWindow(this)?.DragMove();
+        };
         title.ColumnDefinitions.Add(new ColumnDefinition());
         title.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -52,18 +62,12 @@ public sealed class ControlCenterView : Grid
             Text = "控制中心", FontSize = 13, FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0)
         });
-        left.Children.Add(SceneButton("大屏模式", () => CloseRequested?.Invoke()));
-        left.Children.Add(SceneButton("控制模式（当前）", () => { }, disabled: true));
+        left.Children.Add(RoundedButton("大屏模式", () => CloseRequested?.Invoke(), primary: false, foreground: Brushes.White, height: 30));
+        left.Children.Add(RoundedButton("控制模式（当前）", () => { }, primary: false, disabled: true, foreground: Brushes.White, height: 30));
         title.Children.Add(left);
 
-        // 关闭按钮：回到大屏模式，而不是退出整个应用（修复控制模式 UI 问题）
-        var close = new Button
-        {
-            Content = "✕", Width = 46, Height = 30, Foreground = Brushes.White,
-            Background = Brushes.Transparent, BorderThickness = new Thickness(0),
-            Cursor = Cursors.Hand, FontSize = 14
-        };
-        close.Click += (_, _) => CloseRequested?.Invoke();
+        // 关闭按钮：回到大屏模式，而不是退出整个应用
+        var close = RoundedButton("✕", () => CloseRequested?.Invoke(), primary: false, foreground: Brushes.White, width: 46, height: 30, padding: new Thickness(0));
         Grid.SetColumn(close, 1);
         title.Children.Add(close);
         SetRow(title, 0);
@@ -82,10 +86,10 @@ public sealed class ControlCenterView : Grid
         SetRow(stats, 1);
         Children.Add(stats);
 
-        // ===== 主体：左侧导航 + 右侧内容 =====
+        // ===== 主体：左侧导航（220px 加宽）+ 右侧内容 =====
         BuildNavigation();
         var body = new Grid();
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         body.ColumnDefinitions.Add(new ColumnDefinition());
         Grid.SetColumn(_navigation, 0);
         Grid.SetColumn(_content, 1);
@@ -109,9 +113,9 @@ public sealed class ControlCenterView : Grid
         {
             Setters =
             {
-                new Setter(Control.HeightProperty, 42.0),
+                new Setter(Control.HeightProperty, 44.0),
                 new Setter(Control.FontSizeProperty, 13.0),
-                new Setter(Control.PaddingProperty, new Thickness(14, 0, 0, 0)),
+                new Setter(Control.PaddingProperty, new Thickness(18, 0, 0, 0)),
                 new Setter(Control.ForegroundProperty, Brushes.Gray),
                 new Setter(Control.CursorProperty, Cursors.Hand),
                 new Setter(Control.BackgroundProperty, Brushes.Transparent)
@@ -154,11 +158,7 @@ public sealed class ControlCenterView : Grid
         _navigation.SelectedIndex = 0;
     }
 
-    /// <summary>
-    /// 「划课」页：直接嵌入课时划消界面（复用大屏同款 ClassHoursPanelControl）。
-    /// 不再显示「打开划课中心」按钮、不再弹出独立 ClassHoursWindow ——
-    /// 修复划课按钮点击闪退问题，进入控制中心即可直接打卡/划课。
-    /// </summary>
+    /// <summary>「划课」页：直接嵌入课时划消界面（复用大屏同款 ClassHoursPanelControl），进入控制中心即可直接打卡/划课</summary>
     private UIElement HoursPanel()
     {
         _hoursControl ??= new ClassHoursPanelControl();
@@ -188,29 +188,41 @@ public sealed class ControlCenterView : Grid
         return list;
     }
 
+    /// <summary>集控平台列表页：每次切换重建表单控件（修复重复添加同一控件导致崩溃的问题）</summary>
     private UIElement PlatformPanel()
     {
         var panel = new StackPanel { Margin = new Thickness(22) };
-        panel.Children.Add(new TextBlock { Text = "连接集控平台", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) });
-        AddField(panel, "平台名称", _name);
-        AddField(panel, "平台地址", _url);
-        AddField(panel, "用户名", _username);
-        AddField(panel, "密码", _password);
-        var connect = new Button { Content = "连接并加入列表", Width = 140, Height = 34, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 12, 0, 18) };
-        connect.Click += async (_, _) => await ConnectPlatform();
+        panel.Children.Add(new TextBlock { Text = "连接集控平台", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 14, 14) });
+        var name = new TextBox { Text = _platformName };
+        var url = new TextBox { Text = _platformUrl };
+        var username = new TextBox { Text = _platformUsername };
+        var password = new PasswordBox { Password = _platformPassword };
+        AddField(panel, "平台名称", name);
+        AddField(panel, "平台地址", url);
+        AddField(panel, "用户名", username);
+        AddField(panel, "密码", password);
+        var connect = RoundedButton("连接并加入列表", async () =>
+        {
+            _platformName = name.Text;
+            _platformUrl = url.Text;
+            _platformUsername = username.Text;
+            _platformPassword = password.Password;
+            await ConnectPlatform(name.Text, url.Text, username.Text, password.Password);
+        }, primary: true, width: 150);
+        connect.Margin = new Thickness(0, 12, 0, 18);
         panel.Children.Add(connect);
         panel.Children.Add(new ListBox { ItemsSource = _platforms, DisplayMemberPath = nameof(ConnectedPlatform.Name), Height = 180 });
         return panel;
     }
 
-    private async Task ConnectPlatform()
+    private async Task ConnectPlatform(string name, string url, string username, string password)
     {
         try
         {
             var service = new RemoteControlService();
-            service.SetBaseUrl(_url.Text.Trim());
-            await service.LoginAsync(_username.Text.Trim(), _password.Password);
-            _platforms.Add(new ConnectedPlatform { Name = string.IsNullOrWhiteSpace(_name.Text) ? _url.Text.Trim() : _name.Text.Trim(), Url = _url.Text.Trim(), Service = service });
+            service.SetBaseUrl(url);
+            await service.LoginAsync(username, password);
+            _platforms.Add(new ConnectedPlatform { Name = string.IsNullOrWhiteSpace(name) ? url : name, Url = url, Service = service });
             _status.Text = $"已连接 {_platforms.Count} 个集控平台";
             await RefreshAll();
         }
@@ -222,8 +234,7 @@ public sealed class ControlCenterView : Grid
     private async Task RefreshDevices()
     {
         _devices.Clear();
-        // M4：并行拉取所有平台的设备，避免逐平台串行等待拖慢刷新；
-        // 单个平台异常只影响该平台，不影响其他平台的统计
+        // 并行拉取所有平台的设备，避免逐平台串行等待拖慢刷新；单个平台异常只影响该平台
         var snapshot = _platforms.ToList();
         var results = await Task.WhenAll(snapshot.Select(async platform =>
         {
@@ -248,7 +259,7 @@ public sealed class ControlCenterView : Grid
     private async Task RefreshTasks()
     {
         _tasks.Clear();
-        // M4：并行拉取所有平台的任务，单平台失败不影响其他平台
+        // 并行拉取所有平台的任务，单平台失败不影响其他平台
         var snapshot = _platforms.ToList();
         var results = await Task.WhenAll(snapshot.Select(async platform =>
         {
@@ -263,16 +274,70 @@ public sealed class ControlCenterView : Grid
     private static void AddField(Panel panel, string label, Control control) { control.Height = 30; control.Margin = new Thickness(0, 0, 0, 8); panel.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = Brushes.Gray }); panel.Children.Add(control); }
     private static TextBlock StatValue() => new() { Text = "0", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)) };
     private static UIElement Stat(string label, TextBlock value) { var p = new StackPanel { Margin = new Thickness(20, 0, 30, 0) }; p.Children.Add(new TextBlock { Text = label, FontSize = 11, Foreground = Brushes.Gray }); p.Children.Add(value); return p; }
-    private static Button SceneButton(string text, Action action, bool disabled = false)
+
+    /// <summary>圆角按钮：primary = 蓝色实心；primary = false = 透明背景（可配前景色，用于标题栏白字按钮）</summary>
+    private static Button RoundedButton(string text, Action action,
+        bool primary = true, bool disabled = false,
+        double width = double.NaN, double height = 32,
+        Brush? foreground = null, Thickness padding = default)
     {
+        var blue = new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4));
+        var blueHover = new SolidColorBrush(Color.FromRgb(0x5b, 0x95, 0xf5));
+        var bluePressed = new SolidColorBrush(Color.FromRgb(0x33, 0x67, 0xd6));
+        var ghostHover = new SolidColorBrush(Color.FromArgb(0x22, 0xff, 0xff, 0xff));
+        var ghostPressed = new SolidColorBrush(Color.FromArgb(0x33, 0xff, 0xff, 0xff));
+        var disabledBg = new SolidColorBrush(Color.FromRgb(0xcc, 0xcc, 0xcc));
+
         var b = new Button
         {
-            Content = text, Height = 30, Padding = new Thickness(10, 0, 10, 0),
-            Foreground = Brushes.White, Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            Content = text,
+            Height = height,
+            Padding = padding == default ? new Thickness(14, 0, 14, 0) : padding,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
             Cursor = disabled ? Cursors.Arrow : Cursors.Hand,
-            IsEnabled = !disabled, Opacity = disabled ? 0.65 : 1.0
+            IsEnabled = !disabled,
+            Opacity = disabled ? 0.55 : 1.0,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Foreground = foreground ?? (primary ? Brushes.White : blue)
         };
+        if (!double.IsNaN(width)) b.Width = width;
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.BackgroundProperty, primary ? blue : Brushes.Transparent);
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        presenter.SetValue(ContentPresenter.RecognizesAccessKeyProperty, true);
+        border.AppendChild(presenter);
+
+        var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsMouseOverProperty, Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, primary ? blueHover : ghostHover) }
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsPressedProperty, Value = true,
+            Setters = { new Setter(Border.BackgroundProperty, primary ? bluePressed : ghostPressed) }
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsEnabledProperty, Value = false,
+            Setters = { new Setter(Border.BackgroundProperty, primary ? disabledBg : Brushes.Transparent) }
+        });
+        b.Template = template;
         b.Click += (_, _) => action();
         return b;
+    }
+
+    /// <summary>判断鼠标事件原始来源是否位于按钮内部（避免点击按钮时触发窗口拖动）</summary>
+    private static bool IsInsideButton(object? source)
+    {
+        for (DependencyObject? d = source as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
+            if (d is Button) return true;
+        return false;
     }
 }

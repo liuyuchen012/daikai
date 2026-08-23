@@ -8,6 +8,37 @@
              TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
 
     <UserControl.Resources>
+        <!-- 圆角按钮样式：替代默认方形按钮，背景/前景色由按钮自身属性提供 -->
+        <Style x:Key="RoundedButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 现代化圆角 ContextMenu 样式 -->
         <Style x:Key="ModernContextMenu" TargetType="ContextMenu">
             <Setter Property="Background" Value="White"/>
@@ -49,6 +80,7 @@
                              VerticalContentAlignment="Center" ToolTip="学生姓名"/>
                     <DockPanel Margin="0,0,0,6">
                         <Button DockPanel.Dock="Right" Content="添加" Width="64" Height="30"
+                                Style="{StaticResource RoundedButton}"
                                 Background="#4285f4" Foreground="White" BorderThickness="0"
                                 Cursor="Hand" FontSize="13" Click="AddStudent_Click"/>
                         <TextBox x:Name="HoursBox" Height="30" FontSize="13" Margin="0,0,8,0"
@@ -157,10 +189,12 @@
                                          VerticalContentAlignment="Center" Margin="0,0,0,6"/>
                                 <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Margin="12,0,0,6">
                                     <Button Content="划消课时" Width="92" Height="30"
+                                            Style="{StaticResource RoundedButton}"
                                             Background="#4285f4" Foreground="White" BorderThickness="0"
                                             Cursor="Hand" FontSize="13" Click="Deduct_Click"
                                             IsEnabled="{Binding CanOperate}"/>
                                     <Button Content="增加课时" Width="92" Height="30" Margin="8,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
                                             Background="#34a853" Foreground="White" BorderThickness="0"
                                             Cursor="Hand" FontSize="13" Click="AddHours_Click"
                                             IsEnabled="{Binding CanOperate}"/>
@@ -240,12 +274,15 @@
                     <DockPanel Grid.Row="0" Margin="0,0,0,10">
                         <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                             <Button Content="‹" Width="32" Height="30" FontSize="16"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#f0f0f0" BorderThickness="0" Cursor="Hand"
                                     Click="PrevMonth_Click"/>
                             <Button Content="›" Width="32" Height="30" FontSize="16" Margin="6,0,0,0"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#f0f0f0" BorderThickness="0" Cursor="Hand"
                                     Click="NextMonth_Click"/>
                             <Button Content="今天" Width="56" Height="30" Margin="10,0,0,0"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#e8f0fe" Foreground="#4285f4" BorderThickness="0"
                                     Cursor="Hand" FontSize="12" Click="Today_Click"/>
                         </StackPanel>
@@ -351,12 +388,15 @@
                                    FontWeight="SemiBold" Foreground="#333"/>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                             <Button Content="设为不排课日/恢复" Width="142" Height="30"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#fff3e0" Foreground="#e65100" BorderThickness="0"
                                     Cursor="Hand" FontSize="12" Click="ToggleOffDay_Click"/>
                             <Button Content="清空排课" Width="80" Height="30" Margin="8,0,0,0"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
                                     Cursor="Hand" FontSize="12" Click="ClearSchedule_Click"/>
                             <Button Content="复制排课…" Width="90" Height="30" Margin="8,0,0,0"
+                                    Style="{StaticResource RoundedButton}"
                                     Background="#4285f4" Foreground="White" BorderThickness="0"
                                     Cursor="Hand" FontSize="12" Click="CopySchedule_Click"/>
                         </StackPanel>
