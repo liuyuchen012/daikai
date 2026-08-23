@@ -190,7 +190,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
             LoadAttendanceData();
 
             CheckInCommand = new RelayCommand(ExecuteCheckIn);
-            CancelCheckInCommand = new RelayCommand(ExecuteCancel, p => p is StudentModel s && s.IsCheckedIn);
+            CancelCheckInCommand = new RelayCommand(CancelCheckIn, p => p is StudentModel s && s.IsCheckedIn);
             ExportCommand = new RelayCommand(_ => ExportData());
             ImportCommand = new RelayCommand(_ => ImportData());
             ClearAllCommand = new RelayCommand(_ => ClearAllRecords());
@@ -476,7 +476,7 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>
     /// 取消学生打卡：移除最后一次记录，恢复首次时间或清空状态
     /// </summary>
-    private void ExecuteCancel(object? param)
+    public void CancelCheckIn(object? param)
     {
         if (param is not StudentModel stu || !stu.IsCheckedIn) return;
         if (!ModernDialog.Confirm($"确定取消 {stu.Name} 的打卡？")) return;

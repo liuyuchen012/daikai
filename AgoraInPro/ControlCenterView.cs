@@ -30,9 +30,10 @@ public sealed class ControlCenterView : Grid
     private string _platformUsername = "";
     private string _platformPassword = "";
 
-    private readonly TabControl _navigation = new();
+    private readonly StackPanel _navigation = new();
     private readonly ContentControl _content = new();
     private ClassHoursPanelControl? _hoursControl;
+    private int _selectedNavIndex = 0;
 
     /// <summary>请求切回大屏模式（由 MainWindow 订阅）</summary>
     public event Action? CloseRequested;
@@ -67,11 +68,12 @@ public sealed class ControlCenterView : Grid
         {
             Style = (Style)Application.Current.FindResource("ModeComboBoxStyle"),
             ItemContainerStyle = (Style)Application.Current.FindResource("ModeComboItemStyle"),
-            VerticalAlignment = VerticalAlignment.Center,
-            SelectedIndex = 1
+            VerticalAlignment = VerticalAlignment.Center
         };
-        modeCombo.Items.Add(new ComboBoxItem { Content = "大屏模式" });
-        modeCombo.Items.Add(new ComboBoxItem { Content = "控制模式" });
+        // 先填充项再设置选中项：SelectedIndex 在空集合上设置无效，会错误地显示第一项「大屏模式」
+        modeCombo.Items.Add("大屏模式");
+        modeCombo.Items.Add("控制模式");
+        modeCombo.SelectedIndex = 1;
         modeCombo.SelectionChanged += (_, _) =>
         {
             if (modeCombo.SelectedIndex == 0) CloseRequested?.Invoke();
@@ -79,10 +81,23 @@ public sealed class ControlCenterView : Grid
         left.Children.Add(modeCombo);
         title.Children.Add(left);
 
-        // 关闭按钮：回到大屏模式，而不是退出整个应用
+        // 窗口控制按钮：最小化 / 最大化（操作宿主主窗口）/ 关闭（回到大屏模式）
+        var minBtn = RoundedButton("—", () =>
+        {
+            if (Window.GetWindow(this) is Window w) w.WindowState = WindowState.Minimized;
+        }, primary: false, foreground: Brushes.White, width: 40, height: 30, padding: new Thickness(0));
+        var maxBtn = RoundedButton("□", () =>
+        {
+            if (Window.GetWindow(this) is Window w)
+                w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }, primary: false, foreground: Brushes.White, width: 40, height: 30, padding: new Thickness(0));
         var close = RoundedButton("✕", () => CloseRequested?.Invoke(), primary: false, foreground: Brushes.White, width: 46, height: 30, padding: new Thickness(0));
-        Grid.SetColumn(close, 1);
-        title.Children.Add(close);
+        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        right.Children.Add(minBtn);
+        right.Children.Add(maxBtn);
+        right.Children.Add(close);
+        Grid.SetColumn(right, 1);
+        title.Children.Add(right);
         SetRow(title, 0);
         Children.Add(title);
 
@@ -104,9 +119,18 @@ public sealed class ControlCenterView : Grid
         var body = new Grid();
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         body.ColumnDefinitions.Add(new ColumnDefinition());
-        Grid.SetColumn(_navigation, 0);
+
+        var navBorder = new Border
+        {
+            Background = Brushes.White,
+            BorderThickness = new Thickness(0, 0, 1, 0),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0)),
+            Child = _navigation
+        };
+
+        Grid.SetColumn(navBorder, 0);
         Grid.SetColumn(_content, 1);
-        body.Children.Add(_navigation);
+        body.Children.Add(navBorder);
         body.Children.Add(_content);
         SetRow(body, 2);
         Children.Add(body);
@@ -118,27 +142,56 @@ public sealed class ControlCenterView : Grid
     private void BuildNavigation()
     {
         _navigation.Background = Brushes.White;
-        _navigation.BorderThickness = new Thickness(0, 0, 1, 0);
-        _navigation.TabStripPlacement = Dock.Left;
+        _navigation.Orientation = Orientation.Vertical;
 
-        // 圆角选项卡样式（App.xaml 中定义，避免 FrameworkElementFactory 在 .NET 10 WPF 的 TargetName 解析问题）
-        _navigation.Resources.Add(typeof(TabItem), (Style)Application.Current.FindResource("RoundedTabItemStyle"));
-
-        _navigation.SelectionChanged += (_, _) =>
+        var items = new[] { ("划课", "hours"), ("设备列表", "devices"), ("任务中心", "tasks"), ("集控平台列表", "platforms") };
+        for (int i = 0; i < items.Length; i++)
         {
-            if (_navigation.SelectedItem is TabItem item)
-                _content.Content = item.Tag switch
+            var (header, tag) = items[i];
+            var idx = i;
+            var btn = new Button
+            {
+                Content = header,
+                Style = (Style)Application.Current.FindResource("NavButtonStyle")
+            };
+            btn.Click += (_, _) =>
+            {
+                _selectedNavIndex = idx;
+                UpdateNavSelection();
+                _content.Content = tag switch
                 {
                     "hours" => HoursPanel(),
                     "devices" => DevicePanel(),
                     "tasks" => TaskPanel(),
                     _ => PlatformPanel()
                 };
-        };
+            };
+            _navigation.Children.Add(btn);
+        }
 
-        foreach (var item in new[] { ("划课", "hours"), ("设备列表", "devices"), ("任务中心", "tasks"), ("集控平台列表", "platforms") })
-            _navigation.Items.Add(new TabItem { Header = item.Item1, Tag = item.Item2, Content = new Grid() });
-        _navigation.SelectedIndex = 0;
+        _selectedNavIndex = 0;
+        UpdateNavSelection();
+        _content.Content = HoursPanel();
+    }
+
+    private void UpdateNavSelection()
+    {
+        for (int i = 0; i < _navigation.Children.Count; i++)
+        {
+            if (_navigation.Children[i] is Button btn)
+                SetNavButtonState(btn, i == _selectedNavIndex);
+        }
+    }
+
+    private static void SetNavButtonState(Button btn, bool selected)
+    {
+        btn.Foreground = selected
+            ? new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4))
+            : Brushes.Gray;
+        btn.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+        btn.Background = selected
+            ? new SolidColorBrush(Color.FromRgb(0xe8, 0xf0, 0xfe))
+            : Brushes.Transparent;
     }
 
     /// <summary>「划课」页：直接嵌入课时划消界面（复用大屏同款 ClassHoursPanelControl），进入控制中心即可直接打卡/划课</summary>
@@ -151,12 +204,21 @@ public sealed class ControlCenterView : Grid
     private UIElement DevicePanel()
     {
         var grid = new Grid { Margin = new Thickness(18) };
-        var list = new DataGrid { ItemsSource = _devices, AutoGenerateColumns = false, IsReadOnly = true };
+        var list = new DataGrid { ItemsSource = _devices, AutoGenerateColumns = false, IsReadOnly = true, BorderThickness = new Thickness(0) };
         list.Columns.Add(new DataGridTextColumn { Header = "集控平台", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Platform)), Width = 150 });
         list.Columns.Add(new DataGridTextColumn { Header = "设备名称", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Name)), Width = 220 });
         list.Columns.Add(new DataGridTextColumn { Header = "状态", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Status)), Width = 90 });
         list.Columns.Add(new DataGridTextColumn { Header = "UUID", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Uuid)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Children.Add(list);
+        // 圆角工艺：列表外包圆角边框
+        grid.Children.Add(new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe4, 0xe8)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(1),
+            Child = list
+        });
         _ = RefreshDevices();
         return grid;
     }
@@ -293,6 +355,7 @@ public sealed class ControlCenterView : Grid
         presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
         presenter.SetValue(ContentPresenter.RecognizesAccessKeyProperty, true);
+        presenter.SetValue(System.Windows.Documents.TextElement.ForegroundProperty, new TemplateBindingExtension(Button.ForegroundProperty));
         border.AppendChild(presenter);
 
         var template = new ControlTemplate(typeof(Button)) { VisualTree = border };

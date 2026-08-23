@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1530 850" width="100%" font-family="Microsoft YaHei, 'Segoe UI', sans-serif">
+  <defs>
+    <filter id="win-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="20" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <g filter="url(#win-shadow)">
+    <!-- 窗口白底（圆角 12） -->
+    <rect x="0" y="0" width="1530" height="850" rx="12" fill="#ffffff"/>
+
+    <!-- ==================== 左侧栏 ==================== -->
+    <!-- 任务树背景（左下圆角） -->
+    <path d="M0,48 L200,48 L200,838 A12,12 0 0 1 188,850 L12,850 A12,12 0 0 1 0,838 Z" fill="#f5f5f5"/>
+    <!-- 左侧标题栏（左上圆角） -->
+    <path d="M0,12 A12,12 0 0 1 12,0 L200,0 L200,48 L0,48 Z" fill="#4285f4"/>
+    <circle cx="26" cy="24" r="5" fill="#ffffff" opacity="0.9"/>
+    <text x="38" y="29" font-size="13" font-weight="600" fill="#ffffff">AgoraIn</text>
+
+    <!-- 任务树 -->
+    <g font-size="13">
+      <!-- 数学打卡（文件夹） -->
+      <path d="M20,66 C20,65.3 20.7,64.6 21.4,64.6 L25.2,64.6 L27.2,67 L33.6,67 C34.3,67 35,67.7 35,68.4 L35,73 C35,73.7 34.3,74.3 33.6,74.3 L21.4,74.3 C20.7,74.3 20,73.7 20,73 Z" fill="#666"/>
+      <text x="44" y="75" font-weight="600" fill="#333">数学打卡</text>
+      <!-- 2026秋季班（选中，文件） -->
+      <rect x="12" y="84" width="176" height="24" rx="4" fill="#d2e3fc"/>
+      <path d="M30,89 L38,89 L42,93 L42,104 L30,104 Z" fill="#4285f4"/>
+      <path d="M38,89 L38,93 L42,93 Z" fill="#4285f4"/>
+      <text x="47" y="101" font-weight="600" fill="#333">2026秋季班</text>
+      <!-- 英语打卡（文件夹） -->
+      <path d="M20,116 C20,115.3 20.7,114.6 21.4,114.6 L25.2,114.6 L27.2,117 L33.6,117 C34.3,117 35,117.7 35,118.4 L35,123 C35,123.7 34.3,124.3 33.6,124.3 L21.4,124.3 C20.7,124.3 20,123.7 20,123 Z" fill="#666"/>
+      <text x="44" y="125" font-weight="600" fill="#333">英语打卡</text>
+      <!-- 周末班（文件） -->
+      <path d="M30,139 L38,139 L42,143 L42,154 L30,154 Z" fill="#4285f4"/>
+      <path d="M38,139 L38,143 L42,143 Z" fill="#4285f4"/>
+      <text x="47" y="151" font-weight="600" fill="#333">周末班</text>
+      <!-- 物理打卡（文件夹） -->
+      <path d="M20,166 C20,165.3 20.7,164.6 21.4,164.6 L25.2,164.6 L27.2,167 L33.6,167 C34.3,167 35,167.7 35,168.4 L35,173 C35,173.7 34.3,174.3 33.6,174.3 L21.4,174.3 C20.7,174.3 20,173.7 20,173 Z" fill="#666"/>
+      <text x="44" y="175" font-weight="600" fill="#333">物理打卡</text>
+      <!-- 化学打卡（文件夹） -->
+      <path d="M20,194 C20,193.3 20.7,192.6 21.4,192.6 L25.2,192.6 L27.2,195 L33.6,195 C34.3,195 35,195.7 35,196.4 L35,201 C35,201.7 34.3,202.3 33.6,202.3 L21.4,202.3 C20.7,202.3 20,201.7 20,201 Z" fill="#666"/>
+      <text x="44" y="203" font-weight="600" fill="#333">化学打卡</text>
+    </g>
+
+    <!-- ==================== 右侧主内容区 ==================== -->
+    <!-- 右侧标题栏（右上圆角） -->
+    <path d="M200,0 L1518,0 A12,12 0 0 1 1530,12 L1530,48 L200,48 Z" fill="#4285f4"/>
+    <!-- 模式切换下拉框 -->
+    <rect x="212" y="9" width="106" height="30" rx="8" fill="rgba(255,255,255,0.15)"/>
+    <text x="224" y="26" font-size="13" fill="#ffffff">大屏模式</text>
+    <path d="M300,24 L305,29 L310,24" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+    <!-- 菜单按钮 -->
+    <g font-size="13" fill="#ffffff">
+      <text x="330" y="26">文件</text>
+      <text x="376" y="26">远程</text>
+      <text x="422" y="26">设置</text>
+      <text x="468" y="26">帮助</text>
+    </g>
+    <!-- 窗口控制按钮 -->
+    <line x1="1405" y1="24" x2="1425" y2="24" stroke="#ffffff" stroke-width="1.5"/>
+    <rect x="1451" y="17" width="14" height="14" rx="1" fill="none" stroke="#ffffff" stroke-width="1.3"/>
+    <line x1="1497" y1="17" x2="1517" y2="31" stroke="#ffffff" stroke-width="1.4"/>
+    <line x1="1517" y1="17" x2="1497" y2="31" stroke="#ffffff" stroke-width="1.4"/>
+
+    <!-- 标签栏 -->
+    <rect x="200" y="48" width="1330" height="36" fill="#f0f0f0"/>
+    <rect x="200" y="83" width="1330" height="1" fill="#e0e0e0"/>
+    <!-- 选中标签 -->
+    <rect x="200" y="48" width="180" height="36" fill="#ffffff"/>
+    <text x="212" y="68" font-size="12" font-weight="600" fill="#333">数学打卡 - 2026秋季</text>
+    <line x1="356" y1="61" x2="366" y2="71" stroke="#999" stroke-width="1.2"/>
+    <line x1="366" y1="61" x2="356" y2="71" stroke="#999" stroke-width="1.2"/>
+    <!-- 未选中标签 -->
+    <text x="392" y="68" font-size="12" fill="#555">英语打卡 - 周末班</text>
+    <line x1="520" y1="61" x2="530" y2="71" stroke="#999" stroke-width="1.2"/>
+    <line x1="530" y1="61" x2="520" y2="71" stroke="#999" stroke-width="1.2"/>
+    <!-- 新建标签 -->
+    <text x="1512" y="73" font-size="18" font-weight="300" fill="#666" text-anchor="middle">+</text>
+
+    <!-- ==================== 主内容区 ==================== -->
+    <!-- 左侧：打卡排名 -->
+    <rect x="220" y="96" width="320" height="718" rx="8" fill="#f8f9fa"/>
+    <text x="232" y="122" font-size="16" font-weight="600" fill="#333">打卡排名</text>
+    <text x="232" y="143" font-size="12" fill="#888">最早打卡</text>
+    <!-- 排名行：序号 / 姓名 / 时间 -->
+    <g font-size="13">
+      <text x="232" y="170" font-weight="700" fill="#FFD700">1</text>
+      <text x="272" y="170" fill="#333">张三</text>
+      <text x="528" y="170" font-size="12" fill="#888" text-anchor="end">07:58:12</text>
+      <text x="232" y="196" font-weight="700" fill="#C0C0C0">2</text>
+      <text x="272" y="196" fill="#333">李四</text>
+      <text x="528" y="196" font-size="12" fill="#888" text-anchor="end">08:01:03</text>
+      <text x="232" y="222" font-weight="700" fill="#CD7F32">3</text>
+      <text x="272" y="222" fill="#333">王五</text>
+      <text x="528" y="222" font-size="12" fill="#888" text-anchor="end">08:05:47</text>
+      <text x="232" y="248" font-weight="700" fill="#333">4</text>
+      <text x="272" y="248" fill="#333">赵六</text>
+      <text x="528" y="248" font-size="12" fill="#888" text-anchor="end">08:12:30</text>
+      <text x="232" y="274" font-weight="700" fill="#333">5</text>
+      <text x="272" y="274" fill="#333">钱七</text>
+      <text x="528" y="274" font-size="12" fill="#888" text-anchor="end">08:15:22</text>
+      <text x="232" y="300" font-weight="700" fill="#333">6</text>
+      <text x="272" y="300" fill="#333">孙八</text>
+      <text x="528" y="300" font-size="12" fill="#888" text-anchor="end">08:17:05</text>
+      <text x="232" y="326" font-weight="700" fill="#333">7</text>
+      <text x="272" y="326" fill="#333">周九</text>
+      <text x="528" y="326" font-size="12" fill="#888" text-anchor="end">08:19:44</text>
+      <text x="232" y="352" font-weight="700" fill="#333">8</text>
+      <text x="272" y="352" fill="#333">吴十</text>
+      <text x="528" y="352" font-size="12" fill="#888" text-anchor="end">08:22:18</text>
+    </g>
+
+    <!-- 右侧：打卡面板 -->
+    <!-- 状态行 -->
+    <text x="556" y="110" font-size="13" fill="#666">就绪</text>
+    <circle cx="1442" cy="106" r="4" fill="#34a853"/>
+    <text x="1454" y="110" font-size="12" fill="#777">服务器在线</text>
+    <!-- 统计条 -->
+    <rect x="556" y="122" width="954" height="40" rx="8" fill="#e8f0fe"/>
+    <text x="570" y="148" font-size="14" font-weight="500" fill="#4285f4">总人数: 40  |  已打卡: 25  (62.5%)</text>
+
+    <!-- 学生按钮网格（6 列，40 人，前 25 已打卡蓝色） -->
+    <g font-size="15" font-weight="500" text-anchor="middle">
+      <!-- row 0 -->
+      <rect x="560.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="635.5" y="214" fill="#fff">学生1</text>
+      <rect x="719.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="794.5" y="214" fill="#fff">学生2</text>
+      <rect x="878.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="953.5" y="214" fill="#fff">学生3</text>
+      <rect x="1037.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="1112.5" y="214" fill="#fff">学生4</text>
+      <rect x="1196.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="1271.5" y="214" fill="#fff">学生5</text>
+      <rect x="1355.5" y="182" width="150" height="52" rx="8" fill="#4285f4"/><text x="1430.5" y="214" fill="#fff">学生6</text>
+      <!-- row 1 -->
+      <rect x="560.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="635.5" y="274" fill="#fff">学生7</text>
+      <rect x="719.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="794.5" y="274" fill="#fff">学生8</text>
+      <rect x="878.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="953.5" y="274" fill="#fff">学生9</text>
+      <rect x="1037.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="1112.5" y="274" fill="#fff">学生10</text>
+      <rect x="1196.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="1271.5" y="274" fill="#fff">学生11</text>
+      <rect x="1355.5" y="242" width="150" height="52" rx="8" fill="#4285f4"/><text x="1430.5" y="274" fill="#fff">学生12</text>
+      <!-- row 2 -->
+      <rect x="560.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="635.5" y="334" fill="#fff">学生13</text>
+      <rect x="719.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="794.5" y="334" fill="#fff">学生14</text>
+      <rect x="878.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="953.5" y="334" fill="#fff">学生15</text>
+      <rect x="1037.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="1112.5" y="334" fill="#fff">学生16</text>
+      <rect x="1196.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="1271.5" y="334" fill="#fff">学生17</text>
+      <rect x="1355.5" y="302" width="150" height="52" rx="8" fill="#4285f4"/><text x="1430.5" y="334" fill="#fff">学生18</text>
+      <!-- row 3 -->
+      <rect x="560.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="635.5" y="394" fill="#fff">学生19</text>
+      <rect x="719.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="794.5" y="394" fill="#fff">学生20</text>
+      <rect x="878.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="953.5" y="394" fill="#fff">学生21</text>
+      <rect x="1037.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="1112.5" y="394" fill="#fff">学生22</text>
+      <rect x="1196.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="1271.5" y="394" fill="#fff">学生23</text>
+      <rect x="1355.5" y="362" width="150" height="52" rx="8" fill="#4285f4"/><text x="1430.5" y="394" fill="#fff">学生24</text>
+      <!-- row 4：25 已打卡，26-30 未打卡 -->
+      <rect x="560.5" y="422" width="150" height="52" rx="8" fill="#4285f4"/><text x="635.5" y="454" fill="#fff">学生25</text>
+      <rect x="719.5" y="422" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="794.5" y="454" fill="#333">学生26</text>
+      <rect x="878.5" y="422" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="953.5" y="454" fill="#333">学生27</text>
+      <rect x="1037.5" y="422" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1112.5" y="454" fill="#333">学生28</text>
+      <rect x="1196.5" y="422" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1271.5" y="454" fill="#333">学生29</text>
+      <rect x="1355.5" y="422" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1430.5" y="454" fill="#333">学生30</text>
+      <!-- row 5 -->
+      <rect x="560.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="635.5" y="514" fill="#333">学生31</text>
+      <rect x="719.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="794.5" y="514" fill="#333">学生32</text>
+      <rect x="878.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="953.5" y="514" fill="#333">学生33</text>
+      <rect x="1037.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1112.5" y="514" fill="#333">学生34</text>
+      <rect x="1196.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1271.5" y="514" fill="#333">学生35</text>
+      <rect x="1355.5" y="482" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1430.5" y="514" fill="#333">学生36</text>
+      <!-- row 6：37-40 -->
+      <rect x="560.5" y="542" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="635.5" y="574" fill="#333">学生37</text>
+      <rect x="719.5" y="542" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="794.5" y="574" fill="#333">学生38</text>
+      <rect x="878.5" y="542" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="953.5" y="574" fill="#333">学生39</text>
+      <rect x="1037.5" y="542" width="150" height="52" rx="8" fill="#e8e8e8" stroke="#d0d0d0"/><text x="1112.5" y="574" fill="#333">学生40</text>
+    </g>
+
+    <!-- 底部状态栏（右下圆角） -->
+    <path d="M200,822 L1518,822 A12,12 0 0 1 1530,834 L1530,850 L200,850 Z" fill="#f5f5f5"/>
+    <text x="214" y="840" font-size="11" fill="#888">就绪</text>
+    <text x="1518" y="840" font-size="11" fill="#aaa" text-anchor="end">右键点击已打卡学生可取消打卡</text>
+  </g>
+</svg>

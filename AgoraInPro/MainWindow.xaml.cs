@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using CheckIn.Client.Models;
 using CheckIn.Client.Services;
 using CheckIn.Client.ViewModels;
 using Microsoft.Win32;
@@ -181,6 +182,20 @@ public partial class MainWindow : Window
                     DeleteTask(_selectedTreeNode.Tab);
                     break;
             }
+        }
+    }
+
+    // ---- 学生按钮右键菜单 ----
+    /// <summary>
+    /// 右键菜单「取消打卡」：通过 PlacementTarget 拿到学生，调用当前标签页取消打卡。
+    /// ContextMenu 位于 Popup 中，无法用 RelativeSource 绑定命令，因此使用 Click 事件。
+    /// </summary>
+    private void CancelCheckInMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem mi && mi.CommandParameter is StudentModel stu &&
+            DataContext is MainViewModel mvm && mvm.ActiveTab is TaskTabViewModel tab)
+        {
+            tab.CancelCheckIn(stu);
         }
     }
 

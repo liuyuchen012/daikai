@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using CheckIn.Client.Models;
 using CheckIn.Client.ViewModels;
 
@@ -68,12 +70,14 @@ public partial class ClassHoursPanelControl : UserControl
     public void ShowHelp()
     {
         MessageBox.Show(
-            "【课时划消】\n" +
+            "【课时划消与排课】\n" +
             "1. 左侧添加学生并设置初始课时。\n" +
             "2. 选中学生后可划消课时或增加课时，并填写备注。\n" +
-            "3. 「排课管理」按学生编排每日课程，格子显示人数或「休」。\n" +
-            "4. 「当日排课」可为选中日期添加/移除排课学生、设置不排课日、清空排课、复制排课。\n" +
-            "5. 所有数据保存在本地 data/classhours.json。",
+            "3. 月历按学生编排每日课程，格子显示人数或「休」，蓝框为选中日期，「今」为今天。\n" +
+            "4. 右侧当日排课：点击可选学生添加排课（必须填写上课/下课时间），已排课学生可修改时间或移除。\n" +
+            "5. 「设置」页可配置每小时消耗课时（支持小数）与自动划消。\n" +
+            "6. 自动划消开启后，课程在下课时间到达后，按实际时长（下课-上课）自动扣减课时。\n" +
+            "7. 所有数据保存在本地 data/classhours.json。",
             "使用说明", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -101,7 +105,7 @@ public partial class ClassHoursPanelControl : UserControl
     {
         _vm.CurrentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
         _vm.BuildCalendar();
-        _vm.SelectedDate = DateTime.Today;
+        _vm.SelectCalendarDay(_vm.CalendarDays.First(d => d.Date == DateTime.Today));
     }
 
     private void CalendarDay_Click(object sender, MouseButtonEventArgs e)
@@ -110,10 +114,50 @@ public partial class ClassHoursPanelControl : UserControl
             _vm.SelectCalendarDay(item);
     }
 
+    /// <summary>点击可选学生：已在排课中则移除；否则弹出对话框填写上课/下课时间后添加</summary>
     private void ToggleStudent_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is Border b && b.DataContext is ChStudent student)
-            _vm.ToggleScheduleStudent(student);
+        if (sender is not Border b || b.DataContext is not ChStudent student) return;
+        if (student.IsInSchedule)
+        {
+            _vm.RemoveFromSchedule(student);
+            return;
+        }
+        var dialog = new ScheduleTimeDialog(student.Name)
+        {
+            Owner = Window.GetWindow(this)
+        };
+        if (dialog.ShowDialog() == true)
+            _vm.AddToSchedule(student, dialog.StartTime, dialog.EndTime);
+    }
+
+    /// <summary>修改当日排课中学生的上课/下课时间（失焦保存，两个都必填）</summary>
+    private void ScheduleTime_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb && tb.DataContext is ChStudent student)
+        {
+            var grid = FindAncestor<Grid>(tb);
+            var start = (grid?.FindName("StartBox") as TextBox)?.Text;
+            var end = (grid?.FindName("EndBox") as TextBox)?.Text;
+            _vm.UpdateScheduleTime(student, start, end);
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject obj) where T : DependencyObject
+    {
+        while (obj is not null)
+        {
+            if (obj is T target) return target;
+            obj = VisualTreeHelper.GetParent(obj);
+        }
+        return null;
+    }
+
+    /// <summary>从当日排课移除学生</summary>
+    private void RemoveSchedule_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is ChStudent student)
+            _vm.RemoveFromSchedule(student);
     }
 
     private void ToggleOffDay_Click(object sender, RoutedEventArgs e) => _vm.ToggleOffDay();

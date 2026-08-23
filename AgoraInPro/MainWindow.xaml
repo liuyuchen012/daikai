@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:CheckIn.Client.ViewModels"
         xmlns:models="clr-namespace:CheckIn.Client.Models"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}" Height="850" Width="1530"
         WindowStartupLocation="CenterScreen"
@@ -49,7 +50,8 @@
                         <StackPanel>
                             <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
                                     Padding="{TemplateBinding Padding}" Margin="2,1">
-                                <ContentPresenter ContentSource="Header"/>
+                                <ContentPresenter ContentSource="Header"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                             </Border>
                             <ItemsPresenter x:Name="ItemsHost"/>
                         </StackPanel>
@@ -156,7 +158,8 @@
                                                                     BorderBrush="{TemplateBinding BorderBrush}"
                                                                     BorderThickness="{TemplateBinding BorderThickness}">
                                                                 <ContentPresenter HorizontalAlignment="Center"
-                                                                                  VerticalAlignment="Center"/>
+                                                                                  VerticalAlignment="Center"
+                                                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                                                             </Border>
                                                             <ControlTemplate.Triggers>
                                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -177,9 +180,8 @@
                                         </Button.Style>
                                         <Button.ContextMenu>
                                             <ContextMenu Style="{StaticResource ModernContextMenu}">
-                                                <MenuItem Header="取消打卡"
-                                                          Command="{Binding DataContext.CancelCheckInCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
-                                                          CommandParameter="{Binding}"/>
+                                                <MenuItem Header="取消打卡" Click="CancelCheckInMenu_Click"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                             </ContextMenu>
                                         </Button.ContextMenu>
                                     </Button>
@@ -293,8 +295,8 @@
                                       SelectedIndex="0"
                                       VerticalAlignment="Center" Margin="0,0,10,0"
                                       SelectionChanged="ModeCombo_SelectionChanged">
-                                <ComboBoxItem Content="大屏模式"/>
-                                <ComboBoxItem Content="控制模式"/>
+                                <sys:String>大屏模式</sys:String>
+                                <sys:String>控制模式</sys:String>
                             </ComboBox>
                             <Button Content="文件" Style="{StaticResource FlatButton}" Foreground="White"
                                     FontSize="13" Click="MenuFile_Click"/>
@@ -371,7 +373,8 @@
                                                                                     Width="{TemplateBinding Width}"
                                                                                     Height="{TemplateBinding Height}">
                                                                                 <ContentPresenter HorizontalAlignment="Center"
-                                                                                                  VerticalAlignment="Center"/>
+                                                                                                  VerticalAlignment="Center"
+                                                                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                                                                             </Border>
                                                                             <ControlTemplate.Triggers>
                                                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -414,7 +417,8 @@
                                                             Width="{TemplateBinding Width}"
                                                             Height="{TemplateBinding Height}">
                                                         <ContentPresenter HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center"/>
+                                                                          VerticalAlignment="Center"
+                                                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsMouseOver" Value="True">

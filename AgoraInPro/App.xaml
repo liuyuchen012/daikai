@@ -20,7 +20,8 @@
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="Bg" Background="{TemplateBinding Background}"
                                     CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
@@ -60,6 +61,7 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <ContentPresenter x:Name="SelectionPresenter" VerticalAlignment="Center"
+                                                                      TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                       Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                       ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
                                                     <Path Grid.Column="1" Data="M 0,0 L 4,4 L 8,0" Stroke="White" StrokeThickness="1.5"
@@ -95,29 +97,122 @@
                 </Setter>
             </Style>
 
-            <!-- 控制中心左侧圆角选项卡：选中浅蓝高亮、悬停浅灰，圆角 8px -->
-            <Style x:Key="RoundedTabItemStyle" TargetType="TabItem">
+            <!-- 控制中心导航按钮：圆角 8px、选中浅蓝高亮、悬停浅灰反馈 -->
+            <Style x:Key="NavButtonStyle" TargetType="Button">
                 <Setter Property="Height" Value="44"/>
                 <Setter Property="FontSize" Value="13"/>
-                <Setter Property="Foreground" Value="#888888"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Padding" Value="22,0,0,0"/>
+                <Setter Property="Margin" Value="10,2"/>
+                <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#888888"/>
                 <Setter Property="Template">
                     <Setter.Value>
-                        <ControlTemplate TargetType="TabItem">
-                            <Border x:Name="Bd" CornerRadius="8" Margin="10,2"
-                                    Background="{TemplateBinding Background}">
-                                <ContentPresenter ContentSource="Header"
-                                                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0"/>
+                        <ControlTemplate TargetType="Button">
+                            <Border CornerRadius="8" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
-                                    <Setter Property="Foreground" Value="#4285f4"/>
-                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#f5f7fa"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 全局圆角工艺（无一例外）：输入框 / 密码框 / 列表 / 列表项统一圆角边框 -->
+            <Style TargetType="TextBox">
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="Bd" CornerRadius="6" Background="White"
+                                    BorderBrush="#d0d6dd" BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#4285f4"/>
                                 </Trigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#f5f7fa"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#9cc3f5"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Bd" Property="Background" Value="#f2f3f5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="PasswordBox">
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="PasswordBox">
+                            <Border x:Name="Bd" CornerRadius="6" Background="White"
+                                    BorderBrush="#d0d6dd" BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="2,0"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#4285f4"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#9cc3f5"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Bd" Property="Background" Value="#f2f3f5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ListBox">
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBox">
+                            <Border CornerRadius="8" Background="White"
+                                    BorderBrush="#e0e4e8" BorderThickness="{TemplateBinding BorderThickness}">
+                                <ScrollViewer Focusable="False" Padding="2">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ListBoxItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Padding" Value="6,3"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd" CornerRadius="6" Background="Transparent"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#f2f6fd"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -134,7 +229,7 @@
                         <ControlTemplate TargetType="ComboBoxItem">
                             <Border x:Name="Bd" CornerRadius="6" Background="Transparent"
                                     Padding="12,7" Margin="2,1">
-                                <ContentPresenter/>
+                                <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsHighlighted" Value="True">

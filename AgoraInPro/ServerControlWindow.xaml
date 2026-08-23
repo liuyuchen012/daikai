@@ -129,8 +129,9 @@
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="TabItem">
-                                                <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
-                                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <Border x:Name="Bd" CornerRadius="8" Margin="1,2" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      TextElement.Foreground="{TemplateBinding Foreground}"/>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsSelected" Value="True">
