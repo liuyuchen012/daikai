@@ -62,8 +62,21 @@ public sealed class ControlCenterView : Grid
             Text = "控制中心", FontSize = 13, FontWeight = FontWeights.SemiBold,
             Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0)
         });
-        left.Children.Add(RoundedButton("大屏模式", () => CloseRequested?.Invoke(), primary: false, foreground: Brushes.White, height: 30));
-        left.Children.Add(RoundedButton("控制模式（当前）", () => { }, primary: false, disabled: true, foreground: Brushes.White, height: 30));
+        // 大屏 / 控制模式切换下拉框（与主窗口标题栏一致的圆角白字样式）
+        var modeCombo = new ComboBox
+        {
+            Style = (Style)Application.Current.FindResource("ModeComboBoxStyle"),
+            ItemContainerStyle = (Style)Application.Current.FindResource("ModeComboItemStyle"),
+            VerticalAlignment = VerticalAlignment.Center,
+            SelectedIndex = 1
+        };
+        modeCombo.Items.Add(new ComboBoxItem { Content = "大屏模式" });
+        modeCombo.Items.Add(new ComboBoxItem { Content = "控制模式" });
+        modeCombo.SelectionChanged += (_, _) =>
+        {
+            if (modeCombo.SelectedIndex == 0) CloseRequested?.Invoke();
+        };
+        left.Children.Add(modeCombo);
         title.Children.Add(left);
 
         // 关闭按钮：回到大屏模式，而不是退出整个应用
@@ -108,38 +121,8 @@ public sealed class ControlCenterView : Grid
         _navigation.BorderThickness = new Thickness(0, 0, 1, 0);
         _navigation.TabStripPlacement = Dock.Left;
 
-        // 与大屏标签栏一致的选中高亮（浅蓝背景 + 蓝字 + 半粗体）
-        var tabStyle = new Style(typeof(TabItem))
-        {
-            Setters =
-            {
-                new Setter(Control.HeightProperty, 44.0),
-                new Setter(Control.FontSizeProperty, 13.0),
-                new Setter(Control.PaddingProperty, new Thickness(18, 0, 0, 0)),
-                new Setter(Control.ForegroundProperty, Brushes.Gray),
-                new Setter(Control.CursorProperty, Cursors.Hand),
-                new Setter(Control.BackgroundProperty, Brushes.Transparent)
-            },
-            Triggers =
-            {
-                new Trigger
-                {
-                    Property = TabItem.IsSelectedProperty, Value = true,
-                    Setters =
-                    {
-                        new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xe8, 0xf0, 0xfe))),
-                        new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4))),
-                        new Setter(Control.FontWeightProperty, FontWeights.SemiBold)
-                    }
-                },
-                new Trigger
-                {
-                    Property = TabItem.IsMouseOverProperty, Value = true,
-                    Setters = { new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xf5, 0xf7, 0xfa))) }
-                }
-            }
-        };
-        _navigation.Resources.Add(typeof(TabItem), tabStyle);
+        // 圆角选项卡样式（App.xaml 中定义，避免 FrameworkElementFactory 在 .NET 10 WPF 的 TargetName 解析问题）
+        _navigation.Resources.Add(typeof(TabItem), (Style)Application.Current.FindResource("RoundedTabItemStyle"));
 
         _navigation.SelectionChanged += (_, _) =>
         {

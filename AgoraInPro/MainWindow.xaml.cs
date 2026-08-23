@@ -851,8 +851,18 @@ public partial class MainWindow : Window
         ShowDisplayMode();
     }
 
+    /// <summary>大屏 / 控制模式下拉框切换</summary>
+    private void ModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ModeCombo.SelectedIndex == 1)
+            ControlScene_Click(sender, e);
+        else
+            ShowDisplayMode();
+    }
+
     private void ShowDisplayMode()
     {
+        if (ModeCombo.SelectedIndex != 0) ModeCombo.SelectedIndex = 0;
         if (_controlCenter == null) return;
         WindowBody.Children.Remove(_controlCenter);
         DisplayContentRoot.Visibility = Visibility.Visible;
@@ -862,6 +872,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            if (ModeCombo.SelectedIndex != 1) ModeCombo.SelectedIndex = 1;
             DisplayContentRoot.Visibility = Visibility.Collapsed;
             if (_controlCenter == null)
             {

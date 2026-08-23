@@ -31,6 +31,126 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+
+            <!-- 下拉面板阴影 -->
+            <DropShadowEffect x:Key="PopupShadow" BlurRadius="16" ShadowDepth="2" Opacity="0.25" Color="#000000"/>
+
+            <!-- 模式切换下拉框（标题栏用）：圆角、透明背景、白字，用于大屏/控制模式切换 -->
+            <Style x:Key="ModeComboBoxStyle" TargetType="ComboBox">
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBox">
+                            <Grid>
+                                <ToggleButton x:Name="ToggleButton"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              ClickMode="Press"
+                                              Focusable="False"
+                                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bg" CornerRadius="8" Background="Transparent" Padding="12,0">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentPresenter x:Name="SelectionPresenter" VerticalAlignment="Center"
+                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                      ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
+                                                    <Path Grid.Column="1" Data="M 0,0 L 4,4 L 8,0" Stroke="White" StrokeThickness="1.5"
+                                                          Fill="Transparent" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bg" Property="Background" Value="#26FFFFFF"/>
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Bg" Property="Background" Value="#33FFFFFF"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                                       AllowsTransparency="True" PopupAnimation="Fade"
+                                       StaysOpen="False">
+                                    <Border Background="White" CornerRadius="10"
+                                            BorderBrush="#e0e0e0" BorderThickness="1"
+                                            Margin="0,4,0,0" Padding="4"
+                                            Effect="{StaticResource PopupShadow}">
+                                        <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 控制中心左侧圆角选项卡：选中浅蓝高亮、悬停浅灰，圆角 8px -->
+            <Style x:Key="RoundedTabItemStyle" TargetType="TabItem">
+                <Setter Property="Height" Value="44"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="#888888"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="Bd" CornerRadius="8" Margin="10,2"
+                                    Background="{TemplateBinding Background}">
+                                <ContentPresenter ContentSource="Header"
+                                                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
+                                    <Setter Property="Foreground" Value="#4285f4"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#f5f7fa"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 模式下拉框选项：圆角悬停/选中高亮 -->
+            <Style x:Key="ModeComboItemStyle" TargetType="ComboBoxItem">
+                <Setter Property="Foreground" Value="#333"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBoxItem">
+                            <Border x:Name="Bd" CornerRadius="6" Background="Transparent"
+                                    Padding="12,7" Margin="2,1">
+                                <ContentPresenter/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
+                                    <Setter Property="Foreground" Value="#4285f4"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
+                                    <Setter Property="Foreground" Value="#4285f4"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

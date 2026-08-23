@@ -287,10 +287,15 @@
 
                         <!-- 菜单按钮 -->
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                            <Button Content="大屏模式（当前）" Style="{StaticResource FlatButton}" Foreground="White"
-                                FontSize="13" Click="DisplayScene_Click"/>
-                            <Button Content="控制模式" Style="{StaticResource FlatButton}" Foreground="White"
-                                FontSize="13" Click="ControlScene_Click"/>
+                            <!-- 大屏 / 控制模式切换下拉框 -->
+                            <ComboBox x:Name="ModeCombo" Style="{StaticResource ModeComboBoxStyle}"
+                                      ItemContainerStyle="{StaticResource ModeComboItemStyle}"
+                                      SelectedIndex="0"
+                                      VerticalAlignment="Center" Margin="0,0,10,0"
+                                      SelectionChanged="ModeCombo_SelectionChanged">
+                                <ComboBoxItem Content="大屏模式"/>
+                                <ComboBoxItem Content="控制模式"/>
+                            </ComboBox>
                             <Button Content="文件" Style="{StaticResource FlatButton}" Foreground="White"
                                     FontSize="13" Click="MenuFile_Click"/>
                             <Button Content="远程" Style="{StaticResource FlatButton}" Foreground="White"
