@@ -56,6 +56,8 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     public string TabId { get; }
     /// <summary>标签页配置（任务名称、课程、行列数）</summary>
     public TabConfig Config { get; } = new();
+    /// <summary>学生名单文件路径（供学生列表管理跨任务同步使用）</summary>
+    public string NameFilePath => _nameFile;
 
     private readonly string _tabDir;       // 标签页数据目录
     private readonly string _dataFile;     // 打卡数据文件路径
@@ -687,6 +689,86 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
         Students.Clear(); // BUG FIX: 清空已有的学生列表，避免多次调用导致追加而非替换
         foreach (var name in File.ReadAllLines(_nameFile).Select(l => l.Trim()).Where(l => l.Length > 0))
             Students.Add(new StudentModel { Name = name });
+    }
+
+    /// <summary>
+    /// 将当前学生名单写入 name.txt
+    /// </summary>
+    public void SaveStudentNames() =>
+        File.WriteAllLines(_nameFile, Students.Select(s => s.Name).Where(n => !string.IsNullOrWhiteSpace(n)));
+
+    /// <summary>
+    /// 从磁盘重新加载学生名单与打卡数据（外部（如学生列表管理）修改文件后调用刷新）
+    /// </summary>
+    public void ReloadFromDisk()
+    {
+        LoadStudentNames();
+        LoadAttendanceData();
+        UpdateRanking();
+        OnPropertyChanged(nameof(PunchInfo));
+        OnPropertyChanged(nameof(TotalStudents));
+        OnPropertyChanged(nameof(PunchedCount));
+    }
+
+    /// <summary>
+    /// 添加学生到当前任务（去重），成功返回 true
+    /// </summary>
+    public bool AddStudent(string name)
+    {
+        name = name.Trim();
+        if (string.IsNullOrEmpty(name) || Students.Any(s => s.Name == name)) return false;
+        Students.Add(new StudentModel { Name = name });
+        SaveStudentNames();
+        TotalStudents = Students.Count;
+        OnPropertyChanged(nameof(PunchInfo));
+        return true;
+    }
+
+    /// <summary>
+    /// 从当前任务删除学生（同时清理该学生的打卡数据），成功返回 true
+    /// </summary>
+    public bool RemoveStudent(StudentModel stu)
+    {
+        if (stu == null || !Students.Remove(stu)) return false;
+        SaveStudentNames();
+        SaveAttendanceData();
+        TotalStudents = Students.Count;
+        PunchedCount = Students.Count(s => s.IsCheckedIn);
+        UpdateRanking();
+        OnPropertyChanged(nameof(PunchInfo));
+        return true;
+    }
+
+    /// <summary>
+    /// 从当前任务批量删除学生（同时清理打卡数据），返回实际删除数量
+    /// </summary>
+    public int RemoveStudents(IEnumerable<StudentModel> stus)
+    {
+        var list = stus.Where(s => s != null && Students.Contains(s)).Distinct().ToList();
+        if (list.Count == 0) return 0;
+        foreach (var stu in list) Students.Remove(stu);
+        SaveStudentNames();
+        SaveAttendanceData();
+        TotalStudents = Students.Count;
+        PunchedCount = Students.Count(s => s.IsCheckedIn);
+        UpdateRanking();
+        OnPropertyChanged(nameof(PunchInfo));
+        return list.Count;
+    }
+
+    /// <summary>
+    /// 重命名学生（同步更新打卡数据中的姓名），重名或空名返回 false
+    /// </summary>
+    public bool RenameStudent(StudentModel stu, string newName)
+    {
+        newName = newName.Trim();
+        if (stu == null || string.IsNullOrEmpty(newName) || Students.Any(s => s.Name == newName && !ReferenceEquals(s, stu)))
+            return false;
+        stu.Name = newName;
+        SaveStudentNames();
+        SaveAttendanceData();
+        UpdateRanking();
+        return true;
     }
 
     /// <summary>

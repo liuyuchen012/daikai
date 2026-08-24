@@ -955,6 +955,7 @@ public partial class MainWindow : Window
 
     /// <summary>设置菜单：任务设置/管理员设置</summary>
     private void MenuSettings_Click(object sender, RoutedEventArgs e) => ShowMenu(sender,
+        I("学生列表", () => _vm.ShowStudentListCommand.Execute(null)),
         I("任务设置", () => _vm.ActiveTab?.ShowAdminSettingsCommand.Execute(null)),
         Sep(),
         I("管理员设置", () => _vm.ShowAdminSettingsCommand.Execute(null)));

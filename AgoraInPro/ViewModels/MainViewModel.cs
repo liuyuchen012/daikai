@@ -116,6 +116,8 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand SyncToServerCommand { get; }
     /// <summary>显示管理员设置对话框命令</summary>
     public ICommand ShowAdminSettingsCommand { get; }
+    /// <summary>显示学生列表管理对话框命令（大屏模式设置菜单）</summary>
+    public ICommand ShowStudentListCommand { get; }
     /// <summary>打开 GitHub 仓库命令</summary>
     public ICommand OpenGithubCommand { get; }
     /// <summary>检查版本列表命令</summary>
@@ -142,6 +144,7 @@ public class MainViewModel : INotifyPropertyChanged
         LoadFromServerCommand = new RelayCommand(async _ => await LoadFromServerAsync());
         SyncToServerCommand = new RelayCommand(async _ => await SyncToServerAsync());
         ShowAdminSettingsCommand = new RelayCommand(_ => ShowAdminSettings());
+        ShowStudentListCommand = new RelayCommand(_ => ShowStudentList());
         OpenGithubCommand = new RelayCommand(_ => OpenUrl("https://github.com/liuyuchen012/daikai"));
         CheckVersionCommand = new RelayCommand(async _ => await CheckForUpdateAsync());
         ShowAboutCommand = new RelayCommand(_ => ShowAbout());
@@ -627,6 +630,166 @@ public class MainViewModel : INotifyPropertyChanged
         ShowDialog("管理员设置", vm, CreateAdminSettingsView);
     }
 
+    // ---- 学生列表管理（大屏模式设置菜单）----
+    /// <summary>
+    /// 显示当前活跃标签页的学生列表管理对话框：支持添加、编辑（改姓名 + 勾选需要打卡的任务）、删除、批量删除
+    /// </summary>
+    private void ShowStudentList()
+    {
+        if (ActiveTab == null)
+        {
+            ModernDialog.Alert("请先打开或新建一个任务，再管理学生列表");
+            return;
+        }
+        var tab = ActiveTab;
+        var vm = new StudentListVm(tab, GetAllTasks());
+        vm.AddAction = () =>
+        {
+            var name = AskText("添加学生", "请输入学生姓名:");
+            if (string.IsNullOrWhiteSpace(name)) return;
+            if (!tab.AddStudent(name.Trim()))
+            {
+                ModernDialog.Alert("添加失败：姓名不能为空或该学生已存在");
+                return;
+            }
+            ModernDialog.Alert($"已添加学生: {name.Trim()}");
+        };
+        vm.EditAction = () => EditStudent(tab, vm.SelectedStudent);
+        vm.DeleteAction = () =>
+        {
+            if (vm.SelectedStudent == null) { ModernDialog.Alert("请先选中要删除的学生"); return; }
+            var stu = vm.SelectedStudent;
+            if (!ModernDialog.Confirm($"确定删除学生「{stu.Name}」？\n该学生的打卡记录也会一并清除。", "删除确认")) return;
+            if (tab.RemoveStudent(stu)) ModernDialog.Alert($"已删除学生: {stu.Name}");
+        };
+        vm.BatchDeleteAction = () =>
+        {
+            var selected = vm.SelectedStudents.Where(s => s != null).Distinct().ToList();
+            if (selected.Count == 0) { ModernDialog.Alert("请先选中要删除的学生（可按住 Ctrl 或 Shift 多选）"); return; }
+            var names = string.Join("、", selected.Select(s => s.Name));
+            if (!ModernDialog.Confirm($"确定删除选中的 {selected.Count} 名学生？\n\n{names}\n\n他们的打卡记录也会一并清除。", "批量删除确认")) return;
+            var removed = tab.RemoveStudents(selected);
+            if (removed > 0)
+            {
+                ModernDialog.Alert($"已删除 {removed} 名学生");
+                vm.SelectedStudents.Clear();
+                vm.SelectedStudent = null;
+            }
+        };
+        ShowDialog("学生列表", vm, CreateStudentListView, 520, 480);
+    }
+
+    /// <summary>
+    /// 打开编辑学生对话框：可修改学生姓名，并勾选该学生需要进行打卡的任务
+    /// </summary>
+    private void EditStudent(TaskTabViewModel tab, StudentModel? stu)
+    {
+        if (stu == null) { ModernDialog.Alert("请先选中要编辑的学生"); return; }
+        var dlg = new StudentListVm(tab, GetAllTasks())
+        {
+            IsEditMode = true,
+            SelectedStudent = stu,
+            NewName = stu.Name
+        };
+        // 初始化"需要进行打卡的任务"勾选状态：学生存在于某任务名单中即勾选；当前任务恒为勾选
+        foreach (var t in dlg.AllTasks)
+        {
+            var contains = t == tab || ContainsStudent(t, stu.Name);
+            dlg.TaskChecks[t.TabId] = contains;
+        }
+        dlg.SaveAction = () =>
+        {
+            var newName = dlg.NewName.Trim();
+            if (string.IsNullOrEmpty(newName)) { ModernDialog.Alert("姓名不能为空"); return; }
+
+            var oldName = stu.Name;
+            // 1. 修改姓名（当前任务内，含打卡数据同步）
+            if (oldName != newName && !tab.RenameStudent(stu, newName))
+            {
+                ModernDialog.Alert("改名失败：该姓名已存在或为空");
+                return;
+            }
+            // 2. 同步到其他任务：
+            //    - 先移除旧姓名（改名后旧姓名不再有效）
+            //    - 勾选的任务加入新姓名，未勾选的任务不加
+            foreach (var t in dlg.AllTasks)
+            {
+                if (t == tab) continue; // 当前任务已处理
+                if (oldName != newName) SyncStudentToTask(t, oldName, false);
+                var checked_ = dlg.TaskChecks.TryGetValue(t.TabId, out var c) && c;
+                SyncStudentToTask(t, newName, checked_);
+            }
+            tab.ReloadFromDisk();
+            ModernDialog.Alert("学生信息已保存");
+            dlg.CloseAction?.Invoke();
+        };
+        ShowDialog("编辑学生", dlg, CreateStudentListView, 420, 480);
+    }
+
+    /// <summary>判断某任务的学生名单中是否包含指定学生姓名</summary>
+    private static bool ContainsStudent(TaskTabViewModel task, string name)
+    {
+        var file = task.NameFilePath;
+        if (!File.Exists(file)) return false;
+        return File.ReadAllLines(file).Any(l => l.Trim() == name);
+    }
+
+    /// <summary>
+    /// 将学生加入/移出指定任务的名单文件（name.txt），并刷新该任务
+    /// </summary>
+    private static void SyncStudentToTask(TaskTabViewModel task, string studentName, bool include)
+    {
+        var file = task.NameFilePath;
+        var lines = File.Exists(file)
+            ? File.ReadAllLines(file).Where(l => !string.IsNullOrWhiteSpace(l)).ToList()
+            : new List<string>();
+        var changed = false;
+        if (include && !lines.Contains(studentName)) { lines.Add(studentName); changed = true; }
+        else if (!include && lines.Contains(studentName)) { lines.Remove(studentName); changed = true; }
+        if (changed)
+        {
+            File.WriteAllLines(file, lines);
+            task.ReloadFromDisk();
+        }
+    }
+
+    /// <summary>
+    /// 收集所有任务（已打开的 + 后台的），用于学生编辑时勾选"需要打卡的任务"
+    /// </summary>
+    private List<TaskTabViewModel> GetAllTasks()
+    {
+        var all = new List<TaskTabViewModel>();
+        all.AddRange(Tabs);
+        all.AddRange(_backgroundTasks.Where(t => !all.Contains(t)));
+        return all;
+    }
+
+    /// <summary>弹出文本输入对话框，返回输入内容（取消返回 null）</summary>
+    private string? AskText(string title, string label)
+    {
+        string? result = null;
+        var win = new Window
+        {
+            Title = title, Width = 360, Height = 190,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false
+        };
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(15) };
+        panel.Children.Add(new System.Windows.Controls.TextBlock { Text = label, FontSize = 14, Margin = new Thickness(0, 0, 0, 10) });
+        var txt = new System.Windows.Controls.TextBox { FontSize = 14, Padding = new Thickness(4) };
+        panel.Children.Add(txt);
+        var btnPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, Margin = new Thickness(0, 15, 0, 0) };
+        var okBtn = new System.Windows.Controls.Button { Content = "确定", Width = 80, Height = 30, Margin = new Thickness(5) };
+        okBtn.Click += (_, _) => { result = txt.Text; win.Close(); };
+        var cancelBtn = new System.Windows.Controls.Button { Content = "取消", Width = 80, Height = 30, Margin = new Thickness(5) };
+        cancelBtn.Click += (_, _) => win.Close();
+        btnPanel.Children.Add(okBtn); btnPanel.Children.Add(cancelBtn);
+        panel.Children.Add(btnPanel);
+        win.Content = panel;
+        win.ShowDialog();
+        return result;
+    }
+
     // ---- 关于 ----
     private void ShowAbout()
     {
@@ -821,6 +984,112 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 构建学生列表管理对话框 UI 视图
+    /// 列表模式：学生列表（支持多选）+ 添加/编辑/删除/批量删除/关闭
+    /// 编辑模式：姓名输入框 + "需要进行打卡的任务"勾选列表 + 保存/取消
+    /// </summary>
+    private FrameworkElement CreateStudentListView(StudentListVm? vm)
+    {
+        if (vm == null) return new System.Windows.Controls.StackPanel { Margin = new Thickness(15) };
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(15) };
+
+        if (vm.IsEditMode)
+        {
+            // ---- 编辑模式 ----
+            if (vm.SelectedStudent != null)
+            {
+                AddFieldRow(panel, "学生姓名:", vm.NewName, v => vm.NewName = v);
+            }
+            else
+            {
+                // 编辑模式必须有选中学生，否则回到列表模式
+                panel.Children.Add(new System.Windows.Controls.TextBlock { Text = "请先选择学生再编辑", Margin = new Thickness(4) });
+                AddSaveCancel(panel, vm);
+                return panel;
+            }
+
+            panel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "需要进行打卡的任务:",
+                FontSize = 13, FontWeight = System.Windows.FontWeights.SemiBold,
+                Margin = new Thickness(4, 12, 4, 4)
+            });
+            var taskList = new System.Windows.Controls.StackPanel { Margin = new Thickness(4) };
+            foreach (var t in vm.AllTasks)
+            {
+                var chk = new System.Windows.Controls.CheckBox
+                {
+                    Content = t.TabDisplayName,
+                    IsChecked = vm.TaskChecks.TryGetValue(t.TabId, out var c) && c,
+                    Margin = new Thickness(0, 4, 0, 4)
+                };
+                var tid = t.TabId;
+                chk.Checked += (_, _) => vm.TaskChecks[tid] = true;
+                chk.Unchecked += (_, _) => vm.TaskChecks[tid] = false;
+                taskList.Children.Add(chk);
+            }
+            panel.Children.Add(taskList);
+            AddSaveCancel(panel, vm);
+            return panel;
+        }
+
+        // ---- 列表模式 ----
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = $"任务: {vm.Tab.TabDisplayName}  (共 {vm.Students.Count} 人)",
+            FontSize = 13, FontWeight = System.Windows.FontWeights.SemiBold,
+            Margin = new Thickness(4, 0, 4, 8)
+        });
+        var listBox = new System.Windows.Controls.ListBox
+        {
+            Height = 300, FontSize = 14,
+            SelectionMode = System.Windows.Controls.SelectionMode.Extended,
+            ItemsSource = vm.Students,
+            DisplayMemberPath = nameof(StudentModel.Name),
+            Margin = new Thickness(4)
+        };
+        listBox.SelectionChanged += (_, _) =>
+        {
+            vm.SelectedStudent = listBox.SelectedItem as StudentModel;
+            vm.SelectedStudents.Clear();
+            foreach (var s in listBox.SelectedItems.Cast<StudentModel>())
+                if (s != null) vm.SelectedStudents.Add(s);
+        };
+        panel.Children.Add(listBox);
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = "提示: 按住 Ctrl 或 Shift 可多选，选中多名学生后可批量删除",
+            FontSize = 11, Foreground = System.Windows.Media.Brushes.Gray,
+            Margin = new Thickness(4, 2, 4, 0)
+        });
+
+        var btnPanel = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+        var add = new System.Windows.Controls.Button { Content = "添加", Width = 72, Height = 30, Margin = new Thickness(5) };
+        add.Click += (_, _) => vm.AddAction?.Invoke();
+        var edit = new System.Windows.Controls.Button { Content = "编辑", Width = 72, Height = 30, Margin = new Thickness(5) };
+        edit.Click += (_, _) =>
+        {
+            if (vm.SelectedStudent == null) { ModernDialog.Alert("请先选中要编辑的学生"); return; }
+            vm.EditAction?.Invoke();
+        };
+        var del = new System.Windows.Controls.Button { Content = "删除", Width = 72, Height = 30, Margin = new Thickness(5) };
+        del.Click += (_, _) => vm.DeleteAction?.Invoke();
+        var batchDel = new System.Windows.Controls.Button { Content = "批量删除", Width = 82, Height = 30, Margin = new Thickness(5) };
+        batchDel.Click += (_, _) => vm.BatchDeleteAction?.Invoke();
+        var close = new System.Windows.Controls.Button { Content = "关闭", Width = 72, Height = 30, Margin = new Thickness(5) };
+        close.Click += (_, _) => vm.CloseAction?.Invoke();
+        btnPanel.Children.Add(add); btnPanel.Children.Add(edit); btnPanel.Children.Add(del);
+        btnPanel.Children.Add(batchDel); btnPanel.Children.Add(close);
+        panel.Children.Add(btnPanel);
+        return panel;
+    }
+
+    /// <summary>
     /// 向面板添加一行表单字段（标签 + 文本框/密码框）
     /// </summary>
     private static void AddFieldRow(System.Windows.Controls.Panel parent, string label, string value, Action<string> setter, bool isPassword = false)
@@ -916,4 +1185,45 @@ public class AdminSettingsVm : IDialogVm
     public string ConfirmPassword { get; set; } = "";
     public Action? CloseAction { get; set; }
     public Action? SaveAction { get; set; }
+}
+
+/// <summary>
+/// 学生列表管理对话框的 ViewModel
+/// 列表模式：管理当前任务学生（添加/编辑/删除/批量删除，支持多选）
+/// 编辑模式：修改学生姓名 + 勾选该学生需要进行打卡的任务
+/// </summary>
+public class StudentListVm : IDialogVm
+{
+    /// <summary>当前操作的任务（活跃标签页）</summary>
+    public TaskTabViewModel Tab { get; }
+    /// <summary>当前任务的学生集合</summary>
+    public ObservableCollection<StudentModel> Students => Tab.Students;
+    /// <summary>所有任务（用于编辑时勾选"需要进行打卡的任务"）</summary>
+    public List<TaskTabViewModel> AllTasks { get; }
+    /// <summary>当前选中的学生（单选）</summary>
+    public StudentModel? SelectedStudent { get; set; }
+    /// <summary>当前选中的所有学生（多选，用于批量删除）</summary>
+    public List<StudentModel> SelectedStudents { get; } = new();
+    /// <summary>编辑模式下的新姓名</summary>
+    public string NewName { get; set; } = "";
+    /// <summary>是否为编辑模式（true 时显示姓名输入框与任务勾选列表）</summary>
+    public bool IsEditMode { get; set; }
+    /// <summary>任务 ID → 是否勾选（该学生需要在该任务打卡）</summary>
+    public Dictionary<string, bool> TaskChecks { get; } = new();
+    /// <summary>添加学生回调</summary>
+    public Action? AddAction { get; set; }
+    /// <summary>编辑学生回调</summary>
+    public Action? EditAction { get; set; }
+    /// <summary>删除学生回调</summary>
+    public Action? DeleteAction { get; set; }
+    /// <summary>批量删除学生回调</summary>
+    public Action? BatchDeleteAction { get; set; }
+    public Action? CloseAction { get; set; }
+    public Action? SaveAction { get; set; }
+
+    public StudentListVm(TaskTabViewModel tab, List<TaskTabViewModel> allTasks)
+    {
+        Tab = tab;
+        AllTasks = allTasks;
+    }
 }
