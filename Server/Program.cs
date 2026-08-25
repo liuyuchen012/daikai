@@ -216,7 +216,9 @@ async Task MigrateLegacyDataAsync(AppDbContext db)
     await db.SaveChangesAsync();
 
     // 3) 合并同名设备：将同名设备的任务与打卡数据迁移到最近活跃的一台，其余删除
-    var dupGroups = await db.Machines.GroupBy(m => m.Name).Where(g => g.Count() > 1).ToListAsync();
+    // 注：GroupBy 后的 Where(g => g.Count() > 1) 无法翻译为 SQL，先取回内存再分组
+    var machines = await db.Machines.ToListAsync();
+    var dupGroups = machines.GroupBy(m => m.Name).Where(g => g.Count() > 1).ToList();
     foreach (var g in dupGroups)
     {
         var canonical = g.OrderByDescending(m => m.LastSeen).First();
@@ -267,13 +269,39 @@ async Task EnsureSchemaAsync(AppDbContext db)
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId" ON "DeviceAssignments" ("UserId")""");
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId_MachineUuid" ON "DeviceAssignments" ("UserId", "MachineUuid")""");
 
-    // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，ADD COLUMN 会失败，忽略即可）
-    try
+    // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
+    // 先通过 PRAGMA 检查列是否存在，避免对已存在的列重复 ALTER 产生 fail 日志
+    if (!await ColumnExistsAsync(db, "AttendanceRecords", "TaskId"))
     {
         await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "AttendanceRecords" ADD COLUMN "TaskId" TEXT NOT NULL DEFAULT 'default'""");
     }
-    catch { /* 列已存在则忽略 */ }
     await db.Database.ExecuteSqlRawAsync("""UPDATE "AttendanceRecords" SET "TaskId"='default' WHERE "TaskId" IS NULL OR "TaskId"=''""");
+}
+
+/// <summary>
+/// 检查 SQLite 表中是否存在指定列（通过 PRAGMA table_info，幂等、无副作用）
+/// </summary>
+async Task<bool> ColumnExistsAsync(AppDbContext db, string table, string column)
+{
+    var conn = db.Database.GetDbConnection();
+    var needClose = conn.State != System.Data.ConnectionState.Open;
+    if (needClose) await conn.OpenAsync();
+    try
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info(\"{table}\")";
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            if (string.Equals(Convert.ToString(reader["name"]), column, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+    finally
+    {
+        if (needClose) await conn.CloseAsync();
+    }
 }
 
 /// <summary>生成一个不重复的 6 位短链码（用于旧数据回填）</summary>
