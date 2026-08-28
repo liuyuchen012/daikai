@@ -25,6 +25,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Publish AgoraInPro (win-x64)
         run: dotnet publish AgoraInPro/CheckIn.Client.csproj -c Release -r win-x64 --self-contained true -o publish/Client.win-x64
@@ -57,6 +58,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Publish Server (linux-x64)
         run: dotnet publish Server/CheckIn.Server.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o publish/Server.linux-x64
@@ -79,6 +81,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Publish Server (osx-x64)
         run: dotnet publish Server/CheckIn.Server.csproj -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -o publish/Server.osx-x64
@@ -137,6 +140,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
