@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <!-- 各平台只声明可构建的目标框架（MAUI 不支持跨 OS 交叉构建） -->
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('linux'))">net10.0-android</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>CheckIn.Client.Mobile</RootNamespace>
     <UseMaui>true</UseMaui>
