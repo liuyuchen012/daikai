@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.AttendanceDetailPage"
+             Title="考勤详情"
+             BackgroundColor="#f5f6fa">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16" RowSpacing="12">
+
+        <!-- 标题 -->
+        <Border Grid.Row="0" BackgroundColor="White" StrokeShape="RoundRectangle 12"
+               Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
+            <VerticalStackLayout Spacing="4">
+                <Label x:Name="lblSubject" Text="" FontSize="18" FontAttributes="Bold" TextColor="#333333" />
+                <Label x:Name="lblShortCode" Text="" FontSize="12" TextColor="#888888" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 单任务汇总统计（仅单任务模式显示） -->
+        <Grid x:Name="summaryStats" Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8" IsVisible="False">
+            <Border Grid.Column="0" BackgroundColor="White" StrokeShape="RoundRectangle 8" Padding="10,8"
+                   Stroke="#e8e8e8" StrokeThickness="1">
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                    <Label Text="总人数" FontSize="11" TextColor="#888888" HorizontalOptions="Center" />
+                    <Label x:Name="lblTotal" Text="0" FontSize="18" FontAttributes="Bold"
+                           TextColor="#333333" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+            <Border Grid.Column="1" BackgroundColor="#e6f4ea" StrokeShape="RoundRectangle 8" Padding="10,8"
+                   Stroke="Transparent" StrokeThickness="0">
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                    <Label Text="已打卡" FontSize="11" TextColor="#34a853" HorizontalOptions="Center" />
+                    <Label x:Name="lblCheckedIn" Text="0" FontSize="18" FontAttributes="Bold"
+                           TextColor="#34a853" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+            <Border Grid.Column="2" BackgroundColor="#fce8e6" StrokeShape="RoundRectangle 8" Padding="10,8"
+                   Stroke="Transparent" StrokeThickness="0">
+                <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                    <Label Text="未打卡" FontSize="11" TextColor="#ea4335" HorizontalOptions="Center" />
+                    <Label x:Name="lblNotCheckedIn" Text="0" FontSize="18" FontAttributes="Bold"
+                           TextColor="#ea4335" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 学生列表 -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout x:Name="studentListStack" Spacing="6" />
+        </ScrollView>
+
+    </Grid>
+
+</ContentPage>

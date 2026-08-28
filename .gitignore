@@ -24,3 +24,4 @@ config.json
 client_key.pem
 client_uuid.txt
 CHANGELOG.md
+publish/

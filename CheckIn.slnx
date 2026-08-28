@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Client/">
-    <Project Path="Client/CheckIn.Client.csproj" />
+    <Project Path="AgoraInPro/CheckIn.Client.csproj" />
+    <Project Path="Client.Mobile/AgoraIn.Client.Mobile.csproj" />
   </Folder>
   <Folder Name="/Server/">
     <Project Path="Server/CheckIn.Server.csproj" />

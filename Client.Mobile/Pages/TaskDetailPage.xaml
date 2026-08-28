@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             xmlns:models="clr-namespace:CheckIn.Client.Mobile.Models"
+             xmlns:converters="clr-namespace:CheckIn.Client.Mobile.Converters"
+             xmlns:helpers="clr-namespace:CheckIn.Client.Mobile.Helpers"
+             x:Class="CheckIn.Client.Mobile.Pages.TaskDetailPage"
+             Title="{Binding Title}">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,0,4,0">
+            <Label Grid.Column="0"
+                   Text="{Binding Title}"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   VerticalOptions="Center"
+                   LineBreakMode="TailTruncation" />
+            <ImageButton Grid.Column="1"
+                         WidthRequest="32"
+                         HeightRequest="32"
+                         Margin="0,0,4,0"
+                         Command="{Binding SyncToServerCommand}"
+                         BackgroundColor="Transparent">
+                <ImageButton.Source>
+                    <FontImageSource Glyph="&#x21bb;"
+                                     FontFamily="OpenSansRegular"
+                                     Size="20"
+                                     Color="White" />
+                </ImageButton.Source>
+            </ImageButton>
+            <ImageButton Grid.Column="2"
+                         WidthRequest="32"
+                         HeightRequest="32"
+                         Command="{Binding ClearAllCommand}"
+                         BackgroundColor="Transparent">
+                <ImageButton.Source>
+                    <FontImageSource Glyph="&#x1f5d1;"
+                                     FontFamily="OpenSansRegular"
+                                     Size="18"
+                                     Color="White" />
+                </ImageButton.Source>
+            </ImageButton>
+        </Grid>
+    </Shell.TitleView>
+
+    <Grid RowDefinitions="Auto,*" Padding="0">
+
+        <!-- Stats bar -->
+        <Border Grid.Row="0" BackgroundColor="#e8f0fe" StrokeShape="RoundRectangle 0" Padding="16,10" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <!-- Status row -->
+                <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="6">
+                    <Ellipse WidthRequest="8" HeightRequest="8"
+                             Fill="{Binding StatusColor}"
+                             VerticalOptions="Center" />
+                    <Label Text="{Binding StatusText}"
+                           FontSize="12"
+                           TextColor="{StaticResource TextSecondary}"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <!-- Punch stats -->
+                <Label Grid.Row="1" Grid.Column="0"
+                       Text="{Binding PunchInfo}"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource Primary}"
+                       Margin="0,4,0,0" />
+
+                <!-- Online badge -->
+                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                       Style="{StaticResource StatusBadgeOnline}"
+                       IsVisible="{Binding IsOnline}"
+                       VerticalOptions="Center">
+                    <Label Text="Online" FontSize="10" TextColor="White"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+                       Style="{StaticResource StatusBadgeOffline}"
+                       IsVisible="{Binding IsOnline, Converter={StaticResource InverseBool}}"
+                       VerticalOptions="Center">
+                    <Label Text="Offline" FontSize="10" TextColor="White"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Main content: phone=tabbed, tablet=split -->
+        <Grid Grid.Row="1" x:Name="ContentContainer" Padding="0">
+
+            <!-- Phone layout: tabs -->
+            <Grid x:Name="PhoneLayout" IsVisible="True" RowDefinitions="Auto,*">
+                <!-- Segmented control tabs -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,*" BackgroundColor="{StaticResource SurfaceVariant}" Padding="4">
+                    <Button Grid.Column="0" Text="Ranking"
+                            x:Name="RankingTabBtn"
+                            Clicked="OnRankingTabClicked"
+                            CornerRadius="8"
+                            HeightRequest="36"
+                            FontSize="14"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White" />
+                    <Button Grid.Column="1" Text="Check In"
+                            x:Name="CheckInTabBtn"
+                            Clicked="OnCheckInTabClicked"
+                            CornerRadius="8"
+                            HeightRequest="36"
+                            FontSize="14"
+                            BackgroundColor="Transparent"
+                            TextColor="{StaticResource TextSecondary}" />
+                </Grid>
+
+                <!-- Ranking list (phone) -->
+                <ScrollView Grid.Row="1" x:Name="PhoneRankingScroll">
+                    <CollectionView ItemsSource="{Binding Ranking}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RankingItem">
+                                <Grid ColumnDefinitions="40,*,70" Padding="16,8" ColumnSpacing="8">
+                                    <Label Grid.Column="0"
+                                           Text="{Binding Rank}"
+                                           FontAttributes="Bold"
+                                           FontSize="16"
+                                           TextColor="{Binding Rank, Converter={StaticResource RankColorConverter}}"
+                                           VerticalOptions="Center"
+                                           HorizontalOptions="Center" />
+                                    <Label Grid.Column="1"
+                                           Text="{Binding Name}"
+                                           FontSize="15"
+                                           TextColor="{StaticResource TextPrimary}"
+                                           VerticalOptions="Center" />
+                                    <Label Grid.Column="2"
+                                           Text="{Binding Time}"
+                                           FontSize="13"
+                                           TextColor="{StaticResource TextTertiary}"
+                                           VerticalOptions="Center"
+                                           HorizontalOptions="End" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+
+                        <CollectionView.EmptyView>
+                            <StackLayout VerticalOptions="Center" HorizontalOptions="Center" Padding="40">
+                                <Label Text="No Check-ins Yet"
+                                       FontSize="16"
+                                       TextColor="{StaticResource Gray400}"
+                                       HorizontalOptions="Center" />
+                            </StackLayout>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+                </ScrollView>
+
+                <!-- Student grid (phone) -->
+                <ScrollView Grid.Row="1" x:Name="PhoneGridScroll" IsVisible="False">
+                    <FlexLayout x:Name="PhoneStudentGrid"
+                                Wrap="Wrap"
+                                JustifyContent="Center"
+                                AlignItems="Start"
+                                BindableLayout.ItemsSource="{Binding Students}" />
+                </ScrollView>
+            </Grid>
+
+            <!-- Tablet layout: split view -->
+            <Grid x:Name="TabletLayout" IsVisible="False" ColumnDefinitions="0.4*,0.6*" ColumnSpacing="0">
+                <!-- Left: Ranking -->
+                <Border Grid.Column="0" BackgroundColor="{StaticResource SurfaceContainer}"
+                       StrokeShape="RoundRectangle 0" Padding="12" StrokeThickness="0">
+                    <Grid RowDefinitions="Auto,*">
+                        <Label Grid.Row="0"
+                               Text="Ranking"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"
+                               Margin="0,0,0,8" />
+                        <CollectionView Grid.Row="1" ItemsSource="{Binding Ranking}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RankingItem">
+                                    <Grid ColumnDefinitions="36,*,60" Padding="8,6" ColumnSpacing="6">
+                                        <Label Grid.Column="0"
+                                               Text="{Binding Rank}"
+                                               FontAttributes="Bold"
+                                               FontSize="15"
+                                               TextColor="{Binding Rank, Converter={StaticResource RankColorConverter}}"
+                                               VerticalOptions="Center"
+                                               HorizontalOptions="Center" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding Name}"
+                                               FontSize="14"
+                                               TextColor="{StaticResource TextPrimary}"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Time}"
+                                               FontSize="12"
+                                               TextColor="{StaticResource TextTertiary}"
+                                               VerticalOptions="Center"
+                                               HorizontalOptions="End" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+                </Border>
+
+                <!-- Right: Student grid -->
+                <ScrollView Grid.Column="1">
+                    <FlexLayout x:Name="TabletStudentGrid"
+                                Wrap="Wrap"
+                                JustifyContent="Center"
+                                AlignItems="Start"
+                                BindableLayout.ItemsSource="{Binding Students}"
+                                Padding="8" />
+                </ScrollView>
+            </Grid>
+        </Grid>
+    </Grid>
+
+</ContentPage>

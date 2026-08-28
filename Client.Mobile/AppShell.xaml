@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="CheckIn.Client.Mobile.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:CheckIn.Client.Mobile.Pages"
+    Shell.FlyoutBehavior="Disabled"
+    Shell.NavBarHasShadow="True"
+    Shell.TabBarBackgroundColor="White"
+    Shell.TabBarTitleColor="#4285f4"
+    Shell.TabBarUnselectedColor="#888888">
+
+    <!-- 登录页（初始路由） -->
+    <ShellContent Route="login"
+                  ContentTemplate="{DataTemplate pages:LoginPage}"
+                  Shell.TabBarIsVisible="False"
+                  Shell.NavBarIsVisible="False" />
+
+    <!-- ==================== 管理员 TabBar ==================== -->
+    <TabBar x:Name="AdminTabs" Route="main">
+        <ShellContent Title="仪表盘"
+                      Icon="{OnPlatform Default='dashboard.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminDashboardPage}"
+                      Route="dashboard" />
+        <ShellContent Title="任务"
+                      Icon="{OnPlatform Default='tasks.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminTasksPage}"
+                      Route="tasks" />
+        <ShellContent Title="二维码"
+                      Icon="{OnPlatform Default='qrcode.png'}"
+                      ContentTemplate="{DataTemplate pages:QRCodeGeneratePage}"
+                      Route="qrcode" />
+        <ShellContent Title="控制"
+                      Icon="{OnPlatform Default='control.png'}"
+                      ContentTemplate="{DataTemplate pages:ControlModePage}"
+                      Route="control" />
+        <ShellContent Title="用户"
+                      Icon="{OnPlatform Default='users.png'}"
+                      ContentTemplate="{DataTemplate pages:AdminUsersPage}"
+                      Route="adminusers" />
+        <ShellContent Title="我的"
+                      Icon="{OnPlatform Default='profile.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentHistoryPage}"
+                      Route="profile" />
+    </TabBar>
+
+    <!-- ==================== 学生端 TabBar ==================== -->
+    <TabBar x:Name="StudentTabs" Route="student">
+        <ShellContent Title="扫码签到"
+                      Icon="{OnPlatform Default='scan.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentScanPage}"
+                      Route="scan" />
+        <ShellContent Title="签到记录"
+                      Icon="{OnPlatform Default='history.png'}"
+                      ContentTemplate="{DataTemplate pages:StudentHistoryPage}"
+                      Route="history" />
+    </TabBar>
+
+</Shell>

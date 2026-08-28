@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- ============ Card Style ============ -->
+    <Style x:Key="CardFrame" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <!-- ============ Primary Button ============ -->
+    <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="TextColor" Value="{StaticResource TextOnPrimary}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="HeightRequest" Value="52" />
+        <Setter Property="Padding" Value="24,0" />
+    </Style>
+
+    <!-- ============ Secondary Button ============ -->
+    <Style x:Key="SecondaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource Primary}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderColor" Value="{StaticResource Primary}" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="HeightRequest" Value="48" />
+        <Setter Property="Padding" Value="20,0" />
+    </Style>
+
+    <!-- ============ Page Title ============ -->
+    <Style x:Key="PageTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    </Style>
+
+    <!-- ============ Section Title ============ -->
+    <Style x:Key="SectionTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="Margin" Value="0,12,0,8" />
+    </Style>
+
+    <!-- ============ Body Text ============ -->
+    <Style x:Key="BodyText" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
+    </Style>
+
+    <!-- ============ Caption Text ============ -->
+    <Style x:Key="CaptionText" TargetType="Label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextColor" Value="{StaticResource TextTertiary}" />
+    </Style>
+
+    <!-- ============ Task Card Frame ============ -->
+    <Style x:Key="TaskCardFrame" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource CardBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+
+    <!-- ============ Student Button (Not Checked) ============ -->
+    <Style x:Key="StudentButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource ButtonNotChecked}" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HeightRequest" Value="56" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="BorderColor" Value="#d0d0d0" />
+        <Setter Property="Margin" Value="4" />
+    </Style>
+
+    <!-- ============ Student Button (Checked In) ============ -->
+    <Style x:Key="StudentButtonChecked" TargetType="Button" BasedOn="{StaticResource StudentButton}">
+        <Setter Property="BackgroundColor" Value="{StaticResource ButtonCheckedIn}" />
+        <Setter Property="TextColor" Value="{StaticResource TextOnPrimary}" />
+        <Setter Property="BorderColor" Value="{StaticResource ButtonCheckedIn}" />
+    </Style>
+
+    <!-- ============ Input Entry ============ -->
+    <Style x:Key="FormEntry" TargetType="Entry">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray400}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariant}" />
+        <Setter Property="HeightRequest" Value="48" />
+    </Style>
+
+    <!-- ============ Editor Style ============ -->
+    <Style x:Key="FormEditor" TargetType="Editor">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray400}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariant}" />
+        <Setter Property="HeightRequest" Value="120" />
+    </Style>
+
+    <!-- ============ Status Badge Online ============ -->
+    <Style x:Key="StatusBadgeOnline" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Success}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="HeightRequest" Value="22" />
+    </Style>
+
+    <!-- ============ Status Badge Offline ============ -->
+    <Style x:Key="StatusBadgeOffline" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Error}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="HeightRequest" Value="22" />
+    </Style>
+
+    <!-- ============ NavigationPage Style ============ -->
+    <Style TargetType="NavigationPage">
+        <Setter Property="BarBackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="BarTextColor" Value="{StaticResource TextOnPrimary}" />
+    </Style>
+
+    <!-- ============ Shell Style ============ -->
+    <Style TargetType="Shell" ApplyToDerivedTypes="True">
+        <Setter Property="Shell.BackgroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="Shell.ForegroundColor" Value="{StaticResource TextOnPrimary}" />
+        <Setter Property="Shell.TitleColor" Value="{StaticResource TextOnPrimary}" />
+        <Setter Property="Shell.UnselectedColor" Value="#95FFFFFF" />
+        <Setter Property="Shell.TabBarBackgroundColor" Value="{StaticResource Surface}" />
+        <Setter Property="Shell.TabBarForegroundColor" Value="{StaticResource Primary}" />
+        <Setter Property="Shell.TabBarUnselectedColor" Value="{StaticResource Gray400}" />
+        <Setter Property="Shell.TabBarTitleColor" Value="{StaticResource Primary}" />
+    </Style>
+
+    <!-- ============ Page Style ============ -->
+    <Style TargetType="Page" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{StaticResource Background}" />
+    </Style>
+
+    <!-- ============ ActivityIndicator ============ -->
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{StaticResource Primary}" />
+    </Style>
+
+    <!-- ============ RefreshView ============ -->
+    <Style TargetType="RefreshView">
+        <Setter Property="RefreshColor" Value="{StaticResource Primary}" />
+    </Style>
+
+</ResourceDictionary>

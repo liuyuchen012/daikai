@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.QRCodeGeneratePage"
+             Title="生成签到码"
+             BackgroundColor="#f5f6fa">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16" MaximumWidthRequest="500">
+
+            <!-- 表单 -->
+            <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                   Padding="20" Stroke="#e8e8e8" StrokeThickness="1"
+                   IsVisible="{Binding ShowForm}">
+                <VerticalStackLayout Spacing="14">
+
+                    <Label Text="创建签到任务" FontSize="18" FontAttributes="Bold" TextColor="#333333" />
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="选择设备 *" FontSize="13" TextColor="#555555" />
+                        <Border BackgroundColor="#f8f9fb" StrokeShape="RoundRectangle 8"
+                                Padding="4" Stroke="#e0e0e0" StrokeThickness="1">
+                            <Picker x:Name="DevicePicker"
+                                    ItemsSource="{Binding DeviceList}"
+                                    ItemDisplayBinding="{Binding DisplayText}"
+                                    SelectedIndex="-1"
+                                    Title="请选择一个设备"
+                                    FontSize="14"
+                                    SelectedIndexChanged="OnDeviceSelected" />
+                        </Border>
+                        <Label Text="{Binding SelectedDeviceHint}" FontSize="12" TextColor="#4285f4"
+                               IsVisible="{Binding IsSelectedDeviceHintVisible}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="科目 *" FontSize="13" TextColor="#555555" />
+                        <Entry Text="{Binding Subject}" Placeholder="如：高等数学" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="教室" FontSize="13" TextColor="#555555" />
+                        <Entry Text="{Binding Classroom}" Placeholder="如：教学楼A301" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="签到密码 *" FontSize="13" TextColor="#555555" />
+                        <Entry Text="{Binding SignPassword}" Placeholder="学生签到需输入的密码"
+                               IsPassword="True" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="学生名单" FontSize="13" TextColor="#555555" />
+                        <Editor Text="{Binding StudentListText}"
+                                Placeholder="每行一个学生姓名&#x0a;如：&#x0a;张三&#x0a;李四&#x0a;王五"
+                                HeightRequest="150" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <Button Text="生成签到二维码"
+                            Command="{Binding GenerateCommand}"
+                            BackgroundColor="#4285f4" TextColor="White"
+                            FontSize="16" FontAttributes="Bold"
+                            CornerRadius="12" HeightRequest="52"
+                            IsEnabled="{Binding CanGenerate}" />
+
+                    <ActivityIndicator IsRunning="{Binding IsLoading}"
+                                       IsVisible="{Binding IsLoading}"
+                                       Color="#4285f4" HorizontalOptions="Center" />
+
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 生成结果 -->
+            <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                   Padding="20" Stroke="#e8e8e8" StrokeThickness="1"
+                   IsVisible="{Binding ShowResult}">
+                <VerticalStackLayout Spacing="16" HorizontalOptions="Center">
+
+                    <Label Text="签到任务已创建！" FontSize="18" FontAttributes="Bold"
+                           TextColor="#34a853" HorizontalOptions="Center" />
+
+                    <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                        <Label Text="{Binding ResultSubject, StringFormat='科目: {0}'}"
+                               FontSize="15" TextColor="#333333" />
+                        <Label Text="{Binding ResultClassroom, StringFormat='教室: {0}'}"
+                               FontSize="14" TextColor="#666666" />
+                        <Label Text="{Binding ResultDeviceName, StringFormat='设备: {0}'}"
+                               FontSize="14" TextColor="#666666" />
+                        <Label Text="{Binding ResultStudentCount, StringFormat='学生人数: {0}'}"
+                               FontSize="14" TextColor="#666666" />
+                    </VerticalStackLayout>
+
+                    <!-- 二维码图片 -->
+                    <Border BackgroundColor="#f8f9fb" StrokeShape="RoundRectangle 8"
+                           Padding="8" Stroke="#e0e0e0" StrokeThickness="1"
+                           IsVisible="{Binding HasQrImage}"
+                           HorizontalOptions="Center">
+                        <Image Source="{Binding QrCodeImage}"
+                               WidthRequest="240" HeightRequest="240"
+                               HorizontalOptions="Center" />
+                    </Border>
+
+                    <!-- 签到链接 -->
+                    <Border BackgroundColor="#f0f4f8" StrokeShape="RoundRectangle 8"
+                           Padding="12" Stroke="#e0e0e0" StrokeThickness="1">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="签到链接" FontSize="12" TextColor="#888888" />
+                            <Label Text="{Binding SignInUrl}" FontSize="14" TextColor="#4285f4"
+                                   LineBreakMode="CharacterWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                        <Button Text="保存到相册"
+                                Command="{Binding SaveQrCommand}"
+                                BackgroundColor="#4285f4" TextColor="White"
+                                CornerRadius="10" HeightRequest="44" FontSize="14"
+                                IsVisible="{Binding HasQrImage}" />
+                        <Button Text="复制链接"
+                                Command="{Binding CopyUrlCommand}"
+                                BackgroundColor="#34a853" TextColor="White"
+                                CornerRadius="10" HeightRequest="44" FontSize="14" />
+                    </HorizontalStackLayout>
+
+                    <Button Text="创建新的签到"
+                            Command="{Binding ResetCommand}"
+                            BackgroundColor="Transparent" TextColor="#4285f4"
+                            BorderColor="#4285f4" BorderWidth="1"
+                            CornerRadius="10" HeightRequest="44" FontSize="14" />
+
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

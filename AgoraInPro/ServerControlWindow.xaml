@@ -1,0 +1,681 @@
+<Window x:Class="CheckIn.Client.ServerControlWindow" x:Name="ThisWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="远程打卡服务器控制" Height="780" Width="1280"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" GlassFrameThickness="0" ResizeBorderThickness="6" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="ModernContextMenu" TargetType="ContextMenu">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#e0e0e0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border CornerRadius="10" Background="White"
+                                BorderBrush="#e0e0e0" BorderThickness="1"
+                                Padding="4" Effect="{x:Null}">
+                            <ItemsPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid>
+        <Border CornerRadius="12" Background="White" Margin="0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="2" Color="#40000000" Opacity="0.3"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="48"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="28"/>
+                </Grid.RowDefinitions>
+
+                <!-- 顶部标题栏 -->
+                <Grid Grid.Row="0" Background="#4285f4" MouseLeftButtonDown="TitleBar_MouseDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                        <Ellipse Width="10" Height="10" Fill="White" Opacity="0.9" VerticalAlignment="Center"/>
+                        <TextBlock Text=" AgoraIn · 远程控制" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="White" VerticalAlignment="Center" Margin="6,0,14,0"/>
+                        <Button Content="连接" Style="{StaticResource FlatButton}" Foreground="White"
+                                FontSize="13" Click="MenuConnect_Click"/>
+                        <Button Content="数据" Style="{StaticResource FlatButton}" Foreground="White"
+                                FontSize="13" Click="MenuData_Click"/>
+                        <Button Content="操作" Style="{StaticResource FlatButton}" Foreground="White"
+                                FontSize="13" Click="MenuAction_Click"/>
+                        <Button Content="帮助" Style="{StaticResource FlatButton}" Foreground="White"
+                                FontSize="13" Click="MenuHelp_Click"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="─" Width="46" Height="30" Foreground="White"
+                                Background="Transparent" BorderThickness="0" FontSize="16"
+                                Click="Minimize_Click" Cursor="Hand"/>
+                        <Button Content="✕" Width="46" Height="30" Foreground="White"
+                                Background="Transparent" BorderThickness="0" FontSize="14"
+                                Click="Close_Click" Cursor="Hand"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- 主内容区 -->
+                <Grid Grid.Row="1">
+                    <!-- 登录面板 -->
+                    <Grid x:Name="LoginPanel" Visibility="{Binding IsNotLoggedIn, Converter={StaticResource BoolToVis}}">
+                        <Grid.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#f0f4ff" Offset="0"/>
+                                <GradientStop Color="#e8f0fe" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Grid.Background>
+                        <Border Width="400" Height="380" CornerRadius="16" Background="White" VerticalAlignment="Center"
+                                HorizontalAlignment="Center" Padding="28">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="1" Color="#30000000" Opacity="0.2"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="远程打卡服务器控制" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="#333" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="登录后即可查看设备、任务与考勤" FontSize="12" Foreground="#999"
+                                           HorizontalAlignment="Center" Margin="0,0,0,22"/>
+                                <TextBlock Text="服务器地址" FontSize="12" Foreground="#555" Margin="0,0,0,4"/>
+                                <TextBox Height="34" FontSize="13" Padding="8,0"
+                                         Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center" Margin="0,0,0,14"/>
+                                <TextBlock Text="用户名" FontSize="12" Foreground="#555" Margin="0,0,0,4"/>
+                                <TextBox Height="34" FontSize="13" Padding="8,0"
+                                         Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalContentAlignment="Center" Margin="0,0,0,14"/>
+                                <TextBlock Text="密码" FontSize="12" Foreground="#555" Margin="0,0,0,4"/>
+                                <PasswordBox x:Name="PasswordBox" Height="34" FontSize="13" Padding="8,0"
+                                             VerticalContentAlignment="Center" Margin="0,0,0,18"/>
+                                <Button Content="登 录" Height="38" FontSize="14"
+                                        Background="#4285f4" Foreground="White" BorderThickness="0"
+                                        Cursor="Hand" Click="Login_Click"/>
+                                <TextBlock Text="{Binding LoginMessage}" FontSize="12" Foreground="#d32f2f"
+                                           HorizontalAlignment="Center" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- 主面板 -->
+                    <Grid x:Name="MainPanel" Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVis}}">
+                        <TabControl Background="Transparent" BorderThickness="0" Margin="0">
+                            <TabControl.Resources>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="Padding" Value="16,7"/>
+                                    <Setter Property="Foreground" Value="#555"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TabItem">
+                                                <Border x:Name="Bd" CornerRadius="8" Margin="1,2" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
+                                                        <Setter Property="Foreground" Value="#4285f4"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#f0f0f0"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TabControl.Resources>
+
+                            <!-- Tab 1：仪表盘 -->
+                            <TabItem Header="仪表盘">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <UniformGrid Grid.Row="0" Columns="5" Margin="0,0,0,14">
+                                        <Border Margin="4" CornerRadius="10" Background="#e8f0fe" Padding="14,12">
+                                            <StackPanel>
+                                                <TextBlock Text="设备总数" FontSize="11" Foreground="#5b7fb5"/>
+                                                <TextBlock Text="{Binding Summary.TotalDevices}" FontSize="24" FontWeight="Bold" Foreground="#4285f4"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Margin="4" CornerRadius="10" Background="#e6f4ea" Padding="14,12">
+                                            <StackPanel>
+                                                <TextBlock Text="在线设备" FontSize="11" Foreground="#5b8f68"/>
+                                                <TextBlock Text="{Binding Summary.OnlineDevices}" FontSize="24" FontWeight="Bold" Foreground="#34a853"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Margin="4" CornerRadius="10" Background="#fff8e1" Padding="14,12">
+                                            <StackPanel>
+                                                <TextBlock Text="今日签到" FontSize="11" Foreground="#a0895b"/>
+                                                <TextBlock Text="{Binding Summary.TodayCheckins}" FontSize="24" FontWeight="Bold" Foreground="#f9a825"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Margin="4" CornerRadius="10" Background="#fce8e6" Padding="14,12">
+                                            <StackPanel>
+                                                <TextBlock Text="活跃任务" FontSize="11" Foreground="#b06a64"/>
+                                                <TextBlock Text="{Binding Summary.ActiveSignInTasks}" FontSize="24" FontWeight="Bold" Foreground="#d93025"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Margin="4" CornerRadius="10" Background="#f3e8fd" Padding="14,12">
+                                            <StackPanel>
+                                                <TextBlock Text="用户总数" FontSize="11" Foreground="#8a6ab5"/>
+                                                <TextBlock Text="{Binding Summary.TotalUsers}" FontSize="24" FontWeight="Bold" Foreground="#7b1fa2"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+                                    <Grid Grid.Row="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" CornerRadius="8" Background="#f8f9fa" Padding="12" Margin="0,0,8,0">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Top" Text="设备列表" FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="#333" Margin="0,0,0,8"/>
+                                                <ListView ItemsSource="{Binding Devices}" BorderThickness="0"
+                                                          Background="Transparent" FontSize="13">
+                                                    <ListView.ItemContainerStyle>
+                                                        <Style TargetType="ListViewItem">
+                                                            <Setter Property="Padding" Value="6,4"/>
+                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                        </Style>
+                                                    </ListView.ItemContainerStyle>
+                                                    <ListView.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="50"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0">
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#333"/>
+                                                                    <TextBlock Text="{Binding TaskCount, StringFormat=任务数：{0}}" FontSize="11" Foreground="#999"/>
+                                                                </StackPanel>
+                                                                <TextBlock Grid.Column="1" Text="在线" FontSize="11" Foreground="#34a853" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="#34a853"/>
+                                                                            <Setter Property="Text" Value="在线"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding Online}" Value="False">
+                                                                                    <Setter Property="Foreground" Value="#ccc"/>
+                                                                                    <Setter Property="Text" Value="离线"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ListView.ItemTemplate>
+                                                </ListView>
+                                            </DockPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" CornerRadius="8" Background="#f8f9fa" Padding="12" Margin="8,0,0,0">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Top" Text="活跃签到任务" FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="#333" Margin="0,0,0,8"/>
+                                                <ListView ItemsSource="{Binding ActiveTasks}" BorderThickness="0"
+                                                          Background="Transparent" FontSize="13">
+                                                    <ListView.ItemContainerStyle>
+                                                        <Style TargetType="ListViewItem">
+                                                            <Setter Property="Padding" Value="6,4"/>
+                                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                        </Style>
+                                                    </ListView.ItemContainerStyle>
+                                                    <ListView.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="70"/>
+                                                                    <ColumnDefinition Width="70"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0">
+                                                                    <TextBlock Text="{Binding Subject}" FontWeight="SemiBold" Foreground="#333"/>
+                                                                    <TextBlock Text="{Binding Classroom}" FontSize="11" Foreground="#999"/>
+                                                                </StackPanel>
+                                                                <TextBlock Grid.Column="1" Text="{Binding StudentCount, StringFormat=学生{0}}" FontSize="11" Foreground="#888"/>
+                                                                <TextBlock Grid.Column="2" Text="{Binding SignedCount, StringFormat=已签{0}}" FontSize="11" Foreground="#4285f4"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ListView.ItemTemplate>
+                                                </ListView>
+                                            </DockPanel>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- Tab 2：设备管理 -->
+                            <TabItem Header="设备管理">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="刷新设备" Width="90" Height="30" Background="#e8f0fe" Foreground="#4285f4"
+                                                BorderThickness="0" Cursor="Hand" FontSize="12" Click="RefreshDevices_Click"/>
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding DeviceItems}" BorderThickness="0" FontSize="13">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="设备名称" Width="220">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="状态" Width="80">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="在线">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="在线"/>
+                                                                        <Setter Property="Foreground" Value="#34a853"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Online}" Value="False">
+                                                                                <Setter Property="Text" Value="离线"/>
+                                                                                <Setter Property="Foreground" Value="#ccc"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="最近在线" Width="160">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding LastSeen}" FontSize="12" Foreground="#888"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="公钥" Width="260">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding PublicKey}" FontSize="11" Foreground="#aaa" TextTrimming="CharacterEllipsis"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="操作" Width="160">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Button Content="重命名" Height="26" Margin="0,0,6,0" FontSize="11"
+                                                                        Background="#e8f0fe" Foreground="#4285f4" BorderThickness="0"
+                                                                        Cursor="Hand" Click="RenameDevice_Click"/>
+                                                                <Button Content="删除" Height="26" FontSize="11"
+                                                                        Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
+                                                                        Cursor="Hand" Click="DeleteDevice_Click"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- Tab 3：任务管理 -->
+                            <TabItem Header="任务管理">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="刷新任务" Width="90" Height="30" Background="#e8f0fe" Foreground="#4285f4"
+                                                BorderThickness="0" Cursor="Hand" FontSize="12" Click="RefreshTasks_Click"/>
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding TaskItems}" BorderThickness="0" FontSize="13">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="科目" Width="140">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Subject}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="教室" Width="110">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Classroom}" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="短码" Width="80">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding ShortCode}" Foreground="#4285f4" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="状态" Width="80">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="进行中">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="进行中"/>
+                                                                        <Setter Property="Foreground" Value="#34a853"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Status}" Value="closed">
+                                                                                <Setter Property="Text" Value="已关闭"/>
+                                                                                <Setter Property="Foreground" Value="#999"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="学生/已签" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock VerticalAlignment="Center">
+                                                                <Run Text="{Binding StudentCount, Mode=OneWay}"/><Run Text=" / "/><Run Text="{Binding SignedCount, Mode=OneWay}"/>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="创建时间" Width="150">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding CreatedAt}" FontSize="12" Foreground="#888"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="操作" Width="210">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Button Content="重命名" Height="26" Margin="0,0,6,0" FontSize="11"
+                                                                        Background="#e8f0fe" Foreground="#4285f4" BorderThickness="0"
+                                                                        Cursor="Hand" Click="RenameTask_Click"/>
+                                                                <Button Content="关闭" Height="26" Margin="0,0,6,0" FontSize="11"
+                                                                        Background="#fff3e0" Foreground="#e65100" BorderThickness="0"
+                                                                        Cursor="Hand" Click="CloseTask_Click"/>
+                                                                <Button Content="删除" Height="26" FontSize="11"
+                                                                        Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
+                                                                        Cursor="Hand" Click="DeleteTask_Click"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- Tab 4：考勤 -->
+                            <TabItem Header="考勤">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="刷新考勤" Width="90" Height="30" Background="#e8f0fe" Foreground="#4285f4"
+                                                BorderThickness="0" Cursor="Hand" FontSize="12" Click="RefreshAttendance_Click"/>
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding AttendanceItems}" BorderThickness="0" FontSize="13">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="Padding" Value="4,6"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="8" Background="#f8f9fa" Padding="12" Margin="0,3">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0">
+                                                                <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#333">
+                                                                    <Run Text="{Binding MachineName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding TaskId, Mode=OneWay}"/>
+                                                                </TextBlock>
+                                                                <TextBlock FontSize="11" Foreground="#999">
+                                                                    <Run Text="应到 "/><Run Text="{Binding TotalStudents, Mode=OneWay}"/><Run Text=" 人，已到 "/><Run Text="{Binding PunchedCount, Mode=OneWay}"/><Run Text=" 人，未到 "/><Run Text="{Binding UnpunchedCount, Mode=OneWay}"/><Run Text=" 人"/>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                            <Border Grid.Column="1" CornerRadius="12" Padding="10,4"
+                                                                    Background="#e8f0fe" VerticalAlignment="Center">
+                                                                <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="#4285f4">
+                                                                    <Run Text="{Binding AttendanceRate, Mode=OneWay}"/><Run Text="%"/>
+                                                                </TextBlock>
+                                                            </Border>
+                                                        </Grid>
+                                                        <ItemsControl ItemsSource="{Binding Students}" Margin="0,8,0,0">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Margin="2" CornerRadius="10" Padding="8,3" Background="#ffffff">
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#333"/>
+                                                                            <TextBlock Text=" ✓" FontSize="11">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Text" Value=" ✓"/>
+                                                                                        <Setter Property="Foreground" Value="#34a853"/>
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding CheckedIn}" Value="False">
+                                                                                                <Setter Property="Text" Value=" ✗"/>
+                                                                                                <Setter Property="Foreground" Value="#d32f2f"/>
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- Tab 5：签到历史 -->
+                            <TabItem Header="签到历史">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="刷新历史" Width="90" Height="30" Background="#e8f0fe" Foreground="#4285f4"
+                                                BorderThickness="0" Cursor="Hand" FontSize="12" Click="RefreshHistory_Click"/>
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding HistoryItems}" BorderThickness="0" FontSize="13">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="Padding" Value="4,6"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="8" Background="#f8f9fa" Padding="12" Margin="0,3">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="#333">
+                                                                <Run Text="{Binding Subject, Mode=OneWay}"/><Run Text="（"/><Run Text="{Binding Classroom, Mode=OneWay}"/><Run Text="）"/>
+                                                            </TextBlock>
+                                                            <TextBlock FontSize="11" Foreground="#999">
+                                                                <Run Text="{Binding CreatedAt, Mode=OneWay}"/><Run Text="　短码 "/><Run Text="{Binding ShortCode, Mode=OneWay}"/>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" FontSize="12" Foreground="#888" VerticalAlignment="Center">
+                                                            <Run Text="{Binding StudentCount, Mode=OneWay}"/><Run Text=" 学生 / "/><Run Text="{Binding SignedCount, Mode=OneWay}"/><Run Text=" 已签"/>
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- Tab 6：用户管理 -->
+                            <TabItem Header="用户管理">
+                                <Grid Margin="16,12,16,8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                        <Button Content="刷新用户" Width="90" Height="30" Background="#e8f0fe" Foreground="#4285f4"
+                                                BorderThickness="0" Cursor="Hand" FontSize="12" Click="RefreshUsers_Click"/>
+                                        <Button Content="新建用户" Width="90" Height="30" Margin="8,0,0,0"
+                                                Background="#34a853" Foreground="White" BorderThickness="0"
+                                                Cursor="Hand" FontSize="12" Click="CreateUser_Click"/>
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    </StackPanel>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding UserItems}" BorderThickness="0" FontSize="13">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="用户名" Width="140">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Username}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="显示名" Width="140">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="角色" Width="100">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding Role}" VerticalAlignment="Center"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="状态" Width="80">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="启用">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Text" Value="启用"/>
+                                                                        <Setter Property="Foreground" Value="#34a853"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                                                <Setter Property="Text" Value="禁用"/>
+                                                                                <Setter Property="Foreground" Value="#d32f2f"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="创建时间" Width="170">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding CreatedAt}" FontSize="12" Foreground="#888"/>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                                <GridViewColumn Header="操作" Width="190">
+                                                    <GridViewColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Button Content="启用/禁用" Height="26" Margin="0,0,6,0" FontSize="11"
+                                                                        Background="#fff3e0" Foreground="#e65100" BorderThickness="0"
+                                                                        Cursor="Hand" Click="ToggleUserActive_Click"/>
+                                                                <Button Content="删除" Height="26" FontSize="11"
+                                                                        Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
+                                                                        Cursor="Hand" Click="DeleteUser_Click"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </GridViewColumn.CellTemplate>
+                                                </GridViewColumn>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </Grid>
+
+                <!-- 底部状态栏 -->
+                <Border Grid.Row="2" Background="#f5f5f5" Padding="12,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding UserInfo}" FontSize="11" Foreground="#888" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="远程打卡服务器控制 · 需先登录" FontSize="11" Foreground="#aaa" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,503 @@
+<UserControl x:Class="CheckIn.Client.ClassHoursPanelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1000"
+             TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+
+    <UserControl.Resources>
+        <!-- 圆角按钮样式：替代默认方形按钮，背景/前景色由按钮自身属性提供 -->
+        <Style x:Key="RoundedButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 现代化圆角 ContextMenu 样式 -->
+        <Style x:Key="ModernContextMenu" TargetType="ContextMenu">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#e0e0e0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border CornerRadius="10" Background="White"
+                                BorderBrush="#e0e0e0" BorderThickness="1"
+                                Padding="4" Effect="{x:Null}">
+                            <ItemsPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- 左侧：学生列表 -->
+        <Border Grid.Column="0" Background="#f8f9fa" BorderBrush="#e8e8e8"
+                BorderThickness="0,0,1,0" Padding="12">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="学生列表" FontSize="15" FontWeight="SemiBold"
+                           Foreground="#333" Margin="0,0,0,8"/>
+
+                <!-- 添加学生 -->
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                    <TextBox x:Name="NameBox" Height="30" FontSize="13" Margin="0,0,0,6"
+                             Text="{Binding NewStudentName, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalContentAlignment="Center" ToolTip="学生姓名"/>
+                    <DockPanel Margin="0,0,0,6">
+                        <Button DockPanel.Dock="Right" Content="添加" Width="64" Height="30"
+                                Style="{StaticResource RoundedButton}"
+                                Background="#4285f4" Foreground="White" BorderThickness="0"
+                                Cursor="Hand" FontSize="13" Click="AddStudent_Click"/>
+                        <TextBox x:Name="HoursBox" Height="30" FontSize="13" Margin="0,0,8,0"
+                                 Text="{Binding NewStudentHours, UpdateSourceTrigger=PropertyChanged}"
+                                 VerticalContentAlignment="Center" ToolTip="初始课时"
+                                 VerticalAlignment="Center"/>
+                    </DockPanel>
+                </StackPanel>
+
+                <!-- 学生列表 -->
+                <ListView x:Name="StudentList" ItemsSource="{Binding Students}"
+                          SelectedItem="{Binding SelectedStudent, Mode=TwoWay}"
+                          BorderThickness="0" Background="Transparent"
+                          FontSize="13">
+                    <ListView.Resources>
+                        <ContextMenu x:Key="StudentContextMenu" Style="{StaticResource ModernContextMenu}">
+                            <MenuItem Header="删除学生" Click="DeleteStudent_Click" Foreground="#d32f2f"/>
+                        </ContextMenu>
+                    </ListView.Resources>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="Padding" Value="6,4"/>
+                            <Setter Property="Margin" Value="0,1"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="ContextMenu" Value="{StaticResource StudentContextMenu}"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" Foreground="#333"/>
+                                <Border Grid.Column="1" CornerRadius="10" Background="#e8f0fe" Padding="8,2">
+                                    <TextBlock Text="{Binding RemainingHours, StringFormat=剩{0:0.#}}"
+                                               FontSize="11" Foreground="#4285f4"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <!-- 右侧：Tab 内容 -->
+        <TabControl Grid.Column="1" Background="Transparent" BorderThickness="0" Margin="0">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="Padding" Value="16,7"/>
+                    <Setter Property="Foreground" Value="#555"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TabItem">
+                                <Border x:Name="Bd" CornerRadius="8" Margin="1,2" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#e8f0fe"/>
+                                        <Setter Property="Foreground" Value="#4285f4"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#f0f0f0"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </TabControl.Resources>
+
+            <!-- ===== Tab 1：课时划消与排课（合并页） ===== -->
+            <TabItem Header="课时划消与排课">
+                <Grid Margin="16,12,16,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 顶部：划课操作区 -->
+                    <Border Grid.Row="0" CornerRadius="8" Background="#f8f9fa" Padding="14,10" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="330"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 左：学生详情 + 操作 -->
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding SelectedDetail}" FontSize="14" FontWeight="SemiBold"
+                                           Foreground="#333" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBlock Text="课时数：" FontSize="13" Foreground="#555"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBox Width="90" Height="30" FontSize="13"
+                                             Text="{Binding OperateHours, UpdateSourceTrigger=PropertyChanged}"
+                                             VerticalContentAlignment="Center" Margin="0,0,10,0"/>
+                                    <Button Content="划消课时" Width="88" Height="30"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#4285f4" Foreground="White" BorderThickness="0"
+                                            Cursor="Hand" FontSize="13" Click="Deduct_Click"
+                                            IsEnabled="{Binding CanOperate}"/>
+                                    <Button Content="增加课时" Width="88" Height="30" Margin="8,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#34a853" Foreground="White" BorderThickness="0"
+                                            Cursor="Hand" FontSize="13" Click="AddHours_Click"
+                                            IsEnabled="{Binding CanOperate}"/>
+                                </DockPanel>
+                                <DockPanel>
+                                    <TextBlock Text="备注：" FontSize="13" Foreground="#555"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBox Height="30" FontSize="13"
+                                             Text="{Binding OperateNote, UpdateSourceTrigger=PropertyChanged}"
+                                             VerticalContentAlignment="Center" ToolTip="划课备注（可选）"/>
+                                </DockPanel>
+                            </StackPanel>
+
+                            <!-- 右：课时记录 -->
+                            <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                                <TextBlock Text="课时记录" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#333" Margin="0,0,0,4"/>
+                                <ListView ItemsSource="{Binding Records}" BorderThickness="0"
+                                          Background="Transparent" FontSize="12" MaxHeight="92">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="4,2"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="78"/>
+                                                    <ColumnDefinition Width="52"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Date}" Foreground="#888" FontSize="11"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding HoursText}" FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#34a853"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsDeduct}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#d32f2f"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Grid.Column="2" Text="{Binding Note}" Foreground="#666"
+                                                           FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 底部：排课区（日历 + 当日排课） -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="360"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 左：月历 -->
+                        <Grid Grid.Column="0" Margin="0,0,12,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 月份导航 -->
+                            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                    <Button Content="‹" Width="32" Height="28" FontSize="16"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#f0f0f0" BorderThickness="0" Cursor="Hand"
+                                            Click="PrevMonth_Click"/>
+                                    <Button Content="›" Width="32" Height="28" FontSize="16" Margin="6,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#f0f0f0" BorderThickness="0" Cursor="Hand"
+                                            Click="NextMonth_Click"/>
+                                    <Button Content="今天" Width="52" Height="28" Margin="10,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#e8f0fe" Foreground="#4285f4" BorderThickness="0"
+                                            Cursor="Hand" FontSize="12" Click="Today_Click"/>
+                                </StackPanel>
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding CurrentMonth, StringFormat=yyyy年M月}"
+                                           FontSize="16" FontWeight="SemiBold" Foreground="#333"
+                                           VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding SelectedDateText}"
+                                           FontSize="12" Foreground="#666" VerticalAlignment="Center"/>
+                            </DockPanel>
+
+                            <!-- 星期表头 -->
+                            <Grid Grid.Row="1" Margin="0,0,0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                    <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="一" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="二" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="三" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="四" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="4" Text="五" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="5" Text="六" FontSize="11" Foreground="#e57373" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="6" Text="日" FontSize="11" Foreground="#e57373" HorizontalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- 42 格日历 -->
+                            <ItemsControl Grid.Row="2" ItemsSource="{Binding CalendarDays}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="7" Rows="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border x:Name="DayBd" Margin="2" CornerRadius="6"
+                                                Background="#f8f9fa" Padding="5" Cursor="Hand"
+                                                MouseLeftButtonDown="CalendarDay_Click">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+                                                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding Display}" FontSize="12">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#666"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#4285f4"/>
+                                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
+                                                                        <Setter Property="Foreground" Value="#ccc"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <Border x:Name="TodayBadge" CornerRadius="4" Background="#4285f4"
+                                                            Padding="3,0" Margin="3,0,0,0" VerticalAlignment="Center"
+                                                            Visibility="Collapsed">
+                                                        <TextBlock Text="今" FontSize="9" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Grid.Row="1" Text="{Binding Hint}" FontSize="11"
+                                                           VerticalAlignment="Top" Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#34a853"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsOff}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#e57373"/>
+                                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Count}" Value="0">
+                                                                    <Setter Property="Foreground" Value="#bbb"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsOff}" Value="True">
+                                                <Setter TargetName="DayBd" Property="Background" Value="#fce4ec"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                <Setter TargetName="TodayBadge" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter TargetName="DayBd" Property="BorderBrush" Value="#4285f4"/>
+                                                <Setter TargetName="DayBd" Property="BorderThickness" Value="1.5"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+
+                        <!-- 右：当日排课 -->
+                        <Border Grid.Column="1" Background="#f8f9fa" CornerRadius="8" Padding="12">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding SelectedDateText}" FontSize="13"
+                                               FontWeight="SemiBold" Foreground="#333"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding ScheduleHint}" FontSize="11"
+                                               Foreground="#888" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,8,0,8">
+                                    <Button Content="设为不排课日/恢复" Width="132" Height="28"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#fff3e0" Foreground="#e65100" BorderThickness="0"
+                                            Cursor="Hand" FontSize="12" Click="ToggleOffDay_Click"/>
+                                    <Button Content="清空排课" Width="72" Height="28" Margin="6,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
+                                            Cursor="Hand" FontSize="12" Click="ClearSchedule_Click"/>
+                                    <Button Content="复制排课…" Width="80" Height="28" Margin="6,0,0,0"
+                                            Style="{StaticResource RoundedButton}"
+                                            Background="#4285f4" Foreground="White" BorderThickness="0"
+                                            Cursor="Hand" FontSize="12" Click="CopySchedule_Click"/>
+                                </StackPanel>
+
+                                <TextBlock DockPanel.Dock="Top" Text="选择学生（点击添加，需填写上课/下课时间）" FontSize="12"
+                                           FontWeight="SemiBold" Foreground="#555" Margin="0,0,0,4"/>
+                                <ScrollViewer DockPanel.Dock="Top" MaxHeight="116" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding Students}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="ItemBd" Margin="0,2" Padding="10,5" CornerRadius="6"
+                                                        Background="#ffffff" Cursor="Hand"
+                                                        MouseLeftButtonDown="ToggleStudent_Click">
+                                                    <TextBlock Text="{Binding Name}" FontSize="12" Foreground="#333"/>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsInSchedule}" Value="True">
+                                                        <Setter TargetName="ItemBd" Property="Background" Value="#e8f0fe"/>
+                                                        <Setter TargetName="ItemBd" Property="BorderBrush" Value="#4285f4"/>
+                                                        <Setter TargetName="ItemBd" Property="BorderThickness" Value="1"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <TextBlock DockPanel.Dock="Top" Text="已排课学生（可改时间 / 移除）" FontSize="12"
+                                           FontWeight="SemiBold" Foreground="#555" Margin="0,8,0,4"/>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding ScheduleStudents}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="62"/>
+                                                        <ColumnDefinition Width="62"/>
+                                                        <ColumnDefinition Width="52"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12"
+                                                               FontWeight="SemiBold" Foreground="#333"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBox Grid.Column="1" x:Name="StartBox" Height="26" FontSize="12"
+                                                             Margin="4,0,2,0" Text="{Binding ScheduleStartTime}"
+                                                             VerticalContentAlignment="Center"
+                                                             ToolTip="上课时间 HH:mm（必填）"
+                                                             LostFocus="ScheduleTime_LostFocus"/>
+                                                    <TextBox Grid.Column="2" x:Name="EndBox" Height="26" FontSize="12"
+                                                             Margin="2,0,4,0" Text="{Binding ScheduleEndTime}"
+                                                             VerticalContentAlignment="Center"
+                                                             ToolTip="下课时间 HH:mm（必填）"
+                                                             LostFocus="ScheduleTime_LostFocus"/>
+                                                    <Button Grid.Column="3" Content="移除" Height="26" FontSize="11"
+                                                            Style="{StaticResource RoundedButton}"
+                                                            Background="#fdecea" Foreground="#d32f2f" BorderThickness="0"
+                                                            Cursor="Hand" Click="RemoveSchedule_Click"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ===== Tab 2：设置 ===== -->
+            <TabItem Header="设置">
+                <Grid Margin="16,12,16,8">
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="课时设置" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="#333" Margin="0,0,0,10"/>
+
+                        <Border CornerRadius="8" Background="#f8f9fa" Padding="14,12">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,10">
+                                    <TextBlock DockPanel.Dock="Left" Text="每小时消耗课时（支持小数）：" FontSize="13"
+                                               Foreground="#555" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBox DockPanel.Dock="Left" Width="100" Height="30" FontSize="13"
+                                             Text="{Binding HoursPerHourText, UpdateSourceTrigger=LostFocus}"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="例如 1 = 每小时1课时，0.5 = 两小时1课时"/>
+                                </DockPanel>
+
+                                <CheckBox Content="自动划消课时" FontSize="13" Foreground="#333"
+                                          IsChecked="{Binding AutoDeduct}"
+                                          Margin="0,4,0,0"/>
+                                <TextBlock Text="开启后，系统将根据排课时间表，在下课时间到达后，按课程实际时长（下课-上课）× 每小时消耗课时自动划消对应课时；未填写上课/下课时间的排课不参与自动划消。"
+                                           FontSize="12" Foreground="#888" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                <TextBlock Text="划课操作仍可手动执行；自动划消的记录会显示在课时记录中（标记「自动划消」）。"
+                                           FontSize="12" Foreground="#888" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#888" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

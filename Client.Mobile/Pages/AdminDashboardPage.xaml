@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             x:Class="CheckIn.Client.Mobile.Pages.AdminDashboardPage"
+             Title="仪表盘"
+             BackgroundColor="#f5f6fa">
+
+    <RefreshView IsRefreshing="{Binding IsLoading}" Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <VerticalStackLayout Padding="16" Spacing="16">
+
+                <!-- 统计卡片区 -->
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+
+                    <!-- 总设备 -->
+                    <Border Grid.Row="0" Grid.Column="0" BackgroundColor="White"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="总设备" FontSize="12" TextColor="#888888" />
+                            <Label Text="{Binding TotalDevices}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 在线设备 -->
+                    <Border Grid.Row="0" Grid.Column="1" BackgroundColor="#e6f4ea"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="Transparent" StrokeThickness="0">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="在线设备" FontSize="12" TextColor="#34a853" />
+                            <Label Text="{Binding OnlineDevices}" FontSize="28" FontAttributes="Bold" TextColor="#34a853" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 用户总数 -->
+                    <Border Grid.Row="1" Grid.Column="0" BackgroundColor="White"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="用户总数" FontSize="12" TextColor="#888888" />
+                            <Label Text="{Binding TotalUsers}" FontSize="28" FontAttributes="Bold" TextColor="#333333" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 今日签到 -->
+                    <Border Grid.Row="1" Grid.Column="1" BackgroundColor="#e8f0fe"
+                           StrokeShape="RoundRectangle 12" Padding="16" Stroke="Transparent" StrokeThickness="0">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="今日签到" FontSize="12" TextColor="#4285f4" />
+                            <Label Text="{Binding TodayCheckins}" FontSize="28" FontAttributes="Bold" TextColor="#4285f4" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 快捷操作 -->
+                    <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Grid.Column="0" Text="任务管理"
+                                Command="{Binding NavigateToTasksCommand}"
+                                BackgroundColor="#4285f4" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                        <Button Grid.Column="1" Text="生成二维码"
+                                Command="{Binding NavigateToQRCodeCommand}"
+                                BackgroundColor="#34a853" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                        <Button Grid.Column="2" Text="用户管理"
+                                Command="{Binding NavigateToUsersCommand}"
+                                BackgroundColor="#ea4335" TextColor="White"
+                                FontSize="13" CornerRadius="10" HeightRequest="44" />
+                    </Grid>
+                </Grid>
+
+                <!-- 活跃签到任务 -->
+                <Label Text="活跃签到任务" FontSize="16" FontAttributes="Bold" TextColor="#333333" Margin="0,8,0,0" />
+                <CollectionView ItemsSource="{Binding ActiveTaskList}"
+                                HeightRequest="200">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无活跃任务" TextColor="#888888"
+                               HorizontalOptions="Center" Margin="0,20" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                   Padding="14" Stroke="#e8e8e8" StrokeThickness="1"
+                                   Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                    <Label Text="{Binding Subject}" FontSize="15" FontAttributes="Bold"
+                                           TextColor="#333333" Grid.Row="0" Grid.Column="0" />
+                                    <Label Text="{Binding ProgressText}" FontSize="14"
+                                           TextColor="#4285f4" FontAttributes="Bold"
+                                           Grid.Row="0" Grid.Column="1" />
+                                    <Label Text="{Binding Classroom}" FontSize="12" TextColor="#888888"
+                                           Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 设备列表 -->
+                <Label Text="设备列表" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
+                <CollectionView ItemsSource="{Binding Devices}"
+                                SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无设备" TextColor="#888888"
+                               HorizontalOptions="Center" Margin="0,20" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:DeviceInfo">
+                            <SwipeView Margin="0,0,0,6">
+                                <SwipeView.LeftItems>
+                                    <SwipeItems>
+                                        <SwipeItem Text="创建任务" BackgroundColor="#34a853"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CreateTaskForDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="删任务" BackgroundColor="#ea4335"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteTaskForDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                    </SwipeItems>
+                                </SwipeView.LeftItems>
+                                <SwipeView.RightItems>
+                                    <SwipeItems>
+                                        <SwipeItem Text="查看任务" BackgroundColor="#4285f4"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewDeviceQRCodeCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="重命名" BackgroundColor="#fbbc04"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RenameDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                        <SwipeItem Text="删除" BackgroundColor="#ea4335"
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteDeviceCommand}"
+                                                   CommandParameter="{Binding .}" />
+                                    </SwipeItems>
+                                </SwipeView.RightItems>
+
+                                <Border BackgroundColor="White" StrokeShape="RoundRectangle 10"
+                                        Padding="12" Stroke="#e8e8e8" StrokeThickness="1">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeviceTappedCommand}"
+                                            CommandParameter="{Binding .}" />
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10"
+                                                 Fill="{Binding StatusColor}" VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                            <Label Text="{Binding Name}" FontSize="14" TextColor="#333333" LineBreakMode="TailTruncation" />
+                                            <Label Text="{Binding StatusText}" FontSize="11" TextColor="{Binding StatusColor}" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End">
+                                            <Label Text="{Binding TaskCount, StringFormat='{0} 个任务'}"
+                                                   FontSize="12" TextColor="#888888" />
+                                            <Label Text="‹ 滑动操作" FontSize="10" TextColor="#aaaaaa" HorizontalOptions="End" Margin="0,2,0,0" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </SwipeView>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+
+</ContentPage>

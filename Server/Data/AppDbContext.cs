@@ -15,7 +15,7 @@ public class MachineEntity
     public string PublicKey { get; set; } = string.Empty;
     /// <summary>最后在线时间（ISO 8601 格式）</summary>
     public string? LastSeen { get; set; }
-    /// <summary>客户端配置 JSON（学校、课程等）</summary>
+    /// <summary>客户端配置 JSON（学校、课程、待推送任务等）</summary>
     public string Config { get; set; } = "{}";
 }
 
@@ -54,6 +54,8 @@ public class SignInTaskEntity
     public string Classroom { get; set; } = string.Empty;
     /// <summary>科目名称</summary>
     public string Subject { get; set; } = string.Empty;
+    /// <summary>任务显示名称（可被管理员修改）</summary>
+    public string TaskName { get; set; } = string.Empty;
     /// <summary>学生名单 JSON 数组（从 CSV 导入的学生姓名列表）</summary>
     public string StudentList { get; set; } = "[]";
     /// <summary>签到记录 JSON 数组（格式：[{name, time}]）</summary>
@@ -65,7 +67,80 @@ public class SignInTaskEntity
 }
 
 /// <summary>
-/// 应用程序数据库上下文，使用 SQLite 存储设备信息和打卡记录
+/// 用户实体：存储 Web 管理面板的用户账号信息
+/// 角色体系：admin（管理员）、teacher（普通教师）、student（学生）、parent（家长）
+/// 兼容旧角色：operator 映射为 teacher，viewer 映射为 student
+/// </summary>
+public class UserEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>用户名（唯一）</summary>
+    public string Username { get; set; } = string.Empty;
+    /// <summary>密码哈希（加盐 SHA256）</summary>
+    public string PasswordHash { get; set; } = string.Empty;
+    /// <summary>角色：admin / teacher / student / parent（兼容 operator/viewer）</summary>
+    public string Role { get; set; } = "student";
+    /// <summary>显示名称</summary>
+    public string DisplayName { get; set; } = string.Empty;
+    /// <summary>创建时间（ISO 8601 格式）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+    /// <summary>是否启用</summary>
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// 设备分配实体：管理员将设备分配给教师，可精细到任务级别
+/// TaskId 为空表示分配该设备的所有任务
+/// </summary>
+public class DeviceAssignmentEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>被分配的教师用户 ID</summary>
+    public int UserId { get; set; }
+    /// <summary>设备 UUID</summary>
+    public string MachineUuid { get; set; } = string.Empty;
+    /// <summary>任务 ID（可选，为空则该设备所有任务可见）</summary>
+    public string? TaskId { get; set; }
+    /// <summary>分配者用户名</summary>
+    public string AssignedBy { get; set; } = string.Empty;
+    /// <summary>创建时间</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+}
+
+/// <summary>
+/// 呼叫实体：教师通过集控平台向大屏设备发送的即时通知
+/// 三种类型：prenotice（待下课时段通知）/ emergency（上课应急通知）/ summon（下课传唤）
+/// </summary>
+public class CallEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>呼叫类型：prenotice / emergency / summon</summary>
+    public string Type { get; set; } = "prenotice";
+    /// <summary>目标设备 UUID</summary>
+    public string MachineUuid { get; set; } = string.Empty;
+    /// <summary>标题</summary>
+    public string Title { get; set; } = string.Empty;
+    /// <summary>内容</summary>
+    public string Message { get; set; } = string.Empty;
+    /// <summary>提前通知分钟数（仅 prenotice 类型；0 表示当前下课即提醒）</summary>
+    public int MinutesBefore { get; set; }
+    /// <summary>传唤名单（仅 summon 类型，换行或逗号分隔）</summary>
+    public string StudentNames { get; set; } = string.Empty;
+    /// <summary>发送者（教师用户名）</summary>
+    public string Sender { get; set; } = string.Empty;
+    /// <summary>创建时间（ISO 8601）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+    /// <summary>状态：pending / acknowledged / expired</summary>
+    public string Status { get; set; } = "pending";
+    /// <summary>过期时间（ISO 8601），默认 2 小时后自动过期</summary>
+    public string ExpiresAt { get; set; } = DateTime.Now.AddHours(2).ToString("O");
+}
+
+/// <summary>
+/// 应用程序数据库上下文，使用 SQLite 存储设备信息、打卡记录和用户信息
 /// </summary>
 public class AppDbContext : DbContext
 {
@@ -77,6 +152,12 @@ public class AppDbContext : DbContext
     public DbSet<AttendanceEntity> AttendanceRecords => Set<AttendanceEntity>();
     /// <summary>签到任务表</summary>
     public DbSet<SignInTaskEntity> SignInTasks => Set<SignInTaskEntity>();
+    /// <summary>用户表</summary>
+    public DbSet<UserEntity> Users => Set<UserEntity>();
+    /// <summary>设备分配表</summary>
+    public DbSet<DeviceAssignmentEntity> DeviceAssignments => Set<DeviceAssignmentEntity>();
+    /// <summary>呼叫表</summary>
+    public DbSet<CallEntity> Calls => Set<CallEntity>();
 
     /// <summary>
     /// 配置实体映射：设置主键、字段长度限制和索引
@@ -106,8 +187,39 @@ public class AppDbContext : DbContext
             e.HasKey(s => s.Id);
             e.Property(s => s.ShortCode).HasMaxLength(16);
             e.Property(s => s.MachineUuid).HasMaxLength(64);
+            e.Property(s => s.TaskName).HasMaxLength(128);
             e.HasIndex(s => s.ShortCode).IsUnique();              // 短链码唯一索引
             e.HasIndex(s => s.MachineUuid);                       // 按设备查询索引
+        });
+
+        // 用户实体配置
+        modelBuilder.Entity<UserEntity>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.Property(u => u.Username).HasMaxLength(64);
+            e.Property(u => u.PasswordHash).HasMaxLength(128);
+            e.HasIndex(u => u.Username).IsUnique();               // 用户名唯一索引
+        });
+
+        // 设备分配实体配置
+        modelBuilder.Entity<DeviceAssignmentEntity>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.MachineUuid).HasMaxLength(64);
+            e.Property(d => d.TaskId).HasMaxLength(64);
+            e.Property(d => d.AssignedBy).HasMaxLength(64);
+            e.HasIndex(d => d.UserId);
+            e.HasIndex(d => new { d.UserId, d.MachineUuid });
+        });
+
+        // 呼叫实体配置：设备+状态复合索引，优化设备拉取待处理呼叫
+        modelBuilder.Entity<CallEntity>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.MachineUuid).HasMaxLength(64);
+            e.Property(c => c.Type).HasMaxLength(16);
+            e.Property(c => c.Status).HasMaxLength(16);
+            e.HasIndex(c => new { c.MachineUuid, c.Status });
         });
     }
 }

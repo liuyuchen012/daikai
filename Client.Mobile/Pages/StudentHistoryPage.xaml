@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.StudentHistoryPage"
+             Title="签到记录"
+             BackgroundColor="#f5f6fa">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="16" RowSpacing="16">
+
+        <!-- 用户信息 -->
+        <Border Grid.Row="0" BackgroundColor="White" StrokeShape="RoundRectangle 12"
+               Padding="16" Stroke="#e8e8e8" StrokeThickness="1">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                <Border Grid.Column="0" BackgroundColor="#4285f4" StrokeShape="RoundRectangle 24"
+                       WidthRequest="48" HeightRequest="48" Padding="0"
+                       Stroke="Transparent" StrokeThickness="0">
+                    <Label Text="👤" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                    <Label x:Name="lblUsername" Text="" FontSize="17" FontAttributes="Bold" TextColor="#333333" />
+                    <Label x:Name="lblRole" Text="" FontSize="12" TextColor="#888888" />
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+
+        <!-- 统计（管理员/教师显示任务数和签到数，学生显示签到次数） -->
+        <Border Grid.Row="1" BackgroundColor="#e8f0fe" StrokeShape="RoundRectangle 10"
+               Padding="12" Stroke="Transparent" StrokeThickness="0"
+               x:Name="statsBorder">
+            <HorizontalStackLayout Spacing="4" HorizontalOptions="Center">
+                <Label x:Name="lblStatsLabel" Text="总签到次数：" FontSize="14" TextColor="#4285f4" />
+                <Label x:Name="lblTotal" Text="0" FontSize="18" FontAttributes="Bold" TextColor="#4285f4" />
+                <Label x:Name="lblStatsExtra" Text="" FontSize="14" TextColor="#4285f4" />
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- 签到历史列表 -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout x:Name="historyStack" Spacing="6" />
+        </ScrollView>
+
+        <!-- 退出按钮 -->
+        <Button Grid.Row="3" Text="退出登录"
+                Clicked="OnLogoutClicked"
+                BackgroundColor="#ea4335" TextColor="White"
+                CornerRadius="12" HeightRequest="48"
+                FontSize="15" Margin="0,8,0,0" />
+
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.LoginPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#f0f4f8">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="32" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="400">
+
+            <!-- Logo / Title -->
+            <VerticalStackLayout Spacing="4" HorizontalOptions="Center" Margin="0,0,0,20">
+                <Label Text="AgoraIn"
+                       FontSize="32" FontAttributes="Bold"
+                       TextColor="#4285f4"
+                       HorizontalOptions="Center" />
+                <Label Text="集控打卡平台"
+                       FontSize="14" TextColor="#888888"
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <!-- Server URL -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="服务器地址" FontSize="13" TextColor="#555555" />
+                <Entry Text="{Binding ServerUrl}"
+                       Placeholder="http://192.168.1.100:5250"
+                       Keyboard="Url"
+                       ClearButtonVisibility="WhileEditing"
+                       FontSize="15" />
+            </VerticalStackLayout>
+
+            <!-- Username -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="用户名" FontSize="13" TextColor="#555555" />
+                <Entry Text="{Binding Username}"
+                       Placeholder="请输入用户名"
+                       Keyboard="Default"
+                       FontSize="15" />
+            </VerticalStackLayout>
+
+            <!-- Password -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="密码" FontSize="13" TextColor="#555555" />
+                <Entry Text="{Binding Password}"
+                       Placeholder="请输入密码"
+                       IsPassword="True"
+                       FontSize="15" />
+            </VerticalStackLayout>
+
+            <!-- Error Message -->
+            <Border BackgroundColor="#fce8e6" Stroke="Transparent"
+                    StrokeShape="RoundRectangle 8" Padding="12"
+                    IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}" TextColor="#c5221f" FontSize="13" />
+            </Border>
+
+            <!-- Login Button -->
+            <Button x:Name="btnLogin" Text="登 录"
+                    Clicked="OnLoginClicked"
+                    BackgroundColor="#4285f4" TextColor="White"
+                    FontSize="17" FontAttributes="Bold"
+                    HeightRequest="52" CornerRadius="12" />
+
+            <!-- Loading -->
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                               IsVisible="{Binding IsLoading}"
+                               Color="#4285f4"
+                               HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             x:Class="CheckIn.Client.Mobile.Pages.AdminTasksPage"
+             Title="任务管理"
+             BackgroundColor="#f5f6fa">
+
+    <RefreshView IsRefreshing="{Binding IsLoading}" Command="{Binding RefreshCommand}">
+        <CollectionView ItemsSource="{Binding Tasks}"
+                         SelectionMode="None">
+            <CollectionView.Header>
+                <VerticalStackLayout Padding="16,12">
+                    <Label Text="签到任务列表" FontSize="16" FontAttributes="Bold" TextColor="#333333" />
+                </VerticalStackLayout>
+            </CollectionView.Header>
+            <CollectionView.EmptyView>
+                <VerticalStackLayout HorizontalOptions="Center" Margin="0,40">
+                    <Label Text="暂无签到任务" FontSize="16" TextColor="#888888" HorizontalOptions="Center" />
+                    <Label Text="请在【二维码】页面创建新任务" FontSize="13" TextColor="#aaaaaa" HorizontalOptions="Center" Margin="0,8,0,0" />
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="viewmodels:TaskItem">
+                    <SwipeView Margin="16,4">
+                        <SwipeView.RightItems>
+                            <SwipeItems>
+                                <SwipeItem Text="二维码" BackgroundColor="#4285f4"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewQRCodeCommand}"
+                                           CommandParameter="{Binding .}" />
+                                <SwipeItem Text="重命名" BackgroundColor="#fbbc04"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RenameTaskCommand}"
+                                           CommandParameter="{Binding .}" />
+                                <SwipeItem Text="关闭" BackgroundColor="#9c27b0"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CloseTaskCommand}"
+                                           CommandParameter="{Binding Id}" />
+                                <SwipeItem Text="删除" BackgroundColor="#ea4335"
+                                           Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteTaskCommand}"
+                                           CommandParameter="{Binding Id}" />
+                            </SwipeItems>
+                        </SwipeView.RightItems>
+
+                        <Border BackgroundColor="White" StrokeShape="RoundRectangle 12"
+                                Padding="14" Stroke="#e8e8e8" StrokeThickness="1"
+                                HeightRequest="90">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewAttendanceCommand}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                                <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="8">
+                                    <Label Text="{Binding Subject}" FontSize="16" FontAttributes="Bold" TextColor="#333333" VerticalOptions="Center" />
+                                    <Border BackgroundColor="{Binding StatusColor}" StrokeShape="RoundRectangle 4"
+                                            Padding="6,2" Stroke="Transparent" StrokeThickness="0"
+                                            VerticalOptions="Center">
+                                        <Label Text="{Binding StatusText}" FontSize="10" TextColor="White" />
+                                    </Border>
+                                </HorizontalStackLayout>
+                                <Label Text="{Binding ProgressText}" FontSize="15" FontAttributes="Bold"
+                                       TextColor="#4285f4" Grid.Row="0" Grid.Column="1"
+                                       VerticalOptions="Center" HorizontalOptions="End" />
+
+                                <Label Text="{Binding Classroom}" FontSize="12" TextColor="#666666"
+                                       Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" />
+                                <Label Text="{Binding CreatedAt, StringFormat='创建于 {0}'}" FontSize="11"
+                                       TextColor="#aaaaaa" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" />
+                            </Grid>
+                        </Border>
+                    </SwipeView>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </RefreshView>
+
+</ContentPage>

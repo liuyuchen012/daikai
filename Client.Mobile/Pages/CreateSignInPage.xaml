@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CheckIn.Client.Mobile.Pages.CreateSignInPage"
+             Title="Create Sign-In Task"
+             Shell.NavBarIsVisible="True">
+
+    <Grid RowDefinitions="*,Auto" Padding="0">
+
+        <ScrollView Grid.Row="0" Padding="20,16">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- Page Header -->
+                <Label Text="Create Sign-In Task"
+                       Style="{StaticResource PageTitle}"
+                       Margin="0,0,0,8" />
+                <Label Text="Set up a remote sign-in for students to check in via web link"
+                       Style="{StaticResource BodyText}"
+                       Margin="0,0,0,16" />
+
+                <!-- Sign-In Password -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Sign-In Password *" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Entry x:Name="PasswordEntry"
+                           Placeholder="Enter sign-in password"
+                           IsPassword="True"
+                           Style="{StaticResource FormEntry}" />
+                </VerticalStackLayout>
+
+                <!-- Confirm Password -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Confirm Password *" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Entry x:Name="ConfirmPasswordEntry"
+                           Placeholder="Re-enter password"
+                           IsPassword="True"
+                           Style="{StaticResource FormEntry}" />
+                </VerticalStackLayout>
+
+                <!-- Classroom -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Classroom *" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Entry x:Name="ClassroomEntry"
+                           Placeholder="e.g. Room 301"
+                           Style="{StaticResource FormEntry}" />
+                </VerticalStackLayout>
+
+                <!-- Subject -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Subject *" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Entry x:Name="SubjectEntry"
+                           Placeholder="e.g. Math"
+                           Text="Math"
+                           Style="{StaticResource FormEntry}" />
+                </VerticalStackLayout>
+
+                <!-- Students -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Students" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Label Text="Enter one student name per line" FontSize="12" TextColor="{StaticResource TextTertiary}" />
+                    <Editor x:Name="StudentsEditor"
+                            Placeholder="Student A&#10;Student B&#10;Student C&#10;..."
+                            Style="{StaticResource FormEditor}"
+                            MinimumHeightRequest="150" />
+                </VerticalStackLayout>
+
+                <!-- Loading indicator -->
+                <ActivityIndicator x:Name="LoadingIndicator"
+                                   IsVisible="False"
+                                   IsRunning="False"
+                                   HorizontalOptions="Center"
+                                   HeightRequest="40" />
+                <Label x:Name="StatusLabel"
+                       IsVisible="False"
+                       FontSize="13"
+                       TextColor="{StaticResource Primary}"
+                       HorizontalOptions="Center" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Fixed Submit Button -->
+        <Border Grid.Row="1" BackgroundColor="{StaticResource Surface}"
+               StrokeShape="RoundRectangle 0" Padding="20,12"
+               Stroke="{StaticResource Divider}" StrokeThickness="1">
+            <Button x:Name="SubmitButton"
+                    Text="Create Sign-In"
+                    Style="{StaticResource PrimaryButton}"
+                    Clicked="OnCreateClicked"
+                    HorizontalOptions="Fill" />
+        </Border>
+
+    </Grid>
+
+</ContentPage>

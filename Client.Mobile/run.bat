@@ -1,0 +1,1 @@
+dotnet run -f net10.0-android
