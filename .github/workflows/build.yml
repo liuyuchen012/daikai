@@ -93,13 +93,13 @@ jobs:
         run: dotnet workload install maui-ios maui-maccatalyst
 
       - name: Build Client.Mobile (iOS device, unsigned)
-        run: dotnet build Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 -p:EnableCodeSigning=false
+        run: dotnet build Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-ios -c Release -p:TargetFrameworks=net10.0-ios -p:RuntimeIdentifier=ios-arm64 -p:EnableCodeSigning=false
 
       - name: Publish Client.Mobile (macOS Catalyst arm64, unsigned)
-        run: dotnet publish Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-maccatalyst -c Release -p:RuntimeIdentifier=maccatalyst-arm64 -p:EnableCodeSigning=false -o publish/Mobile.macOS-arm64
+        run: dotnet publish Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-maccatalyst -c Release -p:TargetFrameworks=net10.0-maccatalyst -p:RuntimeIdentifier=maccatalyst-arm64 -p:EnableCodeSigning=false -o publish/Mobile.macOS-arm64
 
       - name: Publish Client.Mobile (macOS Catalyst x64, unsigned)
-        run: dotnet publish Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-maccatalyst -c Release -p:RuntimeIdentifier=maccatalyst-x64 -p:EnableCodeSigning=false -o publish/Mobile.macOS-x64
+        run: dotnet publish Client.Mobile/AgoraIn.Client.Mobile.csproj -f net10.0-maccatalyst -c Release -p:TargetFrameworks=net10.0-maccatalyst -p:RuntimeIdentifier=maccatalyst-x64 -p:EnableCodeSigning=false -o publish/Mobile.macOS-x64
 
       - name: Upload Server osx-x64
         uses: actions/upload-artifact@v4
@@ -164,7 +164,7 @@ jobs:
       - name: Publish Android APK/AAB
         shell: bash
         run: |
-          ARGS="-c Release -f net10.0-android -p:AndroidPackageFormats=apk;aab -o publish/Mobile.Android"
+          ARGS="-c Release -f net10.0-android -p:AndroidPackageFormats=apk%3Baab -o publish/Mobile.Android"
           if [ "$KEYSTORE_READY" = "true" ]; then
             ARGS="$ARGS -p:AndroidKeyStore=true -p:AndroidSigningKeyStore=$RUNNER_TEMP/android.keystore -p:AndroidSigningKeyAlias=${{ secrets.ANDROID_KEY_ALIAS }} -p:AndroidSigningKeyPass=${{ secrets.ANDROID_KEY_PASSWORD }} -p:AndroidSigningStorePass=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
           fi
