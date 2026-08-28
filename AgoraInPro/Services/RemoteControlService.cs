@@ -107,6 +107,26 @@ public class RemoteControlService
         await SendAsync(req);
     }
 
+    // ============ 呼叫 ============
+
+    /// <summary>
+    /// 向指定设备发送呼叫（prenotice 待下课时段通知 / emergency 上课应急通知 / summon 下课传唤）
+    /// </summary>
+    public async Task<int> SendCallAsync(string machineUuid, string type, string title, string message, int minutesBefore = 0, string? studentNames = null)
+    {
+        using var req = MakeRequest(HttpMethod.Post, "/api/mobile/calls", new
+        {
+            machine_uuid = machineUuid,
+            type,
+            title,
+            message,
+            minutes_before = minutesBefore,
+            student_names = studentNames ?? ""
+        });
+        var json = await SendAsync(req);
+        return json?.TryGetProperty("id", out var id) == true ? id.GetInt32() : 0;
+    }
+
     // ============ 任务 ============
 
     public async Task<List<RemoteTask>> GetTasksAsync()

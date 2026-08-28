@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <OutputType>Library</OutputType>
+    <RootNamespace>AgoraIn.ClassIslandPlugin</RootNamespace>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ClassIslandPluginSdkVersion>2.0.0.*</ClassIslandPluginSdkVersion>
+    <CreateCipx>true</CreateCipx>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClassIsland.PluginSdk" Version="$(ClassIslandPluginSdkVersion)">
+      <ExcludeAssets>runtime; native</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- SDK targets 末尾导入时会重置 PowershellBinaryName=pwsh，这里在打包前覆盖为系统自带的 Windows PowerShell -->
+  <Target Name="OverrideCipxPowershell" BeforeTargets="CreateCipx">
+    <PropertyGroup>
+      <PowershellBinaryName>powershell</PowershellBinaryName>
+    </PropertyGroup>
+  </Target>
+
+  <ItemGroup>
+    <None Update="manifest.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

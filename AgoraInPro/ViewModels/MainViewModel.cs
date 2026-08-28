@@ -230,6 +230,8 @@ public class MainViewModel : INotifyPropertyChanged
         tab.PendingTasksReceived += HandlePendingTasks;
         // 订阅集控平台新版本通知（管理员弹窗）
         tab.ServerUpdateAvailable += HandleServerUpdate;
+        // 订阅集控平台呼叫通知（待下课 / 应急 / 传唤）
+        tab.CallReceived += HandleCallReceived;
 
         // 如果是签到任务，重新初始化服务器连接以使用正确的 TaskId
         if (isSignIn && !string.IsNullOrEmpty(signInTaskId))
@@ -280,6 +282,8 @@ public class MainViewModel : INotifyPropertyChanged
             tab.PendingTasksReceived += HandlePendingTasks;
             // 订阅集控平台新版本通知（管理员弹窗）
             tab.ServerUpdateAvailable += HandleServerUpdate;
+            // 订阅集控平台呼叫通知（待下课 / 应急 / 传唤）
+            tab.CallReceived += HandleCallReceived;
 
             // 初始化服务器连接（使用后台模式）
             if (!string.IsNullOrEmpty(Config.ServerIp))
@@ -298,6 +302,14 @@ public class MainViewModel : INotifyPropertyChanged
     private void HandleServerUpdate(string latestVersion, string downloadUrl)
     {
         ModernDialog.ServerUpdateAvailable(latestVersion, downloadUrl);
+    }
+
+    /// <summary>
+    /// 处理集控平台下发的呼叫：大屏端醒目弹窗显示（待下课 / 应急 / 传唤）
+    /// </summary>
+    private void HandleCallReceived(CheckIn.Client.Models.CallMessage call)
+    {
+        ModernDialog.ShowCall(call);
     }
 
     /// <summary>

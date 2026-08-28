@@ -30,6 +30,10 @@
                       Icon="{OnPlatform Default='qrcode.png'}"
                       ContentTemplate="{DataTemplate pages:QRCodeGeneratePage}"
                       Route="qrcode" />
+        <ShellContent Title="控制"
+                      Icon="{OnPlatform Default='control.png'}"
+                      ContentTemplate="{DataTemplate pages:ControlModePage}"
+                      Route="control" />
         <ShellContent Title="用户"
                       Icon="{OnPlatform Default='users.png'}"
                       ContentTemplate="{DataTemplate pages:AdminUsersPage}"

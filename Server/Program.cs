@@ -268,6 +268,14 @@ async Task EnsureSchemaAsync(AppDbContext db)
     await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username")""");
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId" ON "DeviceAssignments" ("UserId")""");
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_DeviceAssignments_UserId_MachineUuid" ON "DeviceAssignments" ("UserId", "MachineUuid")""");
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "Calls" (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "Type" TEXT, "MachineUuid" TEXT, "Title" TEXT, "Message" TEXT,
+            "MinutesBefore" INTEGER, "StudentNames" TEXT, "Sender" TEXT,
+            "CreatedAt" TEXT, "Status" TEXT, "ExpiresAt" TEXT)
+        """);
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_Calls_MachineUuid_Status" ON "Calls" ("MachineUuid", "Status")""");
 
     // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
     // 先通过 PRAGMA 检查列是否存在，避免对已存在的列重复 ALTER 产生 fail 日志
@@ -2659,6 +2667,88 @@ app.MapGet("/api/mobile/devices", async (AppDbContext db, HttpContext ctx) =>
 });
 
 /// <summary>
+/// POST /api/mobile/calls - 教师发送呼叫（JWT 鉴权）
+/// 三种类型：prenotice（待下课时段通知）/ emergency（上课应急通知）/ summon（下课传唤）
+/// </summary>
+app.MapPost("/api/mobile/calls", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var machineUuid = body.GetProperty("machine_uuid").GetString() ?? "";
+    if (string.IsNullOrEmpty(machineUuid))
+        return Results.Json(new { error = "machine_uuid 不能为空" }, statusCode: 400);
+
+    var machine = await db.Machines.FindAsync(machineUuid);
+    if (machine == null)
+        return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+
+    var type = body.GetProperty("type").GetString() ?? "prenotice";
+    if (type is not ("prenotice" or "emergency" or "summon"))
+        return Results.Json(new { error = "type 必须为 prenotice / emergency / summon" }, statusCode: 400);
+
+    var title = body.GetProperty("title").GetString() ?? "";
+    if (string.IsNullOrWhiteSpace(title))
+        return Results.Json(new { error = "标题不能为空" }, statusCode: 400);
+
+    var minutes = body.TryGetProperty("minutes_before", out var mb) ? mb.GetInt32() : 0;
+    var call = new CallEntity
+    {
+        Type = type,
+        MachineUuid = machineUuid,
+        Title = title,
+        Message = body.GetProperty("message").GetString() ?? "",
+        MinutesBefore = Math.Max(0, minutes),
+        StudentNames = body.TryGetProperty("student_names", out var sn) ? sn.GetString() ?? "" : "",
+        Sender = username,
+        Status = "pending",
+        CreatedAt = DateTime.Now.ToString("O"),
+        ExpiresAt = DateTime.Now.AddHours(2).ToString("O")
+    };
+    db.Calls.Add(call);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { id = call.Id, status = "ok" });
+});
+
+/// <summary>
+/// GET /api/mobile/calls - 教师查询呼叫记录（JWT 鉴权），管理员可见全部、教师仅可见自己发送的
+/// </summary>
+app.MapGet("/api/mobile/calls", async (AppDbContext db, HttpContext ctx) =>
+{
+    var (username, role, tokenError) = ParseBearerToken(ctx);
+    if (tokenError != null)
+        return Results.Json(new { error = tokenError }, statusCode: 401);
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var query = db.Calls.AsQueryable();
+    if (role == "teacher")
+        query = query.Where(c => c.Sender == username);
+
+    var calls = await query.OrderByDescending(c => c.Id).Take(100).ToListAsync();
+    return Results.Json(new
+    {
+        calls = calls.Select(c => new
+        {
+            id = c.Id,
+            type = c.Type,
+            machine_uuid = c.MachineUuid,
+            title = c.Title,
+            message = c.Message,
+            minutes_before = c.MinutesBefore,
+            student_names = c.StudentNames,
+            sender = c.Sender,
+            created_at = c.CreatedAt,
+            status = c.Status
+        })
+    });
+});
+
+/// <summary>
 /// DELETE /api/mobile/devices/{uuid} - 移动端删除设备（级联删除任务和打卡数据）
 /// 仅管理员可操作
 /// </summary>
@@ -3105,6 +3195,72 @@ app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, Htt
         await db.SaveChangesAsync();
     }
 
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/calls_pull - 设备拉取自己的待处理呼叫（CheckPwd 鉴权）
+/// 返回该设备所有 pending 状态的呼叫，已过期的一并标记为 expired
+/// </summary>
+app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
+{
+    if (!CheckPwd(body, serverPassword, ctx))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var uuid = body.GetProperty("uuid").GetString() ?? "";
+    if (string.IsNullOrEmpty(uuid)) return Results.Json(new { error = "uuid required" }, statusCode: 400);
+
+    var now = DateTime.Now;
+    // 先清理已过期的 pending 呼叫
+    var expired = await db.Calls
+        .Where(c => c.MachineUuid == uuid && c.Status == "pending")
+        .ToListAsync();
+    foreach (var e in expired)
+    {
+        if (DateTime.TryParse(e.ExpiresAt, out var exp) && exp < now)
+            e.Status = "expired";
+    }
+    if (expired.Any(e => e.Status == "expired"))
+        await db.SaveChangesAsync();
+
+    var calls = await db.Calls
+        .Where(c => c.MachineUuid == uuid && c.Status == "pending")
+        .OrderBy(c => c.Id)
+        .ToListAsync();
+
+    return Results.Json(new
+    {
+        calls = calls.Select(c => new
+        {
+            id = c.Id,
+            type = c.Type,
+            title = c.Title,
+            message = c.Message,
+            minutes_before = c.MinutesBefore,
+            student_names = c.StudentNames,
+            sender = c.Sender,
+            created_at = c.CreatedAt
+        })
+    });
+});
+
+/// <summary>
+/// POST /api/calls_ack - 设备确认已收到并显示呼叫（CheckPwd 鉴权）
+/// </summary>
+app.MapPost("/api/calls_ack", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
+{
+    if (!CheckPwd(body, serverPassword, ctx))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var id = body.GetProperty("id").GetInt32();
+    var call = await db.Calls.FindAsync(id);
+    if (call == null) return Results.Json(new { error = "not found" }, statusCode: 404);
+
+    if (call.Status == "pending")
+    {
+        call.Status = "acknowledged";
+        await db.SaveChangesAsync();
+    }
     return Results.Json(new { status = "ok" });
 });
 

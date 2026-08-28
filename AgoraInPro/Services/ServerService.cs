@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using CheckIn.Client.Models;
 using CheckIn.Shared.Models;
 
 namespace CheckIn.Client.Services;
@@ -330,5 +331,51 @@ public class ServerService : IDisposable
             return (hasUpdate, latestVersion, downloadUrl);
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// 拉取集控平台发给本设备的待处理呼叫（待下课通知 / 上课应急 / 下课传唤）
+    /// </summary>
+    public async Task<List<CallMessage>> PullCallsAsync()
+    {
+        try
+        {
+            using var req = MakeRequest(HttpMethod.Post, $"{_baseUrl}/api/calls_pull", new { uuid = _clientUuid, password = _password });
+            var res = await _http.SendAsync(req);
+            if (!res.IsSuccessStatusCode) return new();
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            var calls = new List<CallMessage>();
+            foreach (var item in json.GetProperty("calls").EnumerateArray())
+                calls.Add(new CallMessage
+                {
+                    Id = item.GetProperty("id").GetInt32(),
+                    Type = item.GetProperty("type").GetString() ?? "prenotice",
+                    Title = item.GetProperty("title").GetString() ?? "",
+                    Message = item.GetProperty("message").GetString() ?? "",
+                    MinutesBefore = item.TryGetProperty("minutes_before", out var mb) ? mb.GetInt32() : 0,
+                    StudentNames = item.TryGetProperty("student_names", out var sn) ? sn.GetString() ?? "" : "",
+                    Sender = item.TryGetProperty("sender", out var se) ? se.GetString() ?? "" : "",
+                });
+            return calls;
+        }
+        catch { return new(); }
+    }
+
+    /// <summary>
+    /// 确认已收到并显示呼叫，防止重复拉取
+    /// </summary>
+    public async Task AckCallAsync(int id)
+    {
+        try
+        {
+            using var req = MakeRequest(HttpMethod.Post, $"{_baseUrl}/api/calls_ack", new { id, uuid = _clientUuid, password = _password });
+            var res = await _http.SendAsync(req);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+                if (json.TryGetProperty("status", out var st) && st.GetString() == "ok") { /* acked */ }
+            }
+        }
+        catch { /* 确认失败下次轮询重试 */ }
     }
 }

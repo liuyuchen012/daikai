@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:CheckIn.Client.Mobile.ViewModels"
+             x:Class="CheckIn.Client.Mobile.Pages.SendCallPage"
+             Title="发送呼叫"
+             Shell.PresentationMode="ModalAnimated"
+             BackgroundColor="White">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="{Binding TargetNames, StringFormat='向「{0}」发送呼叫'}"
+                   FontSize="15" FontAttributes="Bold" TextColor="#333333" LineBreakMode="WordWrap" />
+
+            <Label Text="呼叫类型" FontSize="13" TextColor="#333333" />
+            <Picker Title="选择呼叫类型"
+                    ItemsSource="{x:Static viewmodels:SendCallViewModel.CallTypeNames}"
+                    SelectedIndex="{Binding SelectedTypeIndex, Mode=TwoWay}"
+                    FontSize="14" />
+
+            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsPrenotice}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                    <Label Grid.Column="0" Text="提前" VerticalOptions="Center" FontSize="13" TextColor="#333333" />
+                    <Entry Grid.Column="1" Text="{Binding MinutesText}" Keyboard="Numeric" FontSize="14" HeightRequest="40" />
+                    <Label Grid.Column="2" Text="分钟提醒（0 = 到下课时间提醒）" VerticalOptions="Center" FontSize="12" TextColor="#888888" />
+                </Grid>
+            </VerticalStackLayout>
+
+            <Label Text="标题" FontSize="13" TextColor="#333333" />
+            <Entry Text="{Binding Title}" Placeholder="请输入标题" FontSize="14" HeightRequest="40" />
+
+            <Label Text="内容" FontSize="13" TextColor="#333333" />
+            <Editor Text="{Binding Message}" Placeholder="请输入呼叫内容" FontSize="14" HeightRequest="100" />
+
+            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsSummon}">
+                <Label Text="传唤学生名单（每行一个姓名，可留空 = 全体）" FontSize="12" TextColor="#888888" />
+                <Editor Text="{Binding StudentsText}" FontSize="14" HeightRequest="80" />
+            </VerticalStackLayout>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,12,0,0">
+                <Button Grid.Column="0" Text="取消" Command="{Binding CloseCommand}"
+                        BackgroundColor="#e0e0e0" TextColor="#333333" FontSize="15" CornerRadius="10" HeightRequest="44" />
+                <Button Grid.Column="1" Text="发送呼叫" Command="{Binding SendCommand}"
+                        IsEnabled="{Binding CanSend}"
+                        BackgroundColor="#ea4335" TextColor="White" FontSize="15" CornerRadius="10" HeightRequest="44" />
+            </Grid>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

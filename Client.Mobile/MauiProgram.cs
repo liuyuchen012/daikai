@@ -39,6 +39,8 @@ public static class MauiProgram
         builder.Services.AddTransient<ViewModels.QRCodeGenerateViewModel>();
         builder.Services.AddTransient<ViewModels.StudentScanViewModel>();
         builder.Services.AddTransient<ViewModels.TaskTabViewModel>();
+        builder.Services.AddTransient<ViewModels.ControlModeViewModel>();
+        builder.Services.AddTransient<ViewModels.SendCallViewModel>();
 
         // ===== Pages（Transient） =====
         // 新页面
@@ -50,6 +52,8 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.StudentScanPage>();
         builder.Services.AddTransient<Pages.StudentHistoryPage>();
         builder.Services.AddTransient<Pages.AttendanceDetailPage>();
+        builder.Services.AddTransient<Pages.ControlModePage>();
+        builder.Services.AddTransient<Pages.SendCallPage>();
 
         // 保留旧页面兼容
         builder.Services.AddTransient<Pages.TaskListPage>();

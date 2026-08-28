@@ -83,6 +83,9 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>集控平台自身检测到新版本时触发（用于向管理员弹窗）</summary>
     public event Action<string, string>? ServerUpdateAvailable;
 
+    /// <summary>集控平台下发呼叫时触发（待下课通知 / 上课应急 / 下课传唤）</summary>
+    public event Action<CheckIn.Client.Models.CallMessage>? CallReceived;
+
     /// <summary>学生数据集合（绑定到打卡按钮网格）</summary>
     public ObservableCollection<StudentModel> Students { get; } = new();
     /// <summary>打卡排名集合（绑定到左侧排名列表）</summary>
@@ -426,6 +429,14 @@ public class TaskTabViewModel : INotifyPropertyChanged, IDisposable
                         {
                             _serverUpdateShownVersion = upd.Value.latestVersion;
                             ServerUpdateAvailable?.Invoke(upd.Value.latestVersion, upd.Value.downloadUrl);
+                        }
+
+                        // ④.5 拉取集控平台下发的呼叫（待下课 / 应急 / 传唤），逐条触发事件并确认
+                        var calls = await _server.PullCallsAsync();
+                        foreach (var call in calls)
+                        {
+                            await _server.AckCallAsync(call.Id);
+                            await RunOnUiThreadAsync(() => CallReceived?.Invoke(call));
                         }
                     }
 

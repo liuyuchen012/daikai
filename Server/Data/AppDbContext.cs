@@ -110,6 +110,36 @@ public class DeviceAssignmentEntity
 }
 
 /// <summary>
+/// 呼叫实体：教师通过集控平台向大屏设备发送的即时通知
+/// 三种类型：prenotice（待下课时段通知）/ emergency（上课应急通知）/ summon（下课传唤）
+/// </summary>
+public class CallEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>呼叫类型：prenotice / emergency / summon</summary>
+    public string Type { get; set; } = "prenotice";
+    /// <summary>目标设备 UUID</summary>
+    public string MachineUuid { get; set; } = string.Empty;
+    /// <summary>标题</summary>
+    public string Title { get; set; } = string.Empty;
+    /// <summary>内容</summary>
+    public string Message { get; set; } = string.Empty;
+    /// <summary>提前通知分钟数（仅 prenotice 类型；0 表示当前下课即提醒）</summary>
+    public int MinutesBefore { get; set; }
+    /// <summary>传唤名单（仅 summon 类型，换行或逗号分隔）</summary>
+    public string StudentNames { get; set; } = string.Empty;
+    /// <summary>发送者（教师用户名）</summary>
+    public string Sender { get; set; } = string.Empty;
+    /// <summary>创建时间（ISO 8601）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
+    /// <summary>状态：pending / acknowledged / expired</summary>
+    public string Status { get; set; } = "pending";
+    /// <summary>过期时间（ISO 8601），默认 2 小时后自动过期</summary>
+    public string ExpiresAt { get; set; } = DateTime.Now.AddHours(2).ToString("O");
+}
+
+/// <summary>
 /// 应用程序数据库上下文，使用 SQLite 存储设备信息、打卡记录和用户信息
 /// </summary>
 public class AppDbContext : DbContext
@@ -126,6 +156,8 @@ public class AppDbContext : DbContext
     public DbSet<UserEntity> Users => Set<UserEntity>();
     /// <summary>设备分配表</summary>
     public DbSet<DeviceAssignmentEntity> DeviceAssignments => Set<DeviceAssignmentEntity>();
+    /// <summary>呼叫表</summary>
+    public DbSet<CallEntity> Calls => Set<CallEntity>();
 
     /// <summary>
     /// 配置实体映射：设置主键、字段长度限制和索引
@@ -178,6 +210,16 @@ public class AppDbContext : DbContext
             e.Property(d => d.AssignedBy).HasMaxLength(64);
             e.HasIndex(d => d.UserId);
             e.HasIndex(d => new { d.UserId, d.MachineUuid });
+        });
+
+        // 呼叫实体配置：设备+状态复合索引，优化设备拉取待处理呼叫
+        modelBuilder.Entity<CallEntity>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.MachineUuid).HasMaxLength(64);
+            e.Property(c => c.Type).HasMaxLength(16);
+            e.Property(c => c.Status).HasMaxLength(16);
+            e.HasIndex(c => new { c.MachineUuid, c.Status });
         });
     }
 }

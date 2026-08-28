@@ -257,6 +257,105 @@ public static class ModernDialog
     }
 
     /// <summary>
+    /// 显示集控平台下发的呼叫通知（大屏端醒目弹窗）
+    /// 三种模式配色：待下课=蓝 / 上课应急=红 / 下课传唤=橙，应急模式播放急促警示音
+    /// </summary>
+    public static void ShowCall(CheckIn.Client.Models.CallMessage call)
+    {
+        var (accent, icon, label) = call.Type switch
+        {
+            "emergency" => (Color.FromRgb(0xe5, 0x39, 0x35), "🚨", "上课应急通知"),
+            "summon" => (Color.FromRgb(0xfb, 0x8c, 0x00), "📢", "下课传唤"),
+            _ => (Color.FromRgb(0x42, 0x85, 0xf4), "⏰", "待下课时段通知")
+        };
+        var accentBrush = new SolidColorBrush(accent);
+
+        var win = CreateWindow($"{label} - {call.Title}", 620, 430);
+        // 呼叫为紧急通知，需置顶醒目显示
+        win.Topmost = true;
+
+        var grid = new Grid { Margin = new Thickness(28) };
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        // 顶部：图标 + 类型标签
+        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+        header.Children.Add(new TextBlock { Text = icon, FontSize = 34, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center });
+        header.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 15, FontWeight = FontWeights.Bold,
+            Foreground = accentBrush, VerticalAlignment = VerticalAlignment.Center
+        });
+        grid.Children.Add(header);
+
+        // 标题
+        grid.Children.Add(new TextBlock
+        {
+            Text = call.Title, FontSize = 22, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21)),
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10)
+        });
+        Grid.SetRow(grid.Children[^1], 1);
+
+        // 内容 / 传唤名单 / 发送者
+        var body = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        if (!string.IsNullOrWhiteSpace(call.Message))
+            body.Children.Add(new TextBlock
+            {
+                Text = call.Message, FontSize = 16, TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x42, 0x42, 0x42)),
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+        if (call.Type == "summon" && !string.IsNullOrWhiteSpace(call.StudentNames))
+        {
+            var names = string.Join("、", call.StudentNames.Split(new[] { '\r', '\n', ',' },
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            body.Children.Add(new TextBlock
+            {
+                Text = $"传唤学生：{names}", FontSize = 16, FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap, Foreground = accentBrush
+            });
+        }
+        if (!string.IsNullOrWhiteSpace(call.Sender))
+            body.Children.Add(new TextBlock
+            {
+                Text = $"发送人：{call.Sender}    {DateTime.Now:HH:mm:ss}", FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+        grid.Children.Add(body);
+        Grid.SetRow(grid.Children[^1], 2);
+
+        var okBtn = NewBtn("知道了", accentBrush, new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)));
+        okBtn.Click += (_, _) => win.Close();
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
+        btnPanel.Children.Add(okBtn);
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(btnPanel, 3);
+        grid.Children.Add(btnPanel);
+
+        win.Content = new Border
+        {
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0xe0, 0xe0)),
+            BorderThickness = new Thickness(1),
+            Child = grid
+        };
+        // 提示音：应急用急促警示音，其余用系统提示音
+        if (call.Type == "emergency") System.Media.SystemSounds.Hand.Play();
+        else System.Media.SystemSounds.Asterisk.Play();
+
+        win.ShowDialog();
+    }
+
+    /// <summary>
     /// 创建统一样式的无边框对话框窗口，支持 DWM 圆角
     /// </summary>
     private static Window CreateWindow(string title, int w, int h)
