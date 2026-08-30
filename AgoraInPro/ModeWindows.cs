@@ -15,6 +15,10 @@ public sealed class ConnectedPlatform
     public string Name { get; init; } = "";
     public string Url { get; init; } = "";
     public RemoteControlService Service { get; init; } = null!;
+    /// <summary>登录用户名（用于持久化后自动重连）</summary>
+    public string Username { get; init; } = "";
+    /// <summary>DPAPI 加密后的登录密码（Base64，不落明文）</summary>
+    public string ProtectedPassword { get; init; } = "";
 }
 
 public sealed class AggregatedDevice : INotifyPropertyChanged
