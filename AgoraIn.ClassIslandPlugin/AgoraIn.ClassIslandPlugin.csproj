@@ -8,7 +8,7 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <OutputType>Library</OutputType>
     <RootNamespace>AgoraIn.ClassIslandPlugin</RootNamespace>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <AssemblyVersion>2.1.1.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup>

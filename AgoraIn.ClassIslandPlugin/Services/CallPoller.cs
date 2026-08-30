@@ -36,6 +36,10 @@ public class CallPoller
 
     public void Start()
     {
+        // 幂等：重复调用（如 AppStarted 兜底触发）时先停掉旧定时器，避免双轮询
+        _timer?.Dispose();
+        _timer = null;
+
         if (string.IsNullOrEmpty(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Password) ||
             string.IsNullOrEmpty(_settings.DeviceUuid))
         {

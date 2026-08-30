@@ -33,11 +33,13 @@ public class Plugin : PluginBase
             _poller.Start();
         };
 
-        // 主程序启动完成后开始轮询（AppBase 为 Avalonia 应用封装）
+        // 直接启动轮询，不依赖 AppStarted：在部分 ClassIsland 版本上该事件在插件订阅前已触发，
+        // 导致 Start() 永不执行、呼叫永远收不到（用户反馈"安装后一直不显示"的根因）。
+        // AppStarted 若仍触发，Start 内部会先 Stop 再启动，不会出现双轮询。
+        _poller.Start();
+
         var app = ClassIsland.Core.AppBase.Current;
         if (app != null)
             app.AppStarted += (_, _) => _poller.Start();
-        else
-            _poller.Start();
     }
 }
