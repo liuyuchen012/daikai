@@ -29,6 +29,8 @@ public sealed class AggregatedDevice : INotifyPropertyChanged
     public string Status => Online ? "在线" : "离线";
     public bool Online { get; init; }
     public string LastSeen { get; init; } = "-";
+    /// <summary>客户端版本号（客户端上报，如 v3.2.4）</summary>
+    public string Version { get; init; } = "";
     public RemoteControlService? Service { get; init; }
 
     private bool _isSelected;

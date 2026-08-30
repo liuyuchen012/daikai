@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
@@ -849,22 +850,42 @@ public class MainViewModel : INotifyPropertyChanged
     {
         StatusMessage = "正在检查更新...";
         string? latest = null;
-        var downloadUrl = "https://github.com/liuyuchen012/daikai/releases";
+        string? downloadUrl = null;
 
+        // 1) 优先询问集控服务器（局域网，无需外网）
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Client");
-            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/daikai/releases/latest");
-            if (resp.IsSuccessStatusCode)
+            var server = new ServerService();
+            server.Initialize(Config.ServerIp, Config.ServerPort, Config.ServerPassword);
+            var info = await server.GetClientUpdateAsync();
+            if (info != null)
             {
-                var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-                var tag = json.GetProperty("tag_name").GetString();
-                if (!string.IsNullOrEmpty(tag))
-                    latest = tag!.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+                latest = info.Value.LatestVersion;
+                downloadUrl = info.Value.DownloadUrl;
             }
         }
         catch { }
+
+        // 2) 服务器不通时回退 GitHub 直查
+        if (latest == null)
+        {
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+                http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Client");
+                var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/AgoraIn/releases/latest");
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+                    var tag = json.GetProperty("tag_name").GetString();
+                    if (!string.IsNullOrEmpty(tag))
+                        latest = tag!.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+                    foreach (var a in json.GetProperty("assets").EnumerateArray())
+                        if ((a.GetProperty("name").GetString() ?? "") == "Client.win-x64.zip") { downloadUrl = a.GetProperty("browser_download_url").GetString(); break; }
+                }
+            }
+            catch { }
+        }
 
         if (latest == null)
         {
@@ -875,13 +896,82 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (IsNewerVersion(latest, AppConfig.Version))
         {
-            ModernDialog.UpdateAvailable(latest, AppConfig.Version, downloadUrl);
+            var url = downloadUrl ?? "https://github.com/liuyuchen012/AgoraIn/releases";
+            ModernDialog.UpdateAvailable(latest, AppConfig.Version, url, async () => await AutoUpdateAsync(url, latest));
             StatusMessage = $"发现新版本 {latest}";
         }
         else
         {
             ModernDialog.Alert($"当前已是最新版本 {AppConfig.Version}", "检查更新");
             StatusMessage = "已是最新版本";
+        }
+    }
+
+    /// <summary>
+    /// 自动更新：下载最新便携包 → 解压 → 生成 update.cmd（退出后替换并重启）
+    /// 替换时跳过 config.json / workspace.json / 数据库 / data 目录，保留用户数据
+    /// </summary>
+    private async Task AutoUpdateAsync(string downloadUrl, string latest)
+    {
+        if (string.IsNullOrEmpty(downloadUrl) || !downloadUrl.StartsWith("https://"))
+        {
+            ModernDialog.Alert("更新地址不可用，请前往发布页手动下载。", "自动更新");
+            return;
+        }
+        try
+        {
+            StatusMessage = $"正在下载更新包 {latest}...";
+            var dir = Path.Combine(Path.GetTempPath(), "AgoraInUpdate", latest.TrimStart('v', 'V'));
+            var pkgDir = Path.Combine(dir, "pkg");
+            var cmdPath = Path.Combine(dir, "update.cmd");
+            Directory.CreateDirectory(pkgDir);
+
+            using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(15) })
+            {
+                using var resp = await http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    ModernDialog.Alert($"下载失败（HTTP {(int)resp.StatusCode}），请稍后重试或前往发布页手动下载。", "自动更新");
+                    StatusMessage = "下载更新失败";
+                    return;
+                }
+                var zipPath = Path.Combine(dir, "update.zip");
+                await using (var fs = File.Create(zipPath))
+                    await resp.Content.CopyToAsync(fs);
+                if (Directory.Exists(pkgDir)) Directory.Delete(pkgDir, true);
+                ZipFile.ExtractToDirectory(zipPath, pkgDir);
+                File.Delete(zipPath);
+            }
+
+            // 校验更新包完整性
+            if (!File.Exists(Path.Combine(pkgDir, "AgoraIn.exe")))
+            {
+                ModernDialog.Alert("更新包不完整，请前往发布页手动下载。", "自动更新");
+                StatusMessage = "更新包校验失败";
+                return;
+            }
+
+            var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+            var cmd = "@echo off\r\nchcp 65001 >nul\r\ntimeout /t 2 /nobreak >nul\r\n" +
+                      "taskkill /im AgoraIn.exe /f >nul 2>&1\r\n" +
+                      "robocopy \"" + pkgDir + "\" \"" + exeDir + "\" /E /XD \"" + exeDir + "\\data\" " +
+                      "/XF config.json workspace.json *.db *.db-shm *.db-wal *.pdb >nul\r\n" +
+                      "start \"\" \"" + exeDir + "\\AgoraIn.exe\"\r\n";
+            File.WriteAllText(cmdPath, cmd);
+
+            ModernDialog.Alert($"新版本 {latest} 已下载完成，程序即将重启并自动完成更新（保留你的配置与数据）。", "自动更新");
+            Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + cmdPath + "\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            });
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            ModernDialog.Alert($"自动更新失败：{ex.Message}", "自动更新");
+            StatusMessage = "自动更新失败";
         }
     }
 

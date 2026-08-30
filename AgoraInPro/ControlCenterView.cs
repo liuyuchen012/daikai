@@ -255,11 +255,14 @@ public sealed class ControlCenterView : Grid
         list.Columns.Add(new DataGridTextColumn { Header = "集控平台", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Platform)), Width = 130, IsReadOnly = true });
         list.Columns.Add(new DataGridTextColumn { Header = "设备名称", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Name)), Width = 190, IsReadOnly = true });
         list.Columns.Add(new DataGridTextColumn { Header = "状态", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Status)), Width = 70, IsReadOnly = true });
+        list.Columns.Add(new DataGridTextColumn { Header = "版本", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Version)), Width = 90, IsReadOnly = true });
         list.Columns.Add(new DataGridTextColumn { Header = "UUID", Binding = new System.Windows.Data.Binding(nameof(AggregatedDevice.Uuid)), Width = new DataGridLength(1, DataGridLengthUnitType.Star), IsReadOnly = true });
+        var opPanel = new FrameworkElementFactory(typeof(StackPanel));
+        opPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
         var callFactory = new FrameworkElementFactory(typeof(Button));
         callFactory.SetValue(Button.ContentProperty, "呼叫");
         callFactory.SetValue(Button.MarginProperty, new Thickness(2));
-        callFactory.SetValue(Button.WidthProperty, 64d);
+        callFactory.SetValue(Button.WidthProperty, 56d);
         callFactory.SetValue(Button.HeightProperty, 24d);
         callFactory.SetValue(Button.CursorProperty, Cursors.Hand);
         callFactory.AddHandler(Button.ClickEvent, new RoutedEventHandler((s, _) =>
@@ -267,7 +270,26 @@ public sealed class ControlCenterView : Grid
             if ((s as Button)?.DataContext is AggregatedDevice dev && dev.Service != null)
                 ShowCallDialog(new[] { dev });
         }));
-        list.Columns.Add(new DataGridTemplateColumn { Header = "操作", Width = 80, CellTemplate = new DataTemplate { VisualTree = callFactory } });
+        opPanel.AppendChild(callFactory);
+        var renameFactory = new FrameworkElementFactory(typeof(Button));
+        renameFactory.SetValue(Button.ContentProperty, "改名");
+        renameFactory.SetValue(Button.MarginProperty, new Thickness(2));
+        renameFactory.SetValue(Button.WidthProperty, 56d);
+        renameFactory.SetValue(Button.HeightProperty, 24d);
+        renameFactory.SetValue(Button.CursorProperty, Cursors.Hand);
+        renameFactory.AddHandler(Button.ClickEvent, new RoutedEventHandler(async (s, _) =>
+        {
+            if ((s as Button)?.DataContext is not AggregatedDevice dev || dev.Service == null) return;
+            var dlg = new InputDialog("重命名设备", "请输入新的设备名称", dev.Name) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.Value))
+            {
+                try { await dev.Service.RenameDeviceAsync(dev.Uuid, dlg.Value.Trim()); }
+                catch (Exception ex) { MessageBox.Show(ex.Message, "重命名失败", MessageBoxButton.OK, MessageBoxImage.Warning); }
+                await RefreshDevices();
+            }
+        }));
+        opPanel.AppendChild(renameFactory);
+        list.Columns.Add(new DataGridTemplateColumn { Header = "操作", Width = 124, CellTemplate = new DataTemplate { VisualTree = opPanel } });
 
         var cell = new Grid();
         cell.Children.Add(new Border
@@ -491,6 +513,7 @@ public sealed class ControlCenterView : Grid
                     Uuid = device.Uuid,
                     Online = device.Online,
                     LastSeen = device.LastSeen ?? "-",
+                    Version = device.Version,
                     Service = platform.Service
                 });
         _totalDevices.Text = _devices.Count.ToString();

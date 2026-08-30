@@ -106,9 +106,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 
 // ---- 版本常量（供 /api/version、启动横幅与更新检查器使用） ----
-const string ServerVersion = "2.8.0";
-const string LatestClientVersion = "v2.8.34";
-const string ClientDownloadUrl = "https://github.com/liuyuchen012/daikai/releases";
+const string ServerVersion = "3.2.4";
+const string LatestClientVersion = "v3.2.4";
+const string ClientDownloadUrl = "https://github.com/liuyuchen012/AgoraIn/releases";
 
 // ---- 注册集控平台版本更新检查器（后台定时检查 GitHub 最新发布） ----
 builder.Services.AddSingleton(sp => new ServerUpdateChecker(
@@ -277,7 +277,13 @@ async Task EnsureSchemaAsync(AppDbContext db)
         """);
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_Calls_MachineUuid_Status" ON "Calls" ("MachineUuid", "Status")""");
 
-    // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
+        // Machines 补充 ClientVersion 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
+    if (!await ColumnExistsAsync(db, "Machines", "ClientVersion"))
+    {
+        await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "Machines" ADD COLUMN "ClientVersion" TEXT NULL""");
+    }
+
+// AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
     // 先通过 PRAGMA 检查列是否存在，避免对已存在的列重复 ALTER 产生 fail 日志
     if (!await ColumnExistsAsync(db, "AttendanceRecords", "TaskId"))
     {
@@ -848,6 +854,7 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
     if (existing != null)
     {
         existing.LastSeen = DateTime.Now.ToString("O");
+        existing.ClientVersion = body.TryGetProperty("client_version", out var cv) ? cv.GetString() ?? "" : "";
         await db.SaveChangesAsync();
         return Results.Json(new { uuid = existing.Uuid, existing = true });
     }
@@ -857,7 +864,8 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
         Uuid = Guid.NewGuid().ToString(),
         Name = name,
         PublicKey = pubKey,
-        LastSeen = DateTime.Now.ToString("O")
+        LastSeen = DateTime.Now.ToString("O"),
+        ClientVersion = body.TryGetProperty("client_version", out var cv2) ? cv2.GetString() ?? "" : ""
     };
     db.Machines.Add(machine);
     await db.SaveChangesAsync();
@@ -888,7 +896,11 @@ app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpCont
         UpdatedAt = DateTime.Now.ToString("O")
     });
     var m = await db.Machines.FindAsync(uuid);
-    if (m != null) m.LastSeen = DateTime.Now.ToString("O");
+    if (m != null)
+    {
+        m.LastSeen = DateTime.Now.ToString("O");
+        m.ClientVersion = body.TryGetProperty("client_version", out var cv) ? cv.GetString() ?? "" : m.ClientVersion ?? "";
+    }
     await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
 });
@@ -1024,6 +1036,23 @@ app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
     db.SignInTasks.RemoveRange(db.SignInTasks.Where(s => s.MachineUuid == uuid));
     db.DeviceAssignments.RemoveRange(db.DeviceAssignments.Where(d => d.MachineUuid == uuid));
     db.Machines.Remove(machine);
+    await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/web_rename_machine - Web 面板修改设备名称（需已登录会话）
+/// </summary>
+app.MapPost("/api/web_rename_machine", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
+{
+    if (!IsAuthenticated(ctx)) return Results.Json(new { error = "未登录" }, statusCode: 401);
+
+    var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
+    var name = body.GetProperty("name").GetString() ?? "";
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+    if (string.IsNullOrWhiteSpace(name)) return Results.Json(new { error = "设备名称不能为空" }, statusCode: 400);
+    machine.Name = name.Trim();
     await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
 });
@@ -1792,12 +1821,17 @@ app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db, HttpContext c
     }
 
     var escapedConfig = HttpUtility.HtmlAttributeEncode(machine.Config);
+    var clientVersion = HttpUtility.HtmlEncode(string.IsNullOrEmpty(machine.ClientVersion) ? "未知" : machine.ClientVersion);
+    // 重命名设备脚本（普通字符串，避免插值模板转义问题）
+    var renameJs = "<script>function renameMachine() { var nn = prompt('请输入新的设备名称', ''); if (nn == null || nn.trim() == '') return; fetch('/api/web_rename_machine', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ machine_uuid: '" + uuid + "', name: nn.trim() }) }).then(function (r) { return r.json(); }).then(function (j) { if (j.status == 'ok') location.reload(); else alert(j.error || '重命名失败'); }).catch(function (e) { alert('重命名失败: ' + e); }); }</script>";
 
     var content = $@"<div class=""breadcrumb""><a href=""/"">设备总览</a> / {HttpUtility.HtmlEncode(machine.Name)}</div>
 <div class=""page-header"">
 <h2>{HttpUtility.HtmlEncode(machine.Name)}</h2>
 <div style=""display:flex;gap:8px;"">
 <span class=""badge {badgeCls}"">{badgeText}</span>
+<span class=""badge"" style=""background:#eef2ff;color:#4338ca;"">客户端 {clientVersion}</span>
+<button class=""btn btn-sm"" onclick=""renameMachine()"">重命名</button>
 <button class=""btn btn-sm"" onclick=""openEditConfigModal('{uuid}','{escapedConfig}')"">编辑配置</button>
 <button class=""btn btn-sm btn-danger"" onclick=""openDeleteMachineModal('{uuid}','{HttpUtility.HtmlEncode(machine.Name)}')"">删除设备</button>
 </div>
@@ -1808,6 +1842,8 @@ app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db, HttpContext c
     <p style=""color:var(--text-secondary);font-size:13px;margin-bottom:16px;"">点击任务查看详细打卡数据</p>
     <div class=""task-grid"">{taskCards}</div>
 </div>
+
+<script>{renameJs}</script>
 
 <style>
 .task-grid {{ display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px; }}
@@ -2659,6 +2695,7 @@ app.MapGet("/api/mobile/devices", async (AppDbContext db, HttpContext ctx) =>
             name = m.Name,
             online = last != null && (now - last.Value).TotalSeconds < 300,
             last_seen = m.LastSeen,
+            client_version = m.ClientVersion ?? "",
             public_key = string.IsNullOrEmpty(m.PublicKey) ? "N/A" : m.PublicKey[..Math.Min(m.PublicKey.Length, 30)] + "..."
         };
     }).ToList();
@@ -3264,6 +3301,55 @@ app.MapPost("/api/calls_ack", async (AppDbContext db, JsonElement body, HttpCont
     return Results.Json(new { status = "ok" });
 });
 
+/// <summary>
+/// POST /api/client_update - 客户端查询最新客户端版本（GitHub Release 资产）
+/// </summary>
+static int CompareVersions(string a, string b)
+{
+    int[] P(string v) { var p = v.Trim().TrimStart('v', 'V').Split('.'); var n = new int[4]; for (var i = 0; i < 4; i++) if (i < p.Length && int.TryParse(p[i], out var x)) n[i] = x; return n; }
+    var pa = P(a); var pb = P(b);
+    for (var i = 0; i < 4; i++) { var c = pa[i].CompareTo(pb[i]); if (c != 0) return c; }
+    return 0;
+}
+
+app.MapPost("/api/client_update", async (JsonElement body) =>
+{
+    if (!CheckPwd(body, serverPassword, null))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    try
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+        http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Client");
+        var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/AgoraIn/releases/latest");
+        if (!resp.IsSuccessStatusCode) return Results.Json(new { has_update = false });
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var tag = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+        if (string.IsNullOrEmpty(tag)) return Results.Json(new { has_update = false });
+
+        // 优先取安装包，其次便携 zip
+        string? downloadUrl = null;
+        foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+        {
+            var name = a.GetProperty("name").GetString() ?? "";
+            if (name == "AgoraIn-Setup-v" + tag.TrimStart('v', 'V') + ".exe") { downloadUrl = a.GetProperty("browser_download_url").GetString(); break; }
+        }
+        if (downloadUrl == null)
+        {
+            foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+                if ((a.GetProperty("name").GetString() ?? "") == "Client.win-x64.zip") { downloadUrl = a.GetProperty("browser_download_url").GetString(); break; }
+        }
+
+        var latest = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+        var hasUpdate = CompareVersions(latest, LatestClientVersion) > 0;
+        return Results.Json(new { has_update = hasUpdate, latest_version = latest, download_url = downloadUrl ?? "" });
+    }
+    catch
+    {
+        return Results.Json(new { has_update = false });
+    }
+});
+
 // ---- 启动横幅（命令行艺术字） ----
 void PrintBanner()
 {
@@ -3352,7 +3438,7 @@ public class ServerUpdateChecker : IHostedService
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Server");
-            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/daikai/releases/latest");
+            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/AgoraIn/releases/latest");
             if (!resp.IsSuccessStatusCode) return;
             var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
             var tag = json.GetProperty("tag_name").GetString() ?? "";

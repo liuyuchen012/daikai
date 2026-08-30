@@ -69,6 +69,7 @@ public class DeviceItem
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("online")] public bool Online { get; set; }
     [JsonPropertyName("last_seen")] public string? LastSeen { get; set; }
+    [JsonPropertyName("client_version")] public string Version { get; set; } = "";
     [JsonPropertyName("public_key")] public string PublicKey { get; set; } = "";
 }
 

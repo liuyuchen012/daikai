@@ -15,6 +15,8 @@ public class MachineEntity
     public string PublicKey { get; set; } = string.Empty;
     /// <summary>最后在线时间（ISO 8601 格式）</summary>
     public string? LastSeen { get; set; }
+    /// <summary>客户端版本号（客户端上报，如 v3.2.4）</summary>
+    public string? ClientVersion { get; set; }
     /// <summary>客户端配置 JSON（学校、课程、待推送任务等）</summary>
     public string Config { get; set; } = "{}";
 }
