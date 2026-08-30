@@ -54,22 +54,23 @@ var cfgPort = configJson.TryGetProperty("Port", out var p) ? p.GetInt32() : 5250
 var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "AgoraIn 集控平台" : "AgoraIn 集控平台";
 
 // 服务器密码：必须通过 config.json 设置，不存在则生成随机密码并回写
-string serverPassword;
+// 运行时可通过 Web 面板修改（ServerRuntime.Password + config.json 同步持久化）
+ServerRuntime.ConfigPath = configPath;
 if (configJson.TryGetProperty("ServerPassword", out var sp) && sp.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(sp.GetString()))
 {
-    serverPassword = sp.GetString()!;
+    ServerRuntime.Password = sp.GetString()!;
 }
 else
 {
-    serverPassword = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLower();
-    Console.WriteLine($"[安全] 未配置 ServerPassword，已自动生成: {serverPassword}");
+    ServerRuntime.Password = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLower();
+    Console.WriteLine($"[安全] 未配置 ServerPassword，已自动生成: {ServerRuntime.Password}");
     // 回写到 config.json
     try
     {
         var configObj = File.Exists(configPath)
             ? JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(configPath)) ?? new()
             : new();
-        configObj["ServerPassword"] = serverPassword;
+        configObj["ServerPassword"] = ServerRuntime.Password;
         File.WriteAllText(configPath, JsonSerializer.Serialize(configObj, new JsonSerializerOptions { WriteIndented = true }));
     }
     catch (Exception ex) { Console.WriteLine($"[警告] 无法回写 config.json: {ex.Message}"); }
@@ -843,7 +844,7 @@ app.MapGet("/api/machines/{uuid}/tasks", async (string uuid, AppDbContext db) =>
 /// </summary>
 app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var pubKey = body.GetProperty("public_key").GetString() ?? "";
@@ -877,7 +878,7 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
 /// </summary>
 app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -910,7 +911,7 @@ app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpCont
 /// </summary>
 app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -940,7 +941,7 @@ app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body, HttpCont
 /// </summary>
 app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -964,7 +965,7 @@ app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body, HttpCon
 /// </summary>
 app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -986,7 +987,7 @@ app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body, Http
 app.MapPost("/api/update_machine_config", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var machine = await db.Machines.FindAsync(uuid);
@@ -1000,7 +1001,7 @@ app.MapPost("/api/update_machine_config", async (AppDbContext db, JsonElement bo
 app.MapPost("/api/clear_attendance", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? null : null;
@@ -1025,7 +1026,7 @@ app.MapPost("/api/clear_attendance", async (AppDbContext db, JsonElement body) =
 app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var machine = await db.Machines.FindAsync(uuid);
@@ -1037,6 +1038,33 @@ app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
     db.DeviceAssignments.RemoveRange(db.DeviceAssignments.Where(d => d.MachineUuid == uuid));
     db.Machines.Remove(machine);
     await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/settings/protocol_password - 管理员修改设备协议密码（ServerPassword，运行时生效并持久化）
+/// </summary>
+app.MapPost("/api/settings/protocol_password", async (HttpContext ctx, JsonElement body) =>
+{
+    if (!IsAuthenticated(ctx)) return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = GetUserRole(ctx);
+    if (role != "admin") return Results.Json(new { error = "仅管理员可修改协议密码" }, statusCode: 403);
+
+    var newPwd = body.TryGetProperty("new_password", out var np) ? np.GetString() ?? "" : "";
+    if (newPwd.Length < 8) return Results.Json(new { error = "协议密码至少 8 位" }, statusCode: 400);
+
+    ServerRuntime.Password = newPwd;
+    try
+    {
+        var cfgPath = ServerRuntime.ConfigPath;
+        var mutable = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cfgPath));
+        mutable!["ServerPassword"] = newPwd;
+        File.WriteAllText(cfgPath, mutable.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = "内存已更新但持久化失败: " + ex.Message }, statusCode: 500);
+    }
     return Results.Json(new { status = "ok" });
 });
 
@@ -1063,7 +1091,7 @@ app.MapPost("/api/web_rename_machine", async (AppDbContext db, JsonElement body,
 app.MapPost("/api/web_punch", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? "default" : "default";
@@ -1100,7 +1128,7 @@ app.MapPost("/api/web_punch", async (AppDbContext db, JsonElement body) =>
 app.MapPost("/api/web_cancel_punch", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? "default" : "default";
@@ -1365,7 +1393,7 @@ string GenerateShortCode()
 /// </summary>
 app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -1445,7 +1473,7 @@ app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body, Http
 /// </summary>
 app.MapPost("/api/signin_result", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -2069,6 +2097,36 @@ app.MapGet("/profile", async (HttpContext ctx, AppDbContext db) =>
 <div class=""form-group""><label>旧密码</label><input type=""password"" id=""oldPwd"" placeholder=""请输入旧密码"" required></div>
 <div class=""form-group""><label>新密码</label><input type=""password"" id=""newPwd"" placeholder=""请输入新密码"" required></div>
 <div class=""form-group""><label>确认新密码</label><input type=""password"" id=""confirmPwd"" placeholder=""请再次输入新密码"" required></div>
+<div class=""card"" style=""max-width:500px;"">
+<h3>设备协议密码</h3>
+<p style=""color:var(--text-secondary);font-size:13px;"">客户端连接密钥（config.json 的 ServerPassword，默认 admin123）。修改后客户端需在「远程服务器设置」中同步更新，否则无法连接。</p>
+<form id=""protocolPwdForm"">
+<div class=""form-group""><label>新协议密码（至少 8 位）</label><input type=""password"" id=""protoPwd"" placeholder=""请输入新协议密码"" required></div>
+<div class=""form-group""><label>确认新协议密码</label><input type=""password"" id=""protoPwd2"" placeholder=""请再次输入"" required></div>
+<div class=""form-actions""><button type=""submit"" class=""btn"">更新协议密码</button></div>
+</form>
+</div>
+<script>
+document.getElementById('protocolPwdForm').onsubmit = function(e) {{
+    e.preventDefault();
+    var p1 = document.getElementById('protoPwd').value;
+    var p2 = document.getElementById('protoPwd2').value;
+    if (!p1 || !p2) {{ showToast('请填写所有字段', 'error'); return; }}
+    if (p1 !== p2) {{ showToast('两次输入不一致', 'error'); return; }}
+    if (p1.length < 8) {{ showToast('协议密码至少 8 位', 'error'); return; }}
+    fetch('/api/settings/protocol_password', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{ new_password: p1 }})
+    }})
+    .then(r => r.json())
+    .then(d => {{
+        if (d.error) {{ showToast('修改失败: ' + d.error, 'error'); }}
+        else {{ showToast('协议密码已更新（客户端请同步修改配置）', 'success'); document.getElementById('protocolPwdForm').reset(); }}
+    }})
+    .catch(() => showToast('网络请求失败', 'error'));
+}};
+</script>
 <div class=""form-actions""><button type=""submit"" class=""btn"">修改密码</button></div>
 </form>
 </div>
@@ -3212,7 +3270,7 @@ app.MapGet("/api/mobile/teachers", async (AppDbContext db, HttpContext ctx) =>
 /// </summary>
 app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -3241,7 +3299,7 @@ app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, Htt
 /// </summary>
 app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -3286,7 +3344,7 @@ app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpCon
 /// </summary>
 app.MapPost("/api/calls_ack", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var id = body.GetProperty("id").GetInt32();
@@ -3314,7 +3372,7 @@ static int CompareVersions(string a, string b)
 
 app.MapPost("/api/client_update", async (JsonElement body) =>
 {
-    if (!CheckPwd(body, serverPassword, null))
+    if (!CheckPwd(body, ServerRuntime.Password, null))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     try
@@ -3476,4 +3534,12 @@ public class ServerUpdateChecker : IHostedService
             if (i < parts.Length && int.TryParse(parts[i], out var n)) nums[i] = n;
         return nums;
     }
+}
+
+
+/// <summary>运行时可变配置（协议密码可经 Web 面板修改，config.json 同步持久化）</summary>
+public static class ServerRuntime
+{
+    public static string Password = "";
+    public static string ConfigPath = "";
 }
