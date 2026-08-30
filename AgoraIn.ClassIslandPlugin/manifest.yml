@@ -5,6 +5,6 @@ name: AgoraIn 联动插件
 description: 与 AgoraIn 集控平台联动，接收教师端发送的呼叫（待下课时段通知 / 上课应急通知 / 下课传唤），并结合课表在下课时间前自动提醒
 entranceAssembly: "AgoraIn.ClassIslandPlugin.dll"
 url: https://doc.615mc.cn
-version: 2.2.0.0
+version: 2.3.0.0
 apiVersion: 2.0.0.0
 author: AgoraIn
