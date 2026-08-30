@@ -5,7 +5,7 @@
 
 #define MyAppName "AgoraIn Server"
 #define MyAppNameCn "AgoraIn 集控服务器"
-#define MyAppVersion "3.2.0"
+#define MyAppVersion "3.2.4"
 #define MyAppPublisher "LiuYuchen"
 #define MyAppExeName "CheckIn.Server.exe"
 ; 沿用 v2.8.0 服务端安装器的 AppId，使新版安装器可直接覆盖升级

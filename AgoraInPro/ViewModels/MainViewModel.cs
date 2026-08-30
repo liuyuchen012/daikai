@@ -152,6 +152,8 @@ public class MainViewModel : INotifyPropertyChanged
 
         LoadWorkspace();
         InitializeBackgroundTasks();
+        // 后台自动更新检查（启动 8 秒后 + 每 30 分钟；静默，有更新才弹窗）
+        _ = StartAutoUpdateCheckAsync();
     }
 
     // ---- 任务树管理 ----
@@ -846,9 +848,9 @@ public class MainViewModel : INotifyPropertyChanged
     /// <summary>
     /// 检查客户端自身更新：直接查询 GitHub Releases 最新版本（不经过集控平台），比较后提示用户
     /// </summary>
-    private async Task CheckForUpdateAsync()
+    private async Task CheckForUpdateAsync(bool silent = false)
     {
-        StatusMessage = "正在检查更新...";
+        if (!silent) StatusMessage = "正在检查更新...";
         string? latest = null;
         string? downloadUrl = null;
 
@@ -902,9 +904,28 @@ public class MainViewModel : INotifyPropertyChanged
         }
         else
         {
-            ModernDialog.Alert($"当前已是最新版本 {AppConfig.Version}", "检查更新");
-            StatusMessage = "已是最新版本";
+            if (!silent)
+                ModernDialog.Alert($"当前已是最新版本 {AppConfig.Version}", "检查更新");
+            StatusMessage = $"已是最新版本 {AppConfig.Version}";
         }
+    }
+
+    /// <summary>
+    /// 后台自动检查更新：启动 8 秒后检查一次，此后每 30 分钟一次；静默模式不打扰（有更新才弹窗）
+    /// </summary>
+    private async Task StartAutoUpdateCheckAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(8));
+            await CheckForUpdateAsync(silent: true);
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(30));
+                await CheckForUpdateAsync(silent: true);
+            }
+        }
+        catch { }
     }
 
     /// <summary>
