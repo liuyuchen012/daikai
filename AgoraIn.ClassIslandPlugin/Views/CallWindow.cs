@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using System.Text;
+using System.Speech.Synthesis;
 using AgoraIn.ClassIslandPlugin.Models;
 
 namespace AgoraIn.ClassIslandPlugin.Views;
@@ -10,9 +12,13 @@ namespace AgoraIn.ClassIslandPlugin.Views;
 /// <summary>
 /// 呼叫显示窗口（Avalonia，运行在 ClassIsland 2.x 主程序进程内）
 /// 三种模式配色：待下课=蓝 / 上课应急=红 / 下课传唤=橙，置顶显示
+/// 显示后自动朗读（中文 TTS）：标题 + 内容 + 传唤名单
 /// </summary>
 public static class CallWindow
 {
+    /// <summary>最近一次朗读的话语（避免多窗口/重复轮询时重读，也便于测试）</summary>
+    private static string? _lastSpoken;
+
     public static void Show(CallMessage call)
     {
         Dispatcher.UIThread.Post(() =>
@@ -108,6 +114,46 @@ public static class CallWindow
 
             win.Content = stack;
             win.Show();
+
+            SpeakAsync(call, label);
+        });
+    }
+
+    /// <summary>
+    /// 朗读呼叫：拼接「类型、标题、内容、名单」后经 Windows 中文语音合成
+    /// SpeakAsync 在语音合成线程执行，不阻塞 UI；同一呼叫不重复朗读
+    /// </summary>
+    private static void SpeakAsync(CallMessage call, string label)
+    {
+        var sb = new StringBuilder();
+        sb.Append(label).Append('，');
+        sb.Append(call.Title);
+        if (!string.IsNullOrWhiteSpace(call.Message))
+            sb.Append('。').Append(call.Message);
+        if (call.Type == "summon" && !string.IsNullOrWhiteSpace(call.StudentNames))
+            sb.Append('。').Append("请以下同学到办公室：").Append(call.StudentNames.Replace('\n', '、'));
+        var text = sb.ToString();
+
+        if (text == _lastSpoken) return;
+        _lastSpoken = text;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                using var synth = new SpeechSynthesizer();
+                // 优先选用中文语音（如 Microsoft Huihui Desktop），找不到则用默认语音
+                var zh = synth.GetInstalledVoices()
+                    .FirstOrDefault(v => v.VoiceInfo.Culture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+                    ?.VoiceInfo.Name;
+                if (!string.IsNullOrEmpty(zh)) synth.SelectVoice(zh);
+                synth.Rate = 1;
+                synth.Speak(text);
+            }
+            catch
+            {
+                // 无 TTS 环境（如未安装语音包）时静默降级：只看弹窗提示
+            }
         });
     }
 }

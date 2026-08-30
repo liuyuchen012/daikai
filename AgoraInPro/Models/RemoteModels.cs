@@ -90,6 +90,15 @@ public class RemoteTask
     [JsonPropertyName("signed_count")] public int SignedCount { get; set; }
     [JsonPropertyName("created_at")] public string CreatedAt { get; set; } = "";
     [JsonPropertyName("machine_uuid")] public string MachineUuid { get; set; } = "";
+
+    /// <summary>创建时间短格式（"2026-08-28 20:58"）；服务器返回的是 ISO 长格式</summary>
+    [JsonIgnore]
+    public string CreatedShort => CreatedAt.Length >= 16 ? CreatedAt[..16].Replace('T', ' ') : CreatedAt;
+
+    /// <summary>任务中心列表的单行摘要</summary>
+    [JsonIgnore]
+    public string Summary =>
+        $"{Subject} · {(string.IsNullOrEmpty(Classroom) ? "未设教室" : Classroom)} · {(Status == "active" ? "进行中" : Status)} · 已签 {SignedCount}/{StudentCount} · {CreatedShort}";
 }
 
 // ============ 考勤 ============

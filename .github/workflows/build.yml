@@ -129,6 +129,29 @@ jobs:
           path: publish/Mobile.macOS-arm64
           if-no-files-found: error
 
+  # ───────────────── ClassIsland：AgoraIn 联动插件（cipx 打包依赖 Windows PowerShell） ─────────────────
+  plugin:
+    name: ClassIsland · Plugin
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Build plugin (SDK packs .cipx)
+        run: dotnet build AgoraIn.ClassIslandPlugin/AgoraIn.ClassIslandPlugin.csproj -c Release --nologo
+
+      - name: Upload ClassIsland plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassIsland.Plugin.cipx
+          path: AgoraIn.ClassIslandPlugin/cipx/AgoraIn.ClassIslandPlugin.cipx
+          if-no-files-found: error
+
   # ───────────────── Android：Client.Mobile ─────────────────
   android:
     name: Android · Client.Mobile
