@@ -382,7 +382,8 @@ public static class ModernDialog
         {
             var hwnd = new WindowInteropHelper(win).EnsureHandle();
             int p = 2;
-            NativeMethods.DwmSetWindowAttribute(hwnd, 33, ref p, sizeof(int));
+            if (Environment.OSVersion.Version >= new Version(10, 0, 22000, 0))
+                NativeMethods.DwmSetWindowAttribute(hwnd, 33, ref p, sizeof(int));
         }
         catch { }
         return win;
