@@ -58,6 +58,14 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        // DPI 感知（PerMonitorV2）：Win10 1703+ 与 Win11 均支持；失败则静默回退系统默认
+        try
+        {
+            const int DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+            NativeDpi.SetProcessDpiAwarenessContext(new IntPtr(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+        }
+        catch { }
+
         // 诊断模式：--selftest 直接构造控制中心，验证是否抛异常，结果写入 selftest.log
         if (e.Args.Length > 0 && e.Args.Contains("--selftest"))
         {
@@ -106,6 +114,12 @@ public partial class App : Application
         MainWindow = mainWindow;
         mainWindow.Show();
         ShutdownMode = ShutdownMode.OnMainWindowClose;
+    }
+
+    private static class NativeDpi
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        internal static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     }
 
     /// <summary>记录异常到日志文件</summary>
