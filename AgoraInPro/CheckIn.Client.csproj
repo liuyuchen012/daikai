@@ -9,6 +9,9 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <AssemblyName>AgoraIn</AssemblyName>
     <Product>AgoraIn</Product>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyVersion>3.2.5.0</AssemblyVersion>
+    <FileVersion>3.2.5.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
