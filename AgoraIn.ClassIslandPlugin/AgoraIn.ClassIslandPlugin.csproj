@@ -3,12 +3,13 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <OutputType>Library</OutputType>
     <RootNamespace>AgoraIn.ClassIslandPlugin</RootNamespace>
-    <AssemblyVersion>2.3.0.0</AssemblyVersion>
+    <AssemblyVersion>2.5.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <PropertyGroup>
