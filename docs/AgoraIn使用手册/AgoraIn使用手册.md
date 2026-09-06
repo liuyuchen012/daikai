@@ -59,7 +59,7 @@ AgoraIn 是一套面向学校/机构的**集控签到打卡与呼叫通知平台
                  │   SQLite 数据库 + ASP.NET Core Minimal API      │
                  │   Web 管理面板（/、/users、/calls、/logs、/profile）
                  └───────────┬──────────────────────────────────┘
-                             │  HTTP/HTTPS（frpc 隧道：agorain.615mc.cn）
+                             │  HTTP/HTTPS（可选：frpc 隧道/公网域名）
         ┌────────────────────┼───────────────────────┐
         │                    │                       │
    ┌────┴─────┐        ┌─────┴─────┐           ┌─────┴─────┐
@@ -156,7 +156,7 @@ curl -s http://127.0.0.1:5250/api/client_update | head -c 200
 
 | 字段 | 示例 |
 | --- | --- |
-| 服务器地址 | `192.168.31.3`（或公网域名 `agorain.615mc.cn`） |
+| 服务器地址 | 你的服务器 IP 或内网地址（也可填写已配置的公网域名） |
 | 服务器端口 | `5250` |
 | 服务器协议密码 | 与服务器 `config.json` 的 `ServerPassword` 一致（默认 `admin123`） |
 
@@ -172,7 +172,7 @@ curl -s http://127.0.0.1:5250/api/client_update | head -c 200
 1. 手机/平板开启「USB 调试」（或直接安装 APK）；
 2. 安装 `Mobile.Android.zip` 中的 APK（包名 `com.agorain.checkin`）：
    `adb install com.agorain.checkin-Signed.apk`
-3. 打开 App，填写服务器地址 `http://192.168.31.3:5250`（或 `https://agorain.615mc.cn`）、用户名与密码，点击「登录」。
+3. 打开 App，填写服务器地址（如 `http://192.168.31.3:5250`，或你的公网域名）、用户名与密码，点击「登录」。
 
 > 下图（平板实际运行画面）：登录页。
 
@@ -392,7 +392,7 @@ curl -s http://127.0.0.1:5250/api/client_update | head -c 200
 | 桌面客户端 | .NET 10 · WPF · DPAPI 配置加密 · 自动更新（/api/client_update）· Win10/11 DPI 感知（PerMonitorV2） |
 | 移动端 | .NET MAUI（Android / iOS / macOS Catalyst） |
 | 插件 | .NET 8（win-x64）· Avalonia + WinForms · System.Speech 中文 TTS · ClassIsland SDK 2.0.0.2 |
-| 默认端口 | 5250（HTTP）；公网：`https://agorain.615mc.cn`（frpc 隧道 → 内网 5250） |
+| 默认端口 | 5250（HTTP）；公网访问请自行配置 HTTPS 反向代理或隧道 |
 | 设备协议 | 设备注册（UUID + 公钥/自登记）、呼叫拉取（`/api/calls_pull` 心跳）、呼叫确认（`/api/calls_ack`） |
 | 认证 | Web 面板：管理员会话；移动端：Bearer Token（HMAC）；设备端：协议密码 |
 | 数据库 | SQLite（`agorain.db`），服务启动自动建表与幂等迁移（增加列，不影响既有数据） |
@@ -426,7 +426,7 @@ A：插件按课表状态呼出；如仍异常请确认 ClassIsland 已加载课
 A：协议密码修改后，客户端「远程服务器设置」与插件设置中的密码需同步更新；忘记时可在服务器 `config.json` 中重置 `ServerPassword` 并重启服务。
 
 **Q5：移动端无法登录？**
-A：① 确认服务器地址可访问（局域网用 `http://192.168.31.3:5250`）；② 使用管理员/教师账号密码；③ 若为公网访问请使用 `https://agorain.615mc.cn`。
+A：① 确认服务器地址可访问（如 `http://192.168.31.3:5250`）；② 使用管理员/教师账号密码；③ 若为公网访问请使用你配置的公网地址。
 
 **Q6：Windows 10 上客户端点开无反应？**
 A：v3.2.5 已内置 Win10 兼容加固（DPI 感知、异常保护与日志），如仍失败请提交 `%LOCALAPPDATA%\AgoraIn\logs` 中的日志。
@@ -440,7 +440,10 @@ A：v3.2.5 已内置 Win10 兼容加固（DPI 感知、异常保护与日志）�
 - **软件名称**：AgoraIn 集控打卡平台（含 AgoraIn Server、AgoraInPro 桌面客户端、AgoraIn.ClassIslandPlugin、AgoraIn Mobile 四组件）；
 - **作者/版权人**：刘宇晨；
 - **开源托管**：GitHub `liuyuchen012/AgoraIn`（分支 `v3.2`，构建产物发布于 Release `v3.2.5`）；
-- **授权**：版权所有。未经授权不得复制、分发或用于商业用途的二次发布；引用须注明来源。
+- **授权**：本软件基于 **GNU 通用公共许可证 v3（GNU GPLv3）** 开源授权发布（LICENSE 文件见 GitHub 仓库根目录）。
+  依据 GPLv3：任何人均可自由使用、研究、修改与分发本软件及其源代码，但分发衍生作品时必须：
+  ① 以同等许可（GPLv3）发布完整源码；② 保留版权声明与许可声明；③ 明确标注修改内容。
+  未经著作权人另行书面许可，不得以私有许可方式再分发本软件；引用本软件成果须注明出处。
 
 ### 13.2 版本唯一标识
 
@@ -467,7 +470,6 @@ A：v3.2.5 已内置 Win10 兼容加固（DPI 感知、异常保护与日志）�
 ### 13.4 维护与支持
 
 - 文档站点：https://doc.615mc.cn
-- 服务器在线演示：https://agorain.615mc.cn
 - 源码与 Release：https://github.com/liuyuchen012/AgoraIn
 
 ---
