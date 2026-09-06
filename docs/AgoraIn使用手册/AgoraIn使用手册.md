@@ -4,7 +4,6 @@
 > **软件版本**：服务端 v3.2.5 / 桌面客户端 v2.8.34 / 移动端 v2.8.34 / ClassIsland 插件 v2.5.0.0
 > **版权人**：刘宇晨（GitHub: `liuyuchen012`）
 > **文档版本**：v1.0 · 编制日期：2026 年 9 月 6 日
-> **编制依据**：本手册所有界面截图均取自 AgoraIn v3.2.5 正式版实际运行环境（服务器 `192.168.31.3:5250`，ClassIsland 插件运行于 Windows 11 桌面端，移动端运行于小米平板 Pad 8 Pro、Android 17），可作为软件著作权登记、版权归属证明、验收与培训的**佐证材料**。
 
 ---
 
@@ -73,7 +72,7 @@ AgoraIn 是一套面向学校/机构的**集控签到打卡与呼叫通知平台
         ┌────────────────────┼───────────────────────┐
         │                    │                       │
    ┌────┴─────┐        ┌─────┴─────┐           ┌─────┴─────┐
-   │ Windows  │        │  Windows  │           │ 小米平板  │
+   │ Windows  │        │  Windows  │           │ 移动端  │
    │ AgoraInPro│       │ClassIsland│           │ Pad 8 Pro │
    │ 桌面客户端│       │ + 插件     │           │ Mobile App│
    └──────────┘        └───────────┘           └───────────┘
@@ -415,7 +414,7 @@ curl -s http://127.0.0.1:5250/api/client_update | head -c 200
 
 ### 9.2 场景二：移动端发起、电脑端响铃（实测记录）
 
-1. 小米平板 App →「控制」→ 勾选 `ClassIsland-LiuYuchenPC` →「发送到所选」→ 类型「上课应急通知」→ 标题 `EmergencyDrill` → 发送；
+1. 移动端 App →「控制」→ 勾选 `ClassIsland-LiuYuchenPC` →「发送到所选」→ 类型「上课应急通知」→ 标题 `EmergencyDrill` → 发送；
 2. Windows 桌面 ClassIsland 插件在 **1 秒内**收到服务器推送并弹出顶部红色提示栏：
    - 内容：`上课应急通知 · 全平台联动演示 · 移动端发起，电脑端提示栏 15 秒倒计时自动关闭。`
    - 右侧倒计时（截图中显示「9 秒后自动关闭」）；
@@ -540,7 +539,7 @@ A：v3.2.5 已内置 Win10 兼容加固（DPI 感知、异常保护与日志）�
 | 客户端控制中心设备列表 | `images/client-control-center.png` | Windows 11 桌面端（PrintWindow 实拍） |
 | 客户端远程服务器设置 | `images/client-remote-settings.png` | Windows 11 桌面端 |
 | 插件顶部提示栏联动（PC） | `images/linkage-full.png` | Windows 11 桌面端（移动端发起呼叫时实拍） |
-| 移动端登录/仪表盘/任务/签到码/控制/呼叫/我的 | `images/mobile-*.png` | 小米平板 Pad 8 Pro（Android 17，adb 实拍） |
+| 移动端登录/仪表盘/任务/签到码/控制/呼叫/我的 | `images/mobile-*.png` | 移动端 Pad 8 Pro（Android 17，adb 实拍） |
 
 ### 14.4 维护与支持
 
