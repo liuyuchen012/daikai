@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using AgoraIn.ClassIslandPlugin.Models;
-using AgoraIn.ClassIslandPlugin.Views;
+using AgoraIn.ClassIslandPlugin.Services.NotificationProviders;
 
 namespace AgoraIn.ClassIslandPlugin.Services;
 
@@ -40,21 +40,53 @@ public class CallPoller
         _timer?.Dispose();
         _timer = null;
 
-        if (string.IsNullOrEmpty(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Password) ||
-            string.IsNullOrEmpty(_settings.DeviceUuid))
+        if (string.IsNullOrEmpty(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Password))
         {
-            // 配置为空：尝试自动探测，仍为空则提示前往插件设置页配置
+            // 平台地址/密码为空：尝试自动探测，仍为空则提示前往插件设置页配置
             PluginSettings.TryAutoDetect(_settings);
             _settings.Save(_configFolder);
-            if (string.IsNullOrEmpty(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Password) ||
-                string.IsNullOrEmpty(_settings.DeviceUuid))
+            if (string.IsNullOrEmpty(_settings.ServerUrl) || string.IsNullOrEmpty(_settings.Password))
             {
                 return;
             }
         }
 
+        // 设备 UUID 为空：不再依赖本机 AgoraIn 客户端，自动向服务器登记为呼叫接收端
+        if (string.IsNullOrEmpty(_settings.DeviceUuid))
+        {
+            var uuid = RegisterSelf(); // 同步尝试（失败时留空，由轮询重试）
+            if (!string.IsNullOrEmpty(uuid))
+            {
+                _settings.DeviceUuid = uuid;
+                _settings.Save(_configFolder);
+            }
+        }
+
         var interval = TimeSpan.FromSeconds(Math.Max(5, _settings.PollIntervalSeconds));
         _timer = new Timer(async _ => await PollAsync(), null, TimeSpan.FromSeconds(3), interval);
+    }
+
+    /// <summary>
+    /// 呼叫接收端自登记：向服务器注册（无需 AgoraIn 客户端与 RSA 密钥），
+    /// 教师端设备列表会用登记的 UUID 作为发送目标。广播呼叫（*）也总会送达。
+    /// </summary>
+    private string RegisterSelf()
+    {
+        try
+        {
+            var name = "ClassIsland-" + (System.Net.Dns.GetHostName() ?? "设备");
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var req = new HttpRequestMessage(HttpMethod.Post,
+                new Uri((_settings.ServerUrl.EndsWith('/') ? _settings.ServerUrl : _settings.ServerUrl + "/") + "api/calls_register"))
+            {
+                Content = JsonContent.Create(new { name, password = _settings.Password, client_version = "ClassIslandPlugin-2.4.0" })
+            };
+            var res = http.Send(req);
+            if (!res.IsSuccessStatusCode) return "";
+            using var doc = System.Text.Json.JsonDocument.Parse(res.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+            return doc.RootElement.TryGetProperty("uuid", out var u) ? u.GetString() ?? "" : "";
+        }
+        catch { return ""; }
     }
 
     private async Task PollAsync()
@@ -70,8 +102,13 @@ public class CallPoller
                 uuid = _settings.DeviceUuid,
                 password = _settings.Password
             });
-            if (!res.IsSuccessStatusCode) return;
+            if (!res.IsSuccessStatusCode)
+            {
+                CallStatusStore.SetStatus("无法连接集控平台");
+                return;
+            }
 
+            CallStatusStore.SetStatus("已连接，正常监听");
             using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
             foreach (var item in doc.RootElement.GetProperty("calls").EnumerateArray())
             {
@@ -86,9 +123,11 @@ public class CallPoller
                     Sender = item.TryGetProperty("sender", out var se) ? se.GetString() ?? "" : "",
                 };
 
-                if (call.Type == "prenotice" && _settings.PrenoticeEnabled)
+                if ((call.Type == "prenotice" && _settings.PrenoticeEnabled) || call.Type == "summon")
                 {
-                    // 待下课通知：等待"距下课 ≤ 提前分钟数"的窗口再显示
+                    // 待下课/下课传唤：按 ClassIsland 下课状态呼出——
+                    // 上课时段（有课时且距下课 > 提前分钟数）暂缓；下课段/无课时立即呼出。
+                    // 放假（无课表）时视为下课段立即呼出。
                     lock (_pendingPrenotice)
                         _pendingPrenotice.Add(call);
                 }
@@ -123,15 +162,20 @@ public class CallPoller
         catch
         {
             // 网络/平台暂时不可用，下轮重试
+            CallStatusStore.SetStatus("连接出错，将自动重试");
         }
     }
 
     /// <summary>
-    /// 显示呼叫并确认，防止重复拉取
+    /// 显示呼叫并确认，防止重复拉取。
+    /// 展示走 ClassIsland 标准提醒模式（提醒提供方 → 全屏遮罩 + 正文）。
     /// </summary>
     private async Task ShowAndAckAsync(CallMessage call, HttpClient http)
     {
-        CallWindow.Show(call);
+        // ClassIsland 标准提醒（遮罩 + 正文）
+        CallNotificationProvider.Show(call);
+        // 更新主界面组件展示的最近呼叫
+        CallStatusStore.SetLastCall(call);
         try
         {
             await http.PostAsJsonAsync("api/calls_ack", new
