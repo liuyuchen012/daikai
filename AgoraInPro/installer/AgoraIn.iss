@@ -5,7 +5,7 @@
 
 #define MyAppName "AgoraIn"
 #define MyAppNameCn "AgoraIn 桌面端"
-#define MyAppVersion "3.2.4"
+#define MyAppVersion "3.2.5"
 #define MyAppPublisher "LiuYuchen"
 #define MyAppExeName "AgoraIn.exe"
 ; 沿用 v2.8.34 安装器的 AppId，使新版安装器可直接覆盖升级

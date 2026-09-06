@@ -83,6 +83,8 @@
             color: rgba(255,255,255,0.3);
         }
         .nav-users { display: {USERS_VISIBLE}; }
+        .nav-calls { display: {CALLS_VISIBLE}; }
+        .nav-logs { display: {LOGS_VISIBLE}; }
 
         /* Main */
         .main { flex: 1; padding: 28px 32px; overflow-y: auto; }
@@ -343,6 +345,14 @@
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
                     <span>用户管理</span>
                 </a>
+                <a href="/calls" class="nav-calls {NAV_CALLS}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                    <span>发送呼叫</span>
+                </a>
+                <a href="/logs" class="nav-logs {NAV_LOGS}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>系统日志</span>
+                </a>
                 <a href="/profile" class="{NAV_PROFILE}">
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4-4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <span>个人设置</span>
@@ -453,7 +463,7 @@
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
                 '<div class="form-group"><label>行数</label><input type="number" name="z" value="'+(c.z||6)+'"></div>' +
                 '<div class="form-group"><label>列数</label><input type="number" name="l" value="'+(c.l||6)+'"></div></div>' +
-                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="请输入您的管理员登录密码，用于确认身份"></div>' +
                 '<div class="form-actions"><button type="submit" class="btn">保存配置</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
             document.getElementById('modal-body').innerHTML = html;
             document.getElementById('modal').style.display = 'block';
@@ -472,7 +482,7 @@
             var html = '<h3>清除打卡数据</h3>' +
                 '<p style="color:var(--danger);margin:12px 0;font-size:14px;">确定要清除该设备的所有打卡记录吗？此操作不可撤销！</p>' +
                 '<form id="clearDataForm">' +
-                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="请输入您的管理员登录密码，用于确认身份"></div>' +
                 '<div class="form-actions"><button type="submit" class="btn btn-danger">确认清除</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
             document.getElementById('modal-body').innerHTML = html;
             document.getElementById('modal').style.display = 'block';
@@ -487,7 +497,7 @@
                 '<p style="color:var(--danger);margin:12px 0;font-size:14px;">确定要删除设备 <strong>' + name + '</strong> 吗？</p>' +
                 '<p style="color:var(--danger);font-size:13px;margin-bottom:12px;">该设备的所有打卡记录将被永久删除，此操作不可撤销！</p>' +
                 '<form id="deleteMachineForm">' +
-                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="必填"></div>' +
+                '<div class="form-group"><label>管理员密码</label><input type="password" name="password" placeholder="请输入您的管理员登录密码，用于确认身份"></div>' +
                 '<div class="form-actions"><button type="submit" class="btn btn-danger">确认删除</button><button type="button" class="btn btn-ghost" onclick="closeModal(\'modal\')">取消</button></div></form>';
             document.getElementById('modal-body').innerHTML = html;
             document.getElementById('modal').style.display = 'block';

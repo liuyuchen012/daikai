@@ -2,6 +2,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using AgoraIn.ClassIslandPlugin.Models;
 using AgoraIn.ClassIslandPlugin.Services.NotificationProviders;
+using AgoraIn.ClassIslandPlugin.Views;
+using ClassIsland.Shared.IPC.Abstractions.Services;
 
 namespace AgoraIn.ClassIslandPlugin.Services;
 
@@ -79,7 +81,7 @@ public class CallPoller
             var req = new HttpRequestMessage(HttpMethod.Post,
                 new Uri((_settings.ServerUrl.EndsWith('/') ? _settings.ServerUrl : _settings.ServerUrl + "/") + "api/calls_register"))
             {
-                Content = JsonContent.Create(new { name, password = _settings.Password, client_version = "ClassIslandPlugin-2.4.0" })
+                Content = JsonContent.Create(new { name, password = _settings.Password, client_version = "ClassIslandPlugin-2.5.0" })
             };
             var res = http.Send(req);
             if (!res.IsSuccessStatusCode) return "";
@@ -126,10 +128,13 @@ public class CallPoller
                 if ((call.Type == "prenotice" && _settings.PrenoticeEnabled) || call.Type == "summon")
                 {
                     // 待下课/下课传唤：按 ClassIsland 下课状态呼出——
-                    // 上课时段（有课时且距下课 > 提前分钟数）暂缓；下课段/无课时立即呼出。
-                    // 放假（无课表）时视为下课段立即呼出。
+                    // 上课时段（距下课 > 提前分钟数）暂缓；临近下课/下课段（≤ 提前分钟数）呼出。
+                    // 同一呼叫按 Id 去重，避免每轮拉取重复加入导致重复显示。
                     lock (_pendingPrenotice)
-                        _pendingPrenotice.Add(call);
+                    {
+                        if (!_pendingPrenotice.Any(x => x.Id == call.Id))
+                            _pendingPrenotice.Add(call);
+                    }
                 }
                 else
                 {
@@ -137,8 +142,8 @@ public class CallPoller
                 }
             }
 
-            // 检查待显示的待下课通知
-            if (_settings.PrenoticeEnabled)
+            // 检查待显示的待下课通知/下课传唤（有暂缓项时每轮评估：上课时段暂缓，临近下课/下课段呼出）
+            if (_pendingPrenotice.Count > 0)
             {
                 var left = GetBreakingTimeLeft();
                 List<CallMessage>? toShow = null;
@@ -146,7 +151,9 @@ public class CallPoller
                 {
                     foreach (var call in _pendingPrenotice.ToList())
                     {
-                        var trigger = left == null || left.Value.TotalMinutes <= Math.Max(0, call.MinutesBefore);
+                        // 上课时段（距下课 > 提前分钟数）不呼出；临近下课/下课时段（≤ 提前分钟数）才呼出。
+                        // 取不到课表状态（null）时保持待触发，绝不提前显示。
+                        var trigger = left != null && left.Value.TotalMinutes <= Math.Max(0, call.MinutesBefore);
                         if (trigger)
                         {
                             _pendingPrenotice.Remove(call);
@@ -154,6 +161,7 @@ public class CallPoller
                         }
                     }
                 }
+                Trace($"PollAsync left={left?.TotalMinutes.ToString("F1") ?? "null"} pending={_pendingPrenotice.Count} toShow={toShow?.Count ?? 0}");
                 if (toShow != null)
                     foreach (var call in toShow)
                         await ShowAndAckAsync(call, http);
@@ -172,8 +180,9 @@ public class CallPoller
     /// </summary>
     private async Task ShowAndAckAsync(CallMessage call, HttpClient http)
     {
-        // ClassIsland 标准提醒（遮罩 + 正文）
-        CallNotificationProvider.Show(call);
+        // v2.5.0：仅顶部常驻提示栏 + 主界面脉冲动画 + 朗读一遍；
+        // 不再弹出大提示窗口与标准提醒遮罩（用户要求仅保留提示栏）。
+        CallWindow.Show(call);
         // 更新主界面组件展示的最近呼叫
         CallStatusStore.SetLastCall(call);
         try
@@ -189,37 +198,37 @@ public class CallPoller
     }
 
     /// <summary>
-    /// 获取 ClassIsland 课表的"距下课剩余时间"。
-    /// 通过 ClassIsland.Core.AppBase.Current.Services 解析 IPublicLessonsService（反射，避免强依赖 IPC 程序集）
-    /// 获取失败返回 null（此时待下课通知将立即显示）
+    /// 获取 ClassIsland 课表的"距下课剩余时间"（经由 DI 注入的 ILessonsService）。
+    /// IPublicLessonsService 语义：距下课剩余时间；当前不在上课时为 TimeSpan.Zero。
+    /// 返回 null 表示课程服务不可用（保守：不呼出，保持待触发）。
     /// </summary>
     private static TimeSpan? GetBreakingTimeLeft()
     {
         try
         {
-            var app = ClassIsland.Core.AppBase.Current;
-            var servicesProp = app?.GetType().GetProperty("Services");
-            var services = servicesProp?.GetValue(app);
-            if (services == null) return null;
-
-            var getService = services.GetType().GetMethods()
-                .FirstOrDefault(m => m.Name == "GetService" && m.GetParameters().Length == 1);
-            if (getService == null) return null;
-
-            var ipcAsm = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == "ClassIsland.Shared.IPC");
-            var svcType = ipcAsm?.GetType("ClassIsland.Shared.IPC.Abstractions.Services.IPublicLessonsService");
-            if (svcType == null) return null;
-
-            var svc = getService.Invoke(services, new[] { svcType });
-            if (svc == null) return null;
-
-            var prop = svcType.GetProperty("OnBreakingTimeLeftTime");
-            return prop?.GetValue(svc) is TimeSpan ts ? ts : null;
+            var svc = CallNotificationProvider.Lessons;
+            if (svc == null) { Trace("GBTL: Lessons=null"); return null; }
+            var left = svc.OnBreakingTimeLeftTime;
+            Trace($"GBTL: left={left.TotalMinutes:F1}min state={svc.CurrentState} planEnabled={svc.IsClassPlanEnabled} loaded={svc.IsClassPlanLoaded}");
+            return left;
         }
-        catch
+        catch (Exception ex)
         {
+            Trace("GBTL ERROR: " + ex);
             return null;
         }
+    }
+
+    /// <summary>调试日志（%LOCALAPPDATA%\AgoraIn\poller.log）</summary>
+    private static void Trace(string line)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgoraIn");
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "poller.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {line}\r\n");
+        }
+        catch { }
     }
 }
