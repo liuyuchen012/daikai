@@ -191,17 +191,16 @@ public static class CallWindow
         row.Children.Add(iconBlock);
 
         var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
+        var contentLine = string.IsNullOrWhiteSpace(call.Message)
+            ? (call.Type == "summon" ? $"传唤学生：{call.StudentNames.Replace('\n', '、')}" : "（无附加内容）")
+            : call.Message;
         textStack.Children.Add(new TextBlock
         {
-            Text = $"{label}（呼叫类型）",
-            FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White
-        });
-        textStack.Children.Add(new TextBlock
-        {
-            Text = call.Title,
-            FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Brushes.White,
+            Text = $"{label}·{call.Title}·{contentLine}",
+            FontSize = 16, FontWeight = FontWeight.Bold, Foreground = Brushes.White,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 1100
+            TextWrapping = TextWrapping.NoWrap,
+            MaxWidth = 1200
         });
         Grid.SetColumn(textStack, 1);
         row.Children.Add(textStack);
