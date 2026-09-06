@@ -10,21 +10,21 @@ using AgoraIn.ClassIslandPlugin.Models;
 namespace AgoraIn.ClassIslandPlugin.Views;
 
 /// <summary>
-/// 呼叫提示（Avalonia，运行在 ClassIsland 2.x 主程序进程内，v2.3.0.0）：
-/// 1. 呼叫到达 → 在 CLASSISLAND 主界面上播放颜色提示动画（叠加在主窗口顶层，按类型配色：
-///    应急红 / 传唤橙 / 待下课蓝），约 3.2 秒：颜色呼吸 + 中心波纹扩散 + 顶部横幅滑入；
-/// 2. 动画结束后 → 弹出消息框（同色渐变大窗、置顶、常驻、无自动关闭），
-///    主界面保持提醒状态直到用户点击「知道了，关闭」；
-/// 3. 消息框出现时中文 TTS 朗读（System.Speech，自动选择中文语音，同一呼叫不重复朗读）。
+/// 呼叫提示（Avalonia，运行在 ClassIsland 2.x 主程序进程内，v2.5.0）：
+/// 1. 「标准提醒」：ClassIsland 风格右上角通知卡片（类型色条 + 两行文本，约 6 秒自动淡出）
+/// 2. 「新窗口」：呼叫内容大消息框（双行展示：类型·标题 / 内容·名单），
+///    置顶、无自动关闭，用户手动点击「知道了，关闭」才消失
+/// 3. 「主界面常驻提示」：主窗口顶部横幅（呼叫类型+标题）在动画结束后常驻显示，
+///    直到用户在主界面点击「我知道了」才关闭（动画期间按朗读节奏脉冲 ×3）
+/// 4. 朗读：中文 TTS 仅播放一遍（其余两遍节奏无声音，仅界面动画）
 /// </summary>
 public static class CallWindow
 {
-    /// <summary>最近一次朗读的话语（避免多窗口/重复轮询时重读）</summary>
     private static string? _lastSpoken;
-
-    /// <summary>主界面动画播放锁：一次只播一个动画，避免多屏幕叠加</summary>
     private static readonly object _fxLock = new();
     private static bool _fxPlaying;
+    private const int RepeatPulse = 3;   // 朗读节奏次数（3 遍：第 1 遍出声，其余无声）
+    private const double PulseSeconds = 2.8;
 
     private static (Color Accent, string Icon, string Label, Color Dark) ThemeFor(string type) => type switch
     {
@@ -37,45 +37,46 @@ public static class CallWindow
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var (accent, icon, label, dark) = ThemeFor(call.Type);
-
-            // ① ClassIsland 主界面提示动画（按类型颜色）
-            PlayMainOverlayFx(call, accent, icon, label, dark);
-
-            // ② 动画结束后弹消息框（常驻，点击才关闭）并朗读
-            var delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(3400) };
-            delay.Tick += (_, _) =>
+            Color accent, dark; string icon, label;
+            try
             {
-                delay.Stop();
-                ShowMessageBox(call, accent, icon, label, dark);
-            };
-            delay.Start();
+                (accent, icon, label, dark) = ThemeFor(call.Type);
+            }
+            catch (Exception ex) { LogEx("Theme", ex); return; }
+
+            // ① 标准提醒通知卡片（自动淡出）
+            try { StandardNotice.Show(call, accent, icon, label); }
+            catch (Exception ex) { LogEx("StandardNotice", ex); }
+
+            // ② 主界面动画（3 次脉冲节奏）→ 动画结束后顶部常驻横幅（直到点「我知道了」）
+            try { PlayMainOverlayFx(call, accent, icon, label, dark); }
+            catch (Exception ex) { LogEx("PlayMainOverlayFx", ex); }
+
+            // ③ 立即弹出「新窗口」（单行展示，点「知道了，关闭」才消失）
+            try { ShowMessageBox(call, accent, icon, label, dark); }
+            catch (Exception ex) { LogEx("ShowMessageBox", ex); }
+
+            // ④ 中文朗读仅一遍（其余节奏由主界面脉冲承担）
+            try { SpeakOnce(call, label); }
+            catch (Exception ex) { LogEx("SpeakOnce", ex); }
         });
     }
 
     /// <summary>
-    /// 在 ClassIsland 主窗口 OverlayLayer 上叠加颜色提示动画：
-    /// 颜色呼吸遮罩 + 中心波纹扩散 + 顶部横幅滑入（约 3.2 秒后自动移除）
+    /// 主界面效果：
+    /// 阶段一（约 3×Pulse）全屏动画：呼吸遮罩 + 波纹扩散 + 顶部横幅滑入，按朗读节奏脉冲 3 次；
+    /// 阶段二：动画停止后横幅常驻（呼叫类型 + 标题 + 「我知道了」按钮），直到用户点击关闭。
     /// </summary>
     private static void PlayMainOverlayFx(CallMessage call, Color accent, string icon, string label, Color dark)
     {
-        if (_fxPlaying) return;
         Window? main = GetMainWindow();
         if (main == null) return;
+        if (_fxPlaying) return;
         _fxPlaying = true;
 
         var panel = new Panel { IsHitTestVisible = false };
 
-        // ① 颜色呼吸遮罩
-        var veil = new Border
-        {
-            Background = new SolidColorBrush(accent),
-            Opacity = 0,
-            CornerRadius = new CornerRadius(0)
-        };
-        panel.Children.Add(veil);
-
-        // ② 中心波纹（扩散圆环 + 中心光斑）
+        // 中心波纹
         var ring = new Avalonia.Controls.Shapes.Ellipse
         {
             Stroke = new SolidColorBrush(accent),
@@ -87,62 +88,27 @@ public static class CallWindow
         var glow = new Avalonia.Controls.Shapes.Ellipse
         {
             Fill = new SolidColorBrush(Color.FromArgb(0x55, accent.R, accent.G, accent.B)),
-            Width = 200,
-            Height = 200,
+            Width = 200, Height = 200,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Opacity = 1
         };
         panel.Children.Add(glow);
 
-        // ③ 顶部横幅（从上方滑入：类型 + 标题，白字彩底）
-        var bannerTranslate = new TranslateTransform { Y = -92 };
-        var banner = new Border
-        {
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
-                GradientStops =
-                {
-                    new GradientStop(dark, 0),
-                    new GradientStop(accent, 1),
-                }
-            },
-            Height = 92,
-            VerticalAlignment = VerticalAlignment.Top,
-            RenderTransform = bannerTranslate
-        };
-        var bannerStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, Margin = new Thickness(28), VerticalAlignment = VerticalAlignment.Center };
-        bannerStack.Children.Add(new TextBlock { Text = icon, FontSize = 30, VerticalAlignment = VerticalAlignment.Center });
-        var bannerText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
-        bannerText.Children.Add(new TextBlock { Text = label, FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Brushes.White });
-        bannerText.Children.Add(new TextBlock { Text = call.Title, FontSize = 24, FontWeight = FontWeight.ExtraBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
-        bannerStack.Children.Add(bannerText);
-        banner.Child = bannerStack;
+        // 顶部横幅（滑入；动画由内容驱动）
+        var bannerTranslate = new TranslateTransform { Y = -64 };
+        var banner = BuildStickyBanner(call, accent, icon, label, dark, bannerTranslate, panel);
         panel.Children.Add(banner);
 
-        // 优先叠加到主窗口内容（Grid 类布局上铺满且 zIndex 置顶；
-        // 非 Grid 布局时用独立覆盖窗口兜底，同样盖在主界面之上）
-        // 后添加的 Grid 子项绘制在上层，无需显式 ZIndex
+        // 装入主窗（Grid 叠加或覆盖窗兜底）
         var attached = false;
-        Grid? mainGrid = main.Content as Grid;
-        Canvas? mainCanvas = main.Content is Canvas c ? c : null;
-        if (mainGrid != null)
+        var fxHost = main;
+        if (main.Content is Grid g)
         {
-            mainGrid.Children.Add(panel);
+            g.Children.Add(panel);
             attached = true;
         }
-        else if (mainCanvas != null)
-        {
-            mainCanvas.Children.Add(panel);
-            panel.Width = main.Bounds.Width;
-            panel.Height = main.Bounds.Height;
-            attached = true;
-        }
-
-        Window? fxHost = main;
-        if (!attached)
+        else
         {
             fxHost = new Window
             {
@@ -158,51 +124,207 @@ public static class CallWindow
             fxHost.Show();
         }
 
-        // 动画：22 帧 × 150ms ≈ 3.3s
+        // 阶段一：脉冲动画（RepeatPulse 次呼吸），随后进入阶段二常驻
+        var totalFrames = (int)(RepeatPulse * PulseSeconds * 6.67); // ≈每脉冲 2.8s
         var frames = 0;
-        const int totalFrames = 22;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         timer.Tick += (_, _) =>
         {
             frames++;
-            var t = frames / (double)totalFrames;
-            var pulse = Math.Abs(Math.Sin(t * Math.PI * 3));
+            var total = (double)totalFrames;
+            var t = frames / total;
+            var pulse = Math.Abs(Math.Sin(t * Math.PI * RepeatPulse));
+            var size = 200 + t * Math.Max(main.Width, main.Height) * 0.9;
 
-            veil.Opacity = 0.08 + pulse * 0.22;
-            var maxSize = Math.Max(main.Bounds.Width, main.Bounds.Height) * 0.95;
-            var size = 140 + t * maxSize;
-            ring.Width = size;
-            ring.Height = size;
-            ring.StrokeThickness = 6 + (1 - t) * 20;
-            ring.Opacity = Math.Max(0.12, pulse) * 0.95;
-            glow.Opacity = 0.25 + pulse * 0.75;
-            glow.Width = 180 + pulse * 140;
-            glow.Height = 180 + pulse * 140;
+            ring.Width = size; ring.Height = size;
+            ring.StrokeThickness = 6 + (1 - t) * 22;
+            ring.Opacity = Math.Max(0.1, pulse) * 0.95;
+            glow.Opacity = 0.2 + pulse * 0.75;
+            var slideIn = t < 0.12 ? t / 0.12 : 1.0;
+            bannerTranslate.Y = -64 * (1 - slideIn);
 
-            var slideIn = t < 0.25 ? t / 0.25 : 1.0;
-            bannerTranslate.Y = -92 * (1 - slideIn);
             if (frames >= totalFrames)
             {
                 timer.Stop();
-                if (attached)
-                {
-                    if (mainGrid != null) mainGrid.Children.Remove(panel);
-                    if (mainGrid == null && mainCanvas != null) mainCanvas.Children.Remove(panel);
-                }
-                else
-                {
-                    fxHost?.Close();
-                }
+                // 阶段二：动画元素淡出，横幅转为常驻（带「我知道了」按钮）
+                ring.Width = 0; ring.Height = 0; ring.Opacity = 0; glow.Opacity = 0;
+                bannerTranslate.Y = 0;
                 _fxPlaying = false;
+                // 横幅已显示按钮，由按钮点击移除 panel（含覆盖窗/主窗子项）
+                banner.Opacity = 1;
             }
         };
         timer.Start();
+
+        // 记录容器用于移除
+        panel.Tag = new object[] { attached, fxHost, main };
     }
 
-    /// <summary>
-    /// 获取 ClassIsland 主窗口：优先 AppBase.MainWindow（反射），
-    /// 兜底取进程内可见且面积最大的窗口（此时尚无插件弹窗，即主窗口）
-    /// </summary>
+    /// <summary>构建常驻横幅（类型色渐变 + 图标/类型 + 标题 + 「我知道了」按钮）</summary>
+    private static Border BuildStickyBanner(CallMessage call, Color accent, string icon, string label, Color dark,
+        TranslateTransform translate, Panel hostPanel)
+    {
+        var banner = new Border
+        {
+            Height = 58,
+            VerticalAlignment = VerticalAlignment.Top,
+            RenderTransform = translate,
+            Opacity = 0.98,
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(dark, 0),
+                    new GradientStop(accent, 1),
+                }
+            }
+        };
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var iconBlock = new TextBlock { Text = icon, FontSize = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 10, 0) };
+        Grid.SetColumn(iconBlock, 0);
+        row.Children.Add(iconBlock);
+
+        var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
+        textStack.Children.Add(new TextBlock
+        {
+            Text = $"{label}（呼叫类型）",
+            FontSize = 11, FontWeight = FontWeight.Bold, Foreground = Brushes.White
+        });
+        textStack.Children.Add(new TextBlock
+        {
+            Text = call.Title,
+            FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Brushes.White,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 1100
+        });
+        Grid.SetColumn(textStack, 1);
+        row.Children.Add(textStack);
+
+        var okBtn = new Button
+        {
+            Content = "我知道了",
+            MinWidth = 110, Height = 38, FontSize = 13, FontWeight = FontWeight.Bold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 22, 0),
+            Background = new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)),
+            Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        okBtn.Click += (_, _) =>
+        {
+            if (hostPanel.Tag is object[] bag)
+            {
+                var attached = (bool)bag[0];
+                var fxHost = (Window?)bag[1];
+                var main = (Window?)bag[2];
+                if (attached)
+                {
+                    if (main?.Content is Grid g3) g3.Children.Remove(hostPanel);
+                    if (main?.Content is Canvas cv3) cv3.Children.Remove(hostPanel);
+                }
+                else fxHost?.Close();
+            }
+        };
+        Grid.SetColumn(okBtn, 2);
+        row.Children.Add(okBtn);
+
+        banner.Child = row;
+        return banner;
+    }
+
+    /// <summary>标准提醒通知卡片（ClassIsland 风格，约 6 秒后自动淡出）</summary>
+    public static class StandardNotice
+    {
+        public static void Show(CallMessage call, Color accent, string icon, string label)
+        {
+            bool shown = false;
+            var saved = new Border();
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (shown) return;
+                shown = true;
+                var card = new Border
+                {
+                    Width = 390,
+                    CornerRadius = new CornerRadius(14),
+                    ClipToBounds = true,
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(0x88, 0xff, 0xff, 0xff)),
+                    BorderThickness = new Thickness(1),
+                    Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x1d, 0x1f, 0x26)),
+                    IsHitTestVisible = false,
+                    Opacity = 0
+                };
+                var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var colorBar = new Border { Height = 6, Background = new SolidColorBrush(accent), CornerRadius = new CornerRadius(14, 14, 0, 0) };
+                Grid.SetRow(colorBar, 0);
+                grid.Children.Add(colorBar);
+
+                var line1 = new TextBlock
+                {
+                    Text = $"{icon} {label} · {call.Title}",
+                    FontSize = 16, FontWeight = FontWeight.Bold, Foreground = Brushes.White,
+                    Margin = new Thickness(16, 10, 16, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 360
+                };
+                var line2 = new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(call.Message) ? (call.Type == "summon" ? call.StudentNames.Replace('\n', '、') : "呼叫内容") : call.Message,
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xd7, 0xde, 0xe6)),
+                    Margin = new Thickness(16, 2, 16, 12),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 360
+                };
+                var stack = new StackPanel();
+                stack.Children.Add(line1);
+                stack.Children.Add(line2);
+                Grid.SetRow(stack, 1);
+                grid.Children.Add(stack);
+                card.Child = grid;
+
+                var host = GetMainWindow();
+                if (host == null) return;
+                var fx = new Window
+                {
+                    SystemDecorations = SystemDecorations.None,
+                    ShowInTaskbar = false,
+                    IsHitTestVisible = false,
+                    ShowActivated = false,
+                    Topmost = true,
+                    Width = 404,
+                    Height = 96,
+                    Content = card
+                };
+                var screen = host.Bounds;
+                fx.Position = new PixelPoint((int)screen.Width - 420, 84);
+                fx.Show();
+
+                // 淡入 → 6 秒 → 淡出
+                var ticks = 0;
+                const int fadeIn = 4, hold = 40, fadeOut = 4;
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+                timer.Tick += (_, _) =>
+                {
+                    ticks++;
+                    if (ticks <= fadeIn) card.Opacity = ticks / (double)fadeIn;
+                    else if (ticks <= fadeIn + hold) card.Opacity = 1;
+                    else if (ticks <= fadeIn + hold + fadeOut) card.Opacity = 1 - (ticks - fadeIn - hold) / (double)fadeOut;
+                    else { timer.Stop(); fx.Close(); }
+                };
+                timer.Start();
+            });
+        }
+    }
+
     private static Window? GetMainWindow()
     {
         try
@@ -212,7 +334,6 @@ public static class CallWindow
             if (mw != null) return mw;
         }
         catch { }
-        // 兜底：ClassIsland.Core.AppBase 的 MainWindow（反射各种属性名）
         try
         {
             var app = ClassIsland.Core.AppBase.Current;
@@ -226,18 +347,18 @@ public static class CallWindow
         return null;
     }
 
-    /// <summary>常驻消息框：同色渐变大窗、置顶、无自动关闭，点「知道了，关闭」才消失</summary>
+    /// <summary>新窗口消息框：双行展示（类型·标题 / 内容·名单），点「知道了，关闭」才消失</summary>
     private static void ShowMessageBox(CallMessage call, Color accent, string icon, string label, Color dark)
-    {
-        var accentBrush = new SolidColorBrush(accent);
+    {        var accentBrush = new SolidColorBrush(accent);
         var win = new Window
         {
             Title = $"{label} - {call.Title}",
             Width = 920,
-            Height = 560,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Height = 520,
+            WindowStartupLocation = WindowStartupLocation.Manual,
             Topmost = true,
             CanResize = false,
+            ShowActivated = false,
             FontSize = 16,
             Background = new LinearGradientBrush
             {
@@ -250,7 +371,6 @@ public static class CallWindow
                 }
             }
         };
-
         var root = new Grid();
         root.Children.Add(new Border
         {
@@ -258,7 +378,6 @@ public static class CallWindow
             CornerRadius = new CornerRadius(24),
             Margin = new Thickness(18)
         });
-
         var pulseBorder = new Border
         {
             Background = Brushes.Transparent,
@@ -269,53 +388,29 @@ public static class CallWindow
         };
         root.Children.Add(pulseBorder);
 
-        var stack = new StackPanel
-        {
-            Margin = new Thickness(46),
-            Spacing = 14,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
+        var stack = new StackPanel { Margin = new Thickness(46), Spacing = 16, VerticalAlignment = VerticalAlignment.Center };
+        // 双行展示：第一行 = 类型·标题；第二行 = 内容（或传唤名单），超长单行省略（不滚动）
         stack.Children.Add(new TextBlock
         {
-            Text = $"{icon} {label}",
+            Text = $"{icon} {label} — {call.Title}",
             FontSize = 34,
             FontWeight = FontWeight.ExtraBold,
-            Foreground = accentBrush,
-            TextWrapping = TextWrapping.Wrap
+            Foreground = Brushes.White,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
         });
+        var contentLine = string.IsNullOrWhiteSpace(call.Message)
+            ? (call.Type == "summon" ? $"传唤学生：{call.StudentNames.Replace('\n', '、')}" : "（无附加内容）")
+            : call.Message;
         stack.Children.Add(new TextBlock
         {
-            Text = call.Title,
-            FontSize = 44,
-            FontWeight = FontWeight.ExtraBold,
-            Foreground = Brushes.White,
-            TextWrapping = TextWrapping.Wrap
+            Text = contentLine,
+            FontSize = 24,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0xf1, 0xf5, 0xf9)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
         });
-        if (!string.IsNullOrWhiteSpace(call.Message))
-        {
-            stack.Children.Add(new TextBlock
-            {
-                Text = call.Message,
-                FontSize = 24,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xf1, 0xf5, 0xf9))
-            });
-        }
-        if (call.Type == "summon" && !string.IsNullOrWhiteSpace(call.StudentNames))
-        {
-            var names = string.Join("、", call.StudentNames.Split(
-                new[] { '\r', '\n', ',', '，' },
-                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"传唤学生：{names}",
-                FontSize = 28,
-                FontWeight = FontWeight.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0xd5, 0x4d)),
-                TextWrapping = TextWrapping.Wrap
-            });
-        }
         if (!string.IsNullOrWhiteSpace(call.Sender))
         {
             stack.Children.Add(new TextBlock
@@ -325,14 +420,10 @@ public static class CallWindow
                 Foreground = new SolidColorBrush(Color.FromRgb(0xc9, 0xd1, 0xd9))
             });
         }
-
         var ok = new Button
         {
             Content = "知道了，关闭",
-            Width = 220,
-            Height = 52,
-            FontSize = 18,
-            FontWeight = FontWeight.Bold,
+            Width = 220, Height = 52, FontSize = 18, FontWeight = FontWeight.Bold,
             HorizontalAlignment = HorizontalAlignment.Right
         };
         ok.Click += (_, _) => win.Close();
@@ -340,9 +431,17 @@ public static class CallWindow
 
         root.Children.Add(stack);
         win.Content = root;
-        win.Show();
-
-        // 消息框闪光（约 2.6 秒）
+        // 显式定位到主屏中央：必须用屏幕尺寸（主窗口可能是 60px 顶部条模式，
+        // 用主窗 Bounds 会把窗口算到屏幕外）
+        try
+        {
+            var scr = win.Screens?.Primary?.Bounds;
+            var sw = scr?.Width ?? 1920;
+            var sh = scr?.Height ?? 1080;
+            win.Position = new PixelPoint((int)((sw - 920) / 2), (int)((sh - 520) / 2));
+        }
+        catch { }        win.Show();
+        // 窗口脉冲（2.6s）
         var frames = 0;
         const int totalFrames = 17;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
@@ -361,15 +460,23 @@ public static class CallWindow
             }
         };
         timer.Start();
-
-        SpeakAsync(call, label);
     }
 
-    /// <summary>
-    /// 朗读呼叫：拼接「类型、标题、内容、名单」后经 Windows 中文语音合成
-    /// SpeakAsync 在语音合成线程执行，不阻塞 UI；同一呼叫不重复朗读
-    /// </summary>
-    private static void SpeakAsync(CallMessage call, string label)
+    /// <summary>插件异常日志（%LOCALAPPDATA%\AgoraIn\plugin.log）</summary>
+    internal static void LogEx(string tag, Exception ex)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgoraIn");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "plugin.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{tag}] {ex}\r\n\r\n");
+        }
+        catch { }
+    }
+
+    /// <summary>中文朗读仅一遍（语音一次；第二、三遍由主界面脉冲承担）</summary>
+    private static void SpeakOnce(CallMessage call, string label)
     {
         var sb = new StringBuilder();
         sb.Append(label).Append('，');
@@ -379,7 +486,6 @@ public static class CallWindow
         if (call.Type == "summon" && !string.IsNullOrWhiteSpace(call.StudentNames))
             sb.Append('。').Append("请以下同学到办公室：").Append(call.StudentNames.Replace('\n', '、'));
         var text = sb.ToString();
-
         if (text == _lastSpoken) return;
         _lastSpoken = text;
 
@@ -397,7 +503,7 @@ public static class CallWindow
             }
             catch
             {
-                // 无 TTS 环境时静默降级：只看弹窗提示
+                // 无 TTS 环境时静默降级
             }
         });
     }
