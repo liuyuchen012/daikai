@@ -15,6 +15,8 @@ public class MachineEntity
     public string PublicKey { get; set; } = string.Empty;
     /// <summary>最后在线时间（ISO 8601 格式）</summary>
     public string? LastSeen { get; set; }
+    /// <summary>客户端版本号（客户端上报，如 v3.2.4）</summary>
+    public string? ClientVersion { get; set; }
     /// <summary>客户端配置 JSON（学校、课程、待推送任务等）</summary>
     public string Config { get; set; } = "{}";
 }
@@ -137,6 +139,28 @@ public class CallEntity
     public string Status { get; set; } = "pending";
     /// <summary>过期时间（ISO 8601），默认 2 小时后自动过期</summary>
     public string ExpiresAt { get; set; } = DateTime.Now.AddHours(2).ToString("O");
+    /// <summary>重复遍数：设备需连续播报的总遍数（默认 1）。每次 ack 后若剩余遍数 &gt; 0 会自动克隆下一条 pending</summary>
+    public int RepeatCount { get; set; } = 1;
+}
+
+/// <summary>
+/// 系统日志实体：记录服务器关键操作（登录、发送呼叫、删除记录、配置变更等），
+/// 供管理员在 Web 面板「系统日志」页面查看与删除。
+/// </summary>
+public class SystemLogEntity
+{
+    /// <summary>自增主键</summary>
+    public int Id { get; set; }
+    /// <summary>日志级别：info / warning / error</summary>
+    public string Level { get; set; } = "info";
+    /// <summary>操作类型（如 login / send_call / delete_call / delete_log / config 等）</summary>
+    public string Category { get; set; } = string.Empty;
+    /// <summary>操作者（用户名；系统操作为 system）</summary>
+    public string Operator { get; set; } = "system";
+    /// <summary>日志内容</summary>
+    public string Message { get; set; } = string.Empty;
+    /// <summary>创建时间（ISO 8601）</summary>
+    public string CreatedAt { get; set; } = DateTime.Now.ToString("O");
 }
 
 /// <summary>
@@ -158,6 +182,8 @@ public class AppDbContext : DbContext
     public DbSet<DeviceAssignmentEntity> DeviceAssignments => Set<DeviceAssignmentEntity>();
     /// <summary>呼叫表</summary>
     public DbSet<CallEntity> Calls => Set<CallEntity>();
+    /// <summary>系统日志表</summary>
+    public DbSet<SystemLogEntity> SystemLogs => Set<SystemLogEntity>();
 
     /// <summary>
     /// 配置实体映射：设置主键、字段长度限制和索引
@@ -220,6 +246,17 @@ public class AppDbContext : DbContext
             e.Property(c => c.Type).HasMaxLength(16);
             e.Property(c => c.Status).HasMaxLength(16);
             e.HasIndex(c => new { c.MachineUuid, c.Status });
+        });
+
+        // 系统日志实体配置：按时间倒序查询（Id 倒序即可），级别与操作类型加索引
+        modelBuilder.Entity<SystemLogEntity>(e =>
+        {
+            e.HasKey(l => l.Id);
+            e.Property(l => l.Level).HasMaxLength(16);
+            e.Property(l => l.Category).HasMaxLength(32);
+            e.Property(l => l.Operator).HasMaxLength(64);
+            e.HasIndex(l => l.Category);
+            e.HasIndex(l => l.CreatedAt);
         });
     }
 }

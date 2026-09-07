@@ -1,0 +1,10 @@
+# 班级呼叫系统 - 被控端插件清单
+# 插件清单格式参考：https://docs.classisland.tech/dev/plugins/create-project/
+id: classcall.plugin
+name: 班级呼叫系统（被控端）
+description: 接收呼出端（控制端）发起的班级呼叫，置顶弹窗提醒，并通过 ClassIsland 朗读功能朗读呼叫内容
+entranceAssembly: "CallPlugin.dll"
+url: https://classisland.tech
+version: 1.0.0.0
+apiVersion: 2.0.0.0
+author: ClassCall

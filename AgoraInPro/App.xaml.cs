@@ -12,8 +12,28 @@ namespace CheckIn.Client;
 /// </summary>
 public partial class App : Application
 {
-    /// <summary>日志目录（应用目录下 logs 文件夹）</summary>
-    internal static readonly string LogDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+    /// <summary>构造函数：尽早挂全局异常钩子（启动阶段崩溃也能写日志/弹窗，避免"无报错闪退"）</summary>
+    public App()
+    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            LogError("DispatcherUnhandledException", args.Exception);
+            MessageBox.Show($"程序发生未处理的异常：\n{args.Exception.Message}\n\n详细信息已写入日志文件：\n{Path.Combine(LogDir, "error.log")}",
+                "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            LogError("AppDomainUnhandledException", args.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogError("UnobservedTaskException", args.Exception);
+            args.SetObserved();
+        };
+    }
+
+    /// <summary>日志目录（%LOCALAPPDATA%\AgoraIn\logs，安装目录 Program Files 可能无写权限时也能落盘）</summary>
+    internal static readonly string LogDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AgoraIn", "logs");
 
     /// <summary>
     /// 应用程序启动事件处理
@@ -38,6 +58,14 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        // DPI 感知（PerMonitorV2）：Win10 1703+ 与 Win11 均支持；失败则静默回退系统默认
+        try
+        {
+            const int DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+            NativeDpi.SetProcessDpiAwarenessContext(new IntPtr(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+        }
+        catch { }
+
         // 诊断模式：--selftest 直接构造控制中心，验证是否抛异常，结果写入 selftest.log
         if (e.Args.Length > 0 && e.Args.Contains("--selftest"))
         {
@@ -58,17 +86,40 @@ public partial class App : Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         // 显示启动画面（带呼吸动画和进度条）
-        var splash = new SplashScreen();
-        splash.Show();
+        try
+        {
+            var splash = new SplashScreen();
+            splash.Show();
+            await Task.Delay(50);
+            splash.Close();
+        }
+        catch (Exception ex)
+        {
+            LogError("SplashScreen", ex);
+        }
 
-        await Task.Delay(50);
-
-        splash.Close();
-
-        Window mainWindow = new MainWindow();
+        Window mainWindow;
+        try
+        {
+            mainWindow = new MainWindow();
+        }
+        catch (Exception ex)
+        {
+            LogError("MainWindowCtor", ex);
+            MessageBox.Show($"主窗口初始化失败：\n{ex.Message}\n\n详细信息已写入日志：\n{Path.Combine(LogDir, "error.log")}",
+                "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
         MainWindow = mainWindow;
         mainWindow.Show();
         ShutdownMode = ShutdownMode.OnMainWindowClose;
+    }
+
+    private static class NativeDpi
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        internal static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     }
 
     /// <summary>记录异常到日志文件</summary>

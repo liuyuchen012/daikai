@@ -61,8 +61,9 @@ public partial class MainWindow : Window
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd != IntPtr.Zero)
+        if (hwnd != IntPtr.Zero && Environment.OSVersion.Version >= new Version(10, 0, 22000, 0))
         {
+            // 圆角属性仅 Windows 11 22000+ 支持；Win10 调用会返回 E_INVALIDARG（无效），直接跳过
             int preference = DWMWCP_ROUND;
             DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
         }

@@ -54,22 +54,23 @@ var cfgPort = configJson.TryGetProperty("Port", out var p) ? p.GetInt32() : 5250
 var serverName = configJson.TryGetProperty("ServerName", out var sn) ? sn.GetString() ?? "AgoraIn 集控平台" : "AgoraIn 集控平台";
 
 // 服务器密码：必须通过 config.json 设置，不存在则生成随机密码并回写
-string serverPassword;
+// 运行时可通过 Web 面板修改（ServerRuntime.Password + config.json 同步持久化）
+ServerRuntime.ConfigPath = configPath;
 if (configJson.TryGetProperty("ServerPassword", out var sp) && sp.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(sp.GetString()))
 {
-    serverPassword = sp.GetString()!;
+    ServerRuntime.Password = sp.GetString()!;
 }
 else
 {
-    serverPassword = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLower();
-    Console.WriteLine($"[安全] 未配置 ServerPassword，已自动生成: {serverPassword}");
+    ServerRuntime.Password = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLower();
+    Console.WriteLine($"[安全] 未配置 ServerPassword，已自动生成: {ServerRuntime.Password}");
     // 回写到 config.json
     try
     {
         var configObj = File.Exists(configPath)
             ? JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(configPath)) ?? new()
             : new();
-        configObj["ServerPassword"] = serverPassword;
+        configObj["ServerPassword"] = ServerRuntime.Password;
         File.WriteAllText(configPath, JsonSerializer.Serialize(configObj, new JsonSerializerOptions { WriteIndented = true }));
     }
     catch (Exception ex) { Console.WriteLine($"[警告] 无法回写 config.json: {ex.Message}"); }
@@ -106,9 +107,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     .AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 
 // ---- 版本常量（供 /api/version、启动横幅与更新检查器使用） ----
-const string ServerVersion = "2.8.0";
-const string LatestClientVersion = "v2.8.34";
-const string ClientDownloadUrl = "https://github.com/liuyuchen012/daikai/releases";
+const string ServerVersion = "3.2.5";
+const string LatestClientVersion = "v3.2.5";
+const string ClientDownloadUrl = "https://github.com/liuyuchen012/AgoraIn/releases";
 
 // ---- 注册集控平台版本更新检查器（后台定时检查 GitHub 最新发布） ----
 builder.Services.AddSingleton(sp => new ServerUpdateChecker(
@@ -273,17 +274,37 @@ async Task EnsureSchemaAsync(AppDbContext db)
             "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
             "Type" TEXT, "MachineUuid" TEXT, "Title" TEXT, "Message" TEXT,
             "MinutesBefore" INTEGER, "StudentNames" TEXT, "Sender" TEXT,
-            "CreatedAt" TEXT, "Status" TEXT, "ExpiresAt" TEXT)
+            "CreatedAt" TEXT, "Status" TEXT, "ExpiresAt" TEXT, "RepeatCount" INTEGER)
         """);
     await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_Calls_MachineUuid_Status" ON "Calls" ("MachineUuid", "Status")""");
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "SystemLogs" (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "Level" TEXT, "Category" TEXT, "Operator" TEXT,
+            "Message" TEXT, "CreatedAt" TEXT)
+        """);
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_SystemLogs_Category" ON "SystemLogs" ("Category")""");
+    await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_SystemLogs_CreatedAt" ON "SystemLogs" ("CreatedAt")""");
 
-    // AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
+        // Machines 补充 ClientVersion 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
+    if (!await ColumnExistsAsync(db, "Machines", "ClientVersion"))
+    {
+        await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "Machines" ADD COLUMN "ClientVersion" TEXT NULL""");
+    }
+
+// AttendanceRecords 补充 TaskId 列（旧库无此列；新库已由 EnsureCreated 建好，无需执行）
     // 先通过 PRAGMA 检查列是否存在，避免对已存在的列重复 ALTER 产生 fail 日志
     if (!await ColumnExistsAsync(db, "AttendanceRecords", "TaskId"))
     {
         await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "AttendanceRecords" ADD COLUMN "TaskId" TEXT NOT NULL DEFAULT 'default'""");
     }
     await db.Database.ExecuteSqlRawAsync("""UPDATE "AttendanceRecords" SET "TaskId"='default' WHERE "TaskId" IS NULL OR "TaskId"=''""");
+
+    // Calls 补充 RepeatCount 列（旧库无此列；新库已由建表语句建好，无需执行）
+    if (!await ColumnExistsAsync(db, "Calls", "RepeatCount"))
+    {
+        await db.Database.ExecuteSqlRawAsync("""ALTER TABLE "Calls" ADD COLUMN "RepeatCount" INTEGER NOT NULL DEFAULT 1""");
+    }
 }
 
 /// <summary>
@@ -550,12 +571,36 @@ var templateContent = File.Exists(templatePath) ? File.ReadAllText(templatePath)
 var loginTemplateContent = File.Exists(loginTemplatePath) ? File.ReadAllText(loginTemplatePath) : "<html><body>Login</body></html>";
 
 /// <summary>
+/// 写入系统日志（异步，不阻塞请求；失败静默忽略，避免影响主流程）
+/// </summary>
+async Task WriteSystemLogAsync(AppDbContext db, string level, string category, string @operator, string message)
+{
+    try
+    {
+        db.SystemLogs.Add(new SystemLogEntity
+        {
+            Level = level,
+            Category = category,
+            Operator = @operator,
+            Message = message,
+            CreatedAt = DateTime.Now.ToString("O")
+        });
+        await db.SaveChangesAsync();
+    }
+    catch
+    {
+        // 日志写入失败不应影响业务
+    }
+}
+
+/// <summary>
 /// 将页面内容嵌入模板，替换标题和导航高亮
 /// </summary>
 string RenderPage(string content, string activeNav = "home", HttpContext? ctx = null)
 {
     var isAdminUser = ctx != null && IsAdmin(ctx);
     var username = ctx != null ? GetUsername(ctx) ?? "" : "";
+    var canSendCall = ctx != null && IsAdminOrTeacher(NormalizeRole(GetUserRole(ctx) ?? ""));
 
     // 仅对管理员：若后台检测到集控平台有新版本，注入弹窗（每个会话仅提示一次）
     var updateModal = string.Empty;
@@ -583,7 +628,11 @@ string RenderPage(string content, string activeNav = "home", HttpContext? ctx = 
         .Replace("{NAV_HOME}", activeNav == "home" ? "active" : "")
         .Replace("{NAV_USERS}", activeNav == "users" ? "active" : "")
         .Replace("{NAV_PROFILE}", activeNav == "profile" ? "active" : "")
+        .Replace("{NAV_CALLS}", activeNav == "calls" ? "active" : "")
+        .Replace("{NAV_LOGS}", activeNav == "logs" ? "active" : "")
         .Replace("{USERS_VISIBLE}", isAdminUser ? "block" : "none")
+        .Replace("{CALLS_VISIBLE}", canSendCall ? "block" : "none")
+        .Replace("{LOGS_VISIBLE}", isAdminUser ? "block" : "none")
         .Replace("{CURRENT_USER}", HttpUtility.HtmlEncode(username))
         .Replace("{CONTENT}", content)
         .Replace("{UPDATE_MODAL}", updateModal);
@@ -837,7 +886,7 @@ app.MapGet("/api/machines/{uuid}/tasks", async (string uuid, AppDbContext db) =>
 /// </summary>
 app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var pubKey = body.GetProperty("public_key").GetString() ?? "";
@@ -848,6 +897,7 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
     if (existing != null)
     {
         existing.LastSeen = DateTime.Now.ToString("O");
+        existing.ClientVersion = body.TryGetProperty("client_version", out var cv) ? cv.GetString() ?? "" : "";
         await db.SaveChangesAsync();
         return Results.Json(new { uuid = existing.Uuid, existing = true });
     }
@@ -857,7 +907,8 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
         Uuid = Guid.NewGuid().ToString(),
         Name = name,
         PublicKey = pubKey,
-        LastSeen = DateTime.Now.ToString("O")
+        LastSeen = DateTime.Now.ToString("O"),
+        ClientVersion = body.TryGetProperty("client_version", out var cv2) ? cv2.GetString() ?? "" : ""
     };
     db.Machines.Add(machine);
     await db.SaveChangesAsync();
@@ -869,7 +920,7 @@ app.MapPost("/api/register", async (AppDbContext db, JsonElement body, HttpConte
 /// </summary>
 app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -888,7 +939,11 @@ app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpCont
         UpdatedAt = DateTime.Now.ToString("O")
     });
     var m = await db.Machines.FindAsync(uuid);
-    if (m != null) m.LastSeen = DateTime.Now.ToString("O");
+    if (m != null)
+    {
+        m.LastSeen = DateTime.Now.ToString("O");
+        m.ClientVersion = body.TryGetProperty("client_version", out var cv) ? cv.GetString() ?? "" : m.ClientVersion ?? "";
+    }
     await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
 });
@@ -898,7 +953,7 @@ app.MapPost("/api/sync_data", async (AppDbContext db, JsonElement body, HttpCont
 /// </summary>
 app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -928,7 +983,7 @@ app.MapPost("/api/load_data", async (AppDbContext db, JsonElement body, HttpCont
 /// </summary>
 app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -952,7 +1007,7 @@ app.MapPost("/api/get_config", async (AppDbContext db, JsonElement body, HttpCon
 /// </summary>
 app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -969,28 +1024,45 @@ app.MapPost("/api/update_config", async (AppDbContext db, JsonElement body, Http
 });
 
 /// <summary>
-/// POST /api/update_machine_config - Web 面板修改设备配置（需服务器密码）
+/// Web 敏感操作统一鉴权：要求已登录管理员，并校验其本人登录密码（VerifyPassword）
+/// 返回 (0, null) 表示通过；否则返回 (HttpStatus, 错误消息)
 /// </summary>
-app.MapPost("/api/update_machine_config", async (AppDbContext db, JsonElement body) =>
+async Task<(int Code, string Msg)> RequireAdminPwd(HttpContext ctx, AppDbContext db, JsonElement body)
 {
-    var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    var username = GetUsername(ctx);
+    if (username == null) return (401, "未登录或会话已过期");
+    if (!IsAdmin(ctx)) return (403, "仅管理员可操作");
+    var pwd = body.TryGetProperty("password", out var pw) ? pw.GetString() ?? "" : "";
+    var admin = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+    if (admin == null || !VerifyPassword(pwd, admin.PasswordHash)) return (403, "管理员密码错误");
+    return (0, null!);
+}
 
-    var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
+/// <summary>
+/// POST /api/update_machine_config - Web 面板修改设备配置（需管理员登录密码）
+/// </summary>
+app.MapPost("/api/update_machine_config", async (AppDbContext db, HttpContext ctx, JsonElement body) =>
+{
+    var (code, msg) = await RequireAdminPwd(ctx, db, body);
+    if (code != 0) return Results.Json(new { error = msg }, statusCode: code);
+
+    var uuid = body.TryGetProperty("machine_uuid", out var mu) ? mu.GetString() ?? "" : "";
     var machine = await db.Machines.FindAsync(uuid);
-    if (machine != null) { machine.Config = body.GetProperty("config").GetRawText(); await db.SaveChangesAsync(); }
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+    machine.Config = body.TryGetProperty("config", out var cf) ? cf.GetRawText() : "{}";
+    await db.SaveChangesAsync();
     return Results.Json(new { status = "ok" });
 });
 
 /// <summary>
-/// POST /api/clear_attendance - Web 面板清除指定设备/任务的打卡数据
+/// POST /api/clear_attendance - Web 面板清除指定设备/任务的打卡数据（需管理员登录密码）
 /// </summary>
-app.MapPost("/api/clear_attendance", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/clear_attendance", async (AppDbContext db, HttpContext ctx, JsonElement body) =>
 {
-    var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    var (code, msg) = await RequireAdminPwd(ctx, db, body);
+    if (code != 0) return Results.Json(new { error = msg }, statusCode: code);
 
-    var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
+    var uuid = body.TryGetProperty("machine_uuid", out var mu) ? mu.GetString() ?? "" : "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? null : null;
 
     var query = db.AttendanceRecords.Where(a => a.MachineUuid == uuid);
@@ -1009,13 +1081,16 @@ app.MapPost("/api/clear_attendance", async (AppDbContext db, JsonElement body) =
 
 /// <summary>
 /// POST /api/delete_machine - Web 面板删除设备及其所有打卡数据和签到任务
+/// 需要已登录且为管理员，并输入管理员自己的登录密码（VerifyPassword 校验）
 /// </summary>
-app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
+app.MapPost("/api/delete_machine", async (AppDbContext db, HttpContext ctx, JsonElement body) =>
 {
-    var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    var (code, msg) = await RequireAdminPwd(ctx, db, body);
+    if (code != 0) return Results.Json(new { error = msg }, statusCode: code);
 
-    var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
+    var uuid = body.TryGetProperty("machine_uuid", out var mu) ? mu.GetString() ?? "" : "";
+    if (string.IsNullOrEmpty(uuid))
+        return Results.Json(new { error = "machine_uuid 不能为空" }, statusCode: 400);
     var machine = await db.Machines.FindAsync(uuid);
     if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
 
@@ -1029,12 +1104,56 @@ app.MapPost("/api/delete_machine", async (AppDbContext db, JsonElement body) =>
 });
 
 /// <summary>
+/// POST /api/settings/protocol_password - 管理员修改设备协议密码（ServerPassword，运行时生效并持久化）
+/// </summary>
+app.MapPost("/api/settings/protocol_password", async (HttpContext ctx, JsonElement body) =>
+{
+    if (!IsAuthenticated(ctx)) return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = GetUserRole(ctx);
+    if (role != "admin") return Results.Json(new { error = "仅管理员可修改协议密码" }, statusCode: 403);
+
+    var newPwd = body.TryGetProperty("new_password", out var np) ? np.GetString() ?? "" : "";
+    if (newPwd.Length < 8) return Results.Json(new { error = "协议密码至少 8 位" }, statusCode: 400);
+
+    ServerRuntime.Password = newPwd;
+    try
+    {
+        var cfgPath = ServerRuntime.ConfigPath;
+        var mutable = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cfgPath));
+        mutable!["ServerPassword"] = newPwd;
+        File.WriteAllText(cfgPath, mutable.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = "内存已更新但持久化失败: " + ex.Message }, statusCode: 500);
+    }
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/web_rename_machine - Web 面板修改设备名称（需已登录会话）
+/// </summary>
+app.MapPost("/api/web_rename_machine", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
+{
+    if (!IsAuthenticated(ctx)) return Results.Json(new { error = "未登录" }, statusCode: 401);
+
+    var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
+    var name = body.GetProperty("name").GetString() ?? "";
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine == null) return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+    if (string.IsNullOrWhiteSpace(name)) return Results.Json(new { error = "设备名称不能为空" }, statusCode: 400);
+    machine.Name = name.Trim();
+    await db.SaveChangesAsync();
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
 /// POST /api/web_punch - Web 面板远程为学生打卡
 /// </summary>
 app.MapPost("/api/web_punch", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? "default" : "default";
@@ -1071,7 +1190,7 @@ app.MapPost("/api/web_punch", async (AppDbContext db, JsonElement body) =>
 app.MapPost("/api/web_cancel_punch", async (AppDbContext db, JsonElement body) =>
 {
     var pwd = body.GetProperty("password").GetString() ?? "";
-    if (pwd != serverPassword) return Results.Json(new { error = "invalid password" }, statusCode: 403);
+    if (pwd != ServerRuntime.Password) return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("machine_uuid").GetString() ?? "";
     var taskId = body.TryGetProperty("task_id", out var tid) ? tid.GetString() ?? "default" : "default";
@@ -1336,7 +1455,7 @@ string GenerateShortCode()
 /// </summary>
 app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -1416,7 +1535,7 @@ app.MapPost("/api/create_signin", async (AppDbContext db, JsonElement body, Http
 /// </summary>
 app.MapPost("/api/signin_result", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -1663,9 +1782,11 @@ app.MapPost("/login", async (HttpContext ctx, AppDbContext db) =>
             MaxAge = TimeSpan.FromDays(7),
             Path = "/"
         });
+        await WriteSystemLogAsync(db, "info", "login", username, $"用户 {username} 登录成功（角色：{user.Role}）");
         return Results.Redirect("/");
     }
 
+    await WriteSystemLogAsync(db, "warning", "login_fail", username, $"登录失败：用户名或密码错误（尝试用户名：{username}）");
     return Results.Content(RenderLoginPage("用户名或密码错误"), "text/html;charset=utf-8");
 });
 
@@ -1708,9 +1829,13 @@ app.MapGet("/", async (AppDbContext db, HttpContext ctx) =>
         var badgeText = online ? "在线" : "离线";
         var lastSeenStr = last?.ToString("yyyy-MM-dd HH:mm:ss") ?? "从未连接";
 
-        // 文件夹样式显示
+        // 文件夹样式显示（无公钥设备 = 插件/呼叫输出端，附加标记）
+        var isOutput = string.IsNullOrEmpty(m.PublicKey);
+        var outputTag = isOutput
+            ? "<span class='badge' style='margin-left:8px;background:#ecfdf5;color:#047857;'>🔔 呼叫输出端</span>"
+            : "";
         rows.Append($@"<tr class=""machine-row"" onclick=""window.location.href='/machine/{m.Uuid}'"">
-<td><div class=""folder-icon""><span class=""icon"">📁</span><span class=""name"">{HttpUtility.HtmlEncode(m.Name)}</span></div></td>
+<td><div class=""folder-icon""><span class=""icon"">📁</span><span class=""name"">{HttpUtility.HtmlEncode(m.Name)}</span>{outputTag}</div></td>
 <td><span class=""badge {badgeCls}"">{badgeText}</span></td>
 <td>{taskCount} 个任务</td>
 <td>{lastSeenStr}</td>
@@ -1792,12 +1917,21 @@ app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db, HttpContext c
     }
 
     var escapedConfig = HttpUtility.HtmlAttributeEncode(machine.Config);
+    var clientVersion = HttpUtility.HtmlEncode(string.IsNullOrEmpty(machine.ClientVersion) ? "未知" : machine.ClientVersion);
+    var isCallOutput = string.IsNullOrEmpty(machine.PublicKey);
+    var callOutputTag = isCallOutput
+        ? "<span class='badge' style='background:#ecfdf5;color:#047857;'>🔔 呼叫输出端</span>"
+        : "";
+    // 重命名设备脚本（普通字符串，避免插值模板转义问题）
+    var renameJs = "<script>function renameMachine() { var nn = prompt('请输入新的设备名称', ''); if (nn == null || nn.trim() == '') return; fetch('/api/web_rename_machine', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ machine_uuid: '" + uuid + "', name: nn.trim() }) }).then(function (r) { return r.json(); }).then(function (j) { if (j.status == 'ok') location.reload(); else alert(j.error || '重命名失败'); }).catch(function (e) { alert('重命名失败: ' + e); }); }</script>";
 
     var content = $@"<div class=""breadcrumb""><a href=""/"">设备总览</a> / {HttpUtility.HtmlEncode(machine.Name)}</div>
 <div class=""page-header"">
 <h2>{HttpUtility.HtmlEncode(machine.Name)}</h2>
 <div style=""display:flex;gap:8px;"">
 <span class=""badge {badgeCls}"">{badgeText}</span>
+<span class=""badge"" style=""background:#eef2ff;color:#4338ca;"">客户端 {clientVersion}</span>{callOutputTag}
+<button class=""btn btn-sm"" onclick=""renameMachine()"">重命名</button>
 <button class=""btn btn-sm"" onclick=""openEditConfigModal('{uuid}','{escapedConfig}')"">编辑配置</button>
 <button class=""btn btn-sm btn-danger"" onclick=""openDeleteMachineModal('{uuid}','{HttpUtility.HtmlEncode(machine.Name)}')"">删除设备</button>
 </div>
@@ -1808,6 +1942,8 @@ app.MapGet("/machine/{uuid}", async (string uuid, AppDbContext db, HttpContext c
     <p style=""color:var(--text-secondary);font-size:13px;margin-bottom:16px;"">点击任务查看详细打卡数据</p>
     <div class=""task-grid"">{taskCards}</div>
 </div>
+
+{renameJs}
 
 <style>
 .task-grid {{ display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px; }}
@@ -1996,6 +2132,757 @@ function deleteUser(id, username) {{
 });
 
 /// <summary>
+/// GET /calls - 网页端发送呼叫页面（管理员 / 教师）
+/// 三种类型：prenotice（待下课时段通知）/ emergency（上课应急通知）/ summon（下课传唤）
+/// </summary>
+app.MapGet("/calls", async (HttpContext ctx, AppDbContext db) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Redirect("/login");
+
+    var role = NormalizeRole(GetUserRole(ctx) ?? "");
+    if (!IsAdminOrTeacher(role))
+        return Results.Content(RenderPage("<div class='card'><h3>权限不足</h3><p style='color:var(--text-secondary);'>仅管理员或教师可发送呼叫。</p></div>", "calls", ctx), "text/html;charset=utf-8");
+
+    var machines = await db.Machines.OrderBy(m => m.Name).ToListAsync();
+    var machineCards = machines.Count == 0
+        ? "<p style='color:var(--text-secondary);padding:16px 0;'>暂无已注册设备，请先在桌面客户端连接服务器。</p>"
+        : string.Join("\n", machines.Select(m =>
+        {
+            var online = m.LastSeen != null && (DateTime.Now - DateTime.Parse(m.LastSeen)).TotalSeconds < 300;
+            var statusHtml = online
+                ? "<span class='status-dot' style='background:#34a853;'></span><span style='color:#34a853;'>在线</span>"
+                : "<span class='status-dot' style='background:#ea4335;'></span><span style='color:#ea4335;'>离线</span>";
+            return $@"<div class='call-machine' data-uuid=""{m.Uuid}"" data-name=""{HttpUtility.HtmlEncode(m.Name)}"" data-online=""{(online ? 1 : 0)}"">
+  <div class='call-machine-info'><span class='call-machine-name'>{HttpUtility.HtmlEncode(m.Name)}</span><span class='call-machine-status'>{statusHtml}</span></div>
+  <button type='button' class='btn btn-sm call-send-btn'>发送</button>
+</div>";
+        }));
+
+    var content = $@"<div class=""page-header""><h2>发送呼叫</h2><p style=""color:var(--text-secondary);font-size:14px;margin-top:6px;"">呼叫将推送至大屏设备（ClassIsland 插件 / 桌面客户端），并自动播报</p></div>
+
+<div class=""call-layout"">
+  <div class=""card"" style=""padding:24px;"">
+    <h3 style=""margin-bottom:16px;"">呼叫内容</h3>
+    <div class=""form-group"">
+      <label>呼叫类型</label>
+      <div class=""call-type-row"">
+        <label class=""call-type-opt""><input type=""radio"" name=""callType"" value=""prenotice"" checked><span data-kind=""prenotice"">待下课通知</span></label>
+        <label class=""call-type-opt""><input type=""radio"" name=""callType"" value=""emergency""><span data-kind=""emergency"">上课应急</span></label>
+        <label class=""call-type-opt""><input type=""radio"" name=""callType"" value=""summon""><span data-kind=""summon"">下课传唤</span></label>
+      </div>
+    </div>
+    <div class=""form-group""><label>标题 <span class=""req"">*</span></label><input type=""text"" id=""callTitle"" placeholder=""例如：距离下课还有 5 分钟"" maxlength=""60""></div>
+    <div class=""form-group""><label>内容</label><textarea id=""callMessage"" rows=""3"" placeholder=""请输入发给设备的播报内容（可选）""></textarea></div>
+    <div class=""form-group"" id=""minutesRow"">
+      <label>提前提醒（分钟）</label>
+      <select id=""callMinutes"">
+        <option value=""0"" selected>0 · 到下课时间立即提醒</option>
+        <option value=""1"">1 分钟</option>
+        <option value=""2"">2 分钟</option>
+        <option value=""3"">3 分钟</option>
+        <option value=""5"">5 分钟</option>
+        <option value=""10"">10 分钟</option>
+      </select>
+    </div>
+    <div class=""form-group"" id=""studentsRow"" style=""display:none;"">
+      <label>传唤名单</label>
+      <textarea id=""callStudents"" rows=""2"" placeholder=""传唤的学生姓名，多个姓名用换行或逗号分隔（可选）""></textarea>
+    </div>
+    <div class=""form-group"">
+      <label>本次呼叫重复遍数</label>
+      <select id=""callRepeat"">
+        <option value=""1"" selected>1 遍（播报一次）</option>
+        <option value=""2"">2 遍</option>
+        <option value=""3"">3 遍</option>
+        <option value=""5"">5 遍</option>
+        <option value=""10"">10 遍</option>
+      </select>
+    </div>
+    <div class=""form-group"">
+      <label>发送给</label>
+      <div class=""call-target-row"">
+        <label class=""call-target-opt""><input type=""radio"" name=""callTarget"" value=""all"" checked><span>全部设备</span></label>
+        <label class=""call-target-opt""><input type=""radio"" name=""callTarget"" value=""online""><span>仅在线设备</span></label>
+      </div>
+    </div>
+    <div class=""form-actions"">
+      <button type=""button"" id=""callPushBtn"" class=""btn"">发送呼叫</button>
+    </div>
+  </div>
+
+  <div class=""card"" style=""padding:24px;"">
+    <h3 style=""margin-bottom:16px;"">选择目标设备 <span style=""font-size:13px;color:var(--text-secondary);"">（全部：{machines.Count} 台）</span></h3>
+    <div class=""call-machine-list"">
+      {machineCards}
+    </div>
+    <div style=""margin-top:14px;font-size:13px;color:var(--text-secondary);"">设备标记为选中的会被发送；「全部 / 仅在线」按钮可快速切换。</div>
+  </div>
+</div>
+
+<div class=""card"" style=""margin-top:20px;padding:24px;"">
+  <div style=""display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;"">
+    <h3 style=""margin:0;"">最近发送记录</h3>
+    <label style=""font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;"">每页
+        <select id=""callPageSize"" class=""form-group"" style=""width:auto;margin:0;"">
+            <option value=""10"">10</option>
+            <option value=""20"" selected>20</option>
+            <option value=""50"">50</option>
+            <option value=""100"">100</option>
+        </select> 行
+    </label>
+  </div>
+  <div id=""callHistory""></div>
+  <div id=""callPager"" style=""display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px;""></div>
+</div>
+
+<script>
+(function () {{
+  var selected = new Set();
+  var type = 'prenotice';
+  var targetMode = 'all';
+
+  function renderMachines() {{
+    document.querySelectorAll('.call-machine').forEach(function (m) {{
+      var uuid = m.getAttribute('data-uuid');
+      var isSel = targetMode === 'all' || (targetMode === 'online' && m.getAttribute('data-online') === '1');
+      if (targetMode === 'manual') isSel = selected.has(uuid);
+      m.classList.toggle('selected', isSel);
+    }});
+  }}
+
+  document.querySelectorAll('.call-machine').forEach(function (m) {{
+    m.addEventListener('click', function (e) {{
+      if (e.target.closest('.call-send-btn')) return;
+      if (targetMode !== 'manual') targetMode = 'manual';
+      var uuid = m.getAttribute('data-uuid');
+      if (selected.has(uuid)) {{ selected.delete(uuid); }} else {{ selected.add(uuid); }}
+      renderMachines();
+    }});
+    var btn = m.querySelector('.call-send-btn');
+    btn.addEventListener('click', function (e) {{
+      e.stopPropagation();
+      sendTo([m.getAttribute('data-uuid')], m.getAttribute('data-name'));
+    }});
+  }});
+
+  document.querySelectorAll('input[name=callTarget]').forEach(function (r) {{
+    r.addEventListener('change', function () {{
+      targetMode = r.value;
+      if (r.value === 'all' || r.value === 'online') selected.clear();
+      renderMachines();
+    }});
+  }});
+
+  var typeLabels = {{ prenotice: '待下课通知', emergency: '上课应急', summon: '下课传唤' }};
+  document.querySelectorAll('input[name=callType]').forEach(function (r) {{
+    r.addEventListener('change', function () {{
+      type = r.value;
+      document.getElementById('minutesRow').style.display = type === 'prenotice' ? '' : 'none';
+      document.getElementById('studentsRow').style.display = type === 'summon' ? '' : 'none';
+    }});
+  }});
+
+  function getTargets() {{
+    if (targetMode === 'manual') return Array.from(selected);
+    var online = targetMode === 'online';
+    return Array.from(document.querySelectorAll('.call-machine')).filter(function (m) {{
+      return !online || m.getAttribute('data-online') === '1';
+    }}).map(function (m) {{ return m.getAttribute('data-uuid'); }});
+  }}
+
+  function sendTo(uuids, label) {{
+    if (!uuids.length) {{ showToast('没有选中的设备', 'error'); return; }}
+    var title = document.getElementById('callTitle').value.trim();
+    if (!title) {{ showToast('请填写标题', 'error'); return; }}
+    var message = document.getElementById('callMessage').value.trim();
+    var studentNames = document.getElementById('callStudents').value.trim();
+    var minutes = parseInt(document.getElementById('callMinutes').value || '0', 10);
+    if (type === 'summon' && !studentNames) {{ showToast('下课传唤请填写传唤名单（可留空则全班）', 'warn'); }}
+    if (!confirm('确认向 ' + label + '（' + uuids.length + ' 台设备）发送【' + typeLabels[type] + '】呼叫？')) return;
+    var repeat = parseInt(document.getElementById('callRepeat').value || '1', 10);
+    var payload = {{
+      machine_uuids: uuids,
+      type: type,
+      title: title,
+      message: message,
+      minutes_before: type === 'prenotice' ? minutes : 0,
+      student_names: type === 'summon' ? studentNames : '',
+      repeat_count: repeat
+    }};
+    fetch('/api/web/calls', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify(payload)
+    }})
+    .then(r => r.json())
+    .then(d => {{
+      if (d.error) {{ showToast('发送失败: ' + d.error, 'error'); return; }}
+      showToast('呼叫已发送（' + d.count + ' 台设备）', 'success');
+      document.getElementById('callTitle').value = '';
+      document.getElementById('callMessage').value = '';
+      loadHistory();
+    }})
+    .catch(function () {{ showToast('网络请求失败', 'error'); }});
+  }}
+
+  document.getElementById('callPushBtn').addEventListener('click', function () {{
+    var uuids = getTargets();
+    sendTo(uuids, targetMode === 'manual' ? '已选设备' : (targetMode === 'online' ? '在线设备' : '全部设备'));
+  }});
+
+  var callPage = 1;
+  var callTotal = 0;
+
+  function renderCallPager() {{
+    var size = parseInt(document.getElementById('callPageSize').value, 10) || 20;
+    var totalPages = Math.max(1, Math.ceil(callTotal / size));
+    var pager = document.getElementById('callPager');
+    var html = '<span style=""font-size:13px;color:var(--text-secondary);"">共 ' + callTotal + ' 条 · 第 ' + callPage + ' / ' + totalPages + ' 页</span>';
+    html += '<button type=""button"" class=""btn btn-sm"" ' + (callPage <= 1 ? 'disabled' : '') + ' onclick=""gotoCallPage(' + (callPage - 1) + ')"">上一页</button>';
+    html += '<button type=""button"" class=""btn btn-sm"" ' + (callPage >= totalPages ? 'disabled' : '') + ' onclick=""gotoCallPage(' + (callPage + 1) + ')"">下一页</button>';
+    pager.innerHTML = html;
+  }}
+
+  function gotoCallPage(p) {{
+    callPage = p;
+    loadHistory();
+  }}
+
+  function loadHistory() {{
+    var size = parseInt(document.getElementById('callPageSize').value, 10) || 20;
+    fetch('/api/web/calls?page=' + callPage + '&pageSize=' + size)
+      .then(r => r.json())
+      .then(function (d) {{
+        var el = document.getElementById('callHistory');
+        var clearBtn = '<div style=""text-align:right;margin-bottom:8px;""><button type=""button"" class=""btn btn-sm btn-danger"" onclick=""clearAllCalls()"">清空记录</button></div>';
+        callTotal = d.total || 0;
+        if (!d.calls || !d.calls.length) {{ el.innerHTML = '<p style=""color:var(--text-secondary);font-size:14px;"">暂无呼叫记录</p>' + clearBtn; renderCallPager(); return; }}
+        var rows = d.calls.map(function (c) {{
+          var st = c.status === 'pending' ? '<span style=""color:#34a853;"">待接收</span>'
+                 : c.status === 'acknowledged' ? '<span style=""color:#4285f4;"">已确认</span>'
+                 : '<span style=""color:#ea4335;"">未接收</span>';
+          return '<tr><td>' + c.id + '</td><td>' + (typeLabels[c.type] || c.type) + '</td><td>' + esc(c.title) + '</td><td>' + esc(c.machine_name || '-') + '</td><td>' + esc(c.sender || '-') + '</td><td>' + esc((c.created_at || '').replace('T',' ').slice(0,19)) + '</td><td>' + st + '</td><td><button type=""button"" class=""btn btn-sm"" style=""margin-right:6px;"" onclick=""repeatCall(' + c.id + ')"">再读一遍</button><button type=""button"" class=""btn btn-sm btn-danger"" onclick=""deleteCall(' + c.id + ')"">删除</button></td></tr>';
+        }}).join('');
+        el.innerHTML = clearBtn + '<table><thead><tr><th>ID</th><th>类型</th><th>标题</th><th>目标设备</th><th>发送者</th><th>时间</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        renderCallPager();
+      }})
+      .catch(function () {{ var el = document.getElementById('callHistory'); el.innerHTML = '<p style=""color:var(--text-secondary);font-size:14px;"">加载失败</p>'; }});
+  }}
+
+  function deleteCall(id) {{
+    if (!confirm('确定删除该条呼叫记录？')) return;
+    fetch('/api/web/calls/delete', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ id: id }})
+    }})
+    .then(r => r.json())
+    .then(function (d) {{
+      if (d.status === 'ok') {{ showToast('记录已删除', 'success'); loadHistory(); }}
+      else {{ showToast('删除失败: ' + (d.error || '未知错误'), 'error'); }}
+    }})
+    .catch(function () {{ showToast('网络请求失败', 'error'); }});
+  }}
+
+  function clearAllCalls() {{
+    if (!confirm('确定清空所有呼叫记录？此操作不可撤销！')) return;
+    fetch('/api/web/calls/delete', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ all: true }})
+    }})
+    .then(r => r.json())
+    .then(function (d) {{
+      if (d.status === 'ok') {{ showToast('记录已全部清空', 'success'); callPage = 1; loadHistory(); }}
+      else {{ showToast('清空失败: ' + (d.error || '未知错误'), 'error'); }}
+    }})
+    .catch(function () {{ showToast('网络请求失败', 'error'); }});
+  }}
+
+  function repeatCall(id) {{
+    if (!confirm('确定让该呼叫再读一遍吗？设备将重新播报一次。')) return;
+    fetch('/api/web/calls/repeat', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ id: id }})
+    }})
+    .then(r => r.json())
+    .then(function (d) {{
+      if (d.status === 'ok') {{ showToast('已再次推送，设备将重新播报', 'success'); loadHistory(); }}
+      else {{ showToast('复读失败: ' + (d.error || '未知错误'), 'error'); }}
+    }})
+    .catch(function () {{ showToast('网络请求失败', 'error'); }});
+  }}
+
+  function esc(s) {{ var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }}
+
+  // 内联 onclick 需访问全局作用域，暴露相关函数
+  window.clearAllCalls = clearAllCalls;
+  window.deleteCall = deleteCall;
+  window.repeatCall = repeatCall;
+  window.gotoCallPage = gotoCallPage;
+
+  document.getElementById('callPageSize').addEventListener('change', function () {{ callPage = 1; loadHistory(); }});
+
+  // 在线状态由服务端渲染到 data-online
+  renderMachines();
+  loadHistory();
+}})();
+</script>
+<style>
+.call-layout {{ display:grid; grid-template-columns:420px 1fr; gap:20px; align-items:start; }}
+@media (max-width:1100px) {{ .call-layout {{ grid-template-columns:1fr; }} }}
+.call-type-row,.call-target-row {{ display:flex; gap:14px; flex-wrap:wrap; }}
+.call-type-opt,.call-target-opt {{ display:flex; align-items:center; gap:6px; padding:8px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; font-size:14px; }}
+.call-type-opt:has(input:checked),.call-target-opt:has(input:checked) {{ border-color:#4285f4; background:#e8f0fe; }}
+.call-machine-list {{ display:flex; flex-direction:column; gap:8px; max-height:480px; overflow-y:auto; }}
+.call-machine {{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; transition:all .15s; }}
+.call-machine:hover {{ border-color:#4285f4; }}
+.call-machine.selected {{ border-color:#4285f4; background:#e8f0fe; }}
+.call-machine-info {{ display:flex; align-items:center; gap:10px; }}
+.call-machine-name {{ font-weight:600; font-size:15px; }}
+.call-machine-status {{ display:flex; align-items:center; gap:5px; font-size:13px; }}
+.status-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
+.call-send-btn:hover {{ opacity:.85; }} /* 按钮点击事件由独立监听处理,点击不会穿透到卡片 */
+.req {{ color:#ea4335; }}
+</style>";
+    return Results.Content(RenderPage(content, "calls", ctx), "text/html;charset=utf-8");
+});
+
+/// <summary>
+/// POST /api/web/calls - 网页端发送呼叫（Web 会话鉴权，管理员 / 教师）
+/// </summary>
+app.MapPost("/api/web/calls", async (HttpContext ctx, AppDbContext db, JsonElement body) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = NormalizeRole(GetUserRole(ctx) ?? "");
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足，仅管理员或教师可发送呼叫" }, statusCode: 403);
+
+    var uuids = new List<string>();
+    if (body.TryGetProperty("machine_uuids", out var mu))
+    {
+        if (mu.ValueKind == JsonValueKind.Array)
+            uuids = mu.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String)
+                            .Select(x => x.GetString() ?? "").Where(s => s.Length > 0).Distinct().ToList();
+        else if (mu.ValueKind == JsonValueKind.String)
+        {
+            var s = mu.GetString() ?? "";
+            if (s.Length > 0) uuids.Add(s);
+        }
+    }
+    if (uuids.Count == 0)
+        return Results.Json(new { error = "请选择至少一台目标设备" }, statusCode: 400);
+
+    var machines = await db.Machines.Where(m => uuids.Contains(m.Uuid)).ToListAsync();
+    var found = machines.Select(m => m.Uuid).ToHashSet();
+    var missing = uuids.Where(u => !found.Contains(u)).ToList();
+    if (missing.Count > 0)
+        return Results.Json(new { error = $"以下设备不存在：{string.Join("、", missing.Take(5))}" }, statusCode: 404);
+
+    var type = body.TryGetProperty("type", out var t) ? t.GetString() ?? "prenotice" : "prenotice";
+    if (type is not ("prenotice" or "emergency" or "summon"))
+        return Results.Json(new { error = "type 必须为 prenotice / emergency / summon" }, statusCode: 400);
+
+    var title = body.TryGetProperty("title", out var tt) ? tt.GetString() ?? "" : "";
+    if (string.IsNullOrWhiteSpace(title))
+        return Results.Json(new { error = "标题不能为空" }, statusCode: 400);
+
+    var message = body.TryGetProperty("message", out var ms) ? ms.GetString() ?? "" : "";
+    var minutes = body.TryGetProperty("minutes_before", out var mb) ? mb.GetInt32() : 0;
+    var studentNames = body.TryGetProperty("student_names", out var sn) ? sn.GetString() ?? "" : "";
+    // 重复遍数：1~10，默认 1（播报一遍）
+    var repeatCount = body.TryGetProperty("repeat_count", out var rc) && rc.ValueKind == JsonValueKind.Number ? rc.GetInt32() : 1;
+    repeatCount = Math.Clamp(repeatCount, 1, 10);
+
+    var now = DateTime.Now;
+    foreach (var m in machines)
+    {
+        db.Calls.Add(new CallEntity
+        {
+            Type = type,
+            MachineUuid = m.Uuid,
+            Title = title,
+            Message = message,
+            MinutesBefore = Math.Max(0, minutes),
+            StudentNames = type == "summon" ? studentNames : "",
+            Sender = username,
+            Status = "pending",
+            CreatedAt = now.ToString("O"),
+            ExpiresAt = now.AddHours(2).ToString("O"),
+            RepeatCount = repeatCount
+        });
+    }
+    await db.SaveChangesAsync();
+
+    await WriteSystemLogAsync(db, "info", "send_call", username,
+        $"发送呼叫：类型={type}，标题={title}，目标设备 {machines.Count} 台，重复 {repeatCount} 遍");
+
+    return Results.Json(new { status = "ok", count = machines.Count });
+});
+
+/// <summary>
+/// POST /api/web/calls/delete - 网页端删除呼叫记录（Web 会话鉴权，管理员可删任意，教师仅删自己发送的）
+/// body: { ids: [1,2,3] } 或 { id: 1 }；支持 all=true 清空（仅管理员）
+/// </summary>
+app.MapPost("/api/web/calls/delete", async (HttpContext ctx, AppDbContext db, JsonElement body) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = NormalizeRole(GetUserRole(ctx) ?? "");
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var isAdmin = IsAdmin(ctx);
+    var clearAll = body.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True && all.GetBoolean();
+
+    List<CallEntity> targets;
+    if (clearAll)
+    {
+        if (!isAdmin)
+            return Results.Json(new { error = "仅管理员可清空全部呼叫记录" }, statusCode: 403);
+        targets = await db.Calls.ToListAsync();
+    }
+    else
+    {
+        var ids = new List<int>();
+        if (body.TryGetProperty("ids", out var idsEl) && idsEl.ValueKind == JsonValueKind.Array)
+            ids = idsEl.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Number).Select(x => x.GetInt32()).ToList();
+        else if (body.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number)
+            ids.Add(idEl.GetInt32());
+
+        if (ids.Count == 0)
+            return Results.Json(new { error = "请指定要删除的记录" }, statusCode: 400);
+
+        var query = db.Calls.Where(c => ids.Contains(c.Id));
+        if (!isAdmin)
+            query = query.Where(c => c.Sender == username); // 教师仅能删除自己发送的
+        targets = await query.ToListAsync();
+    }
+
+    if (targets.Count == 0)
+        return Results.Json(new { error = "未找到可删除的记录" }, statusCode: 404);
+
+    db.Calls.RemoveRange(targets);
+    await db.SaveChangesAsync();
+
+    await WriteSystemLogAsync(db, "info", "delete_call", username, $"删除呼叫记录 {targets.Count} 条");
+
+    return Results.Json(new { status = "ok", count = targets.Count });
+});
+
+/// <summary>
+/// POST /api/web/calls/repeat - 网页端"再读一遍"：复制一条历史呼叫为新 pending 记录，
+/// 设备将再次拉取并播报一遍（Web 会话鉴权，管理员 / 教师）
+/// body: { id: 呼叫记录ID }
+/// </summary>
+app.MapPost("/api/web/calls/repeat", async (HttpContext ctx, AppDbContext db, JsonElement body) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = NormalizeRole(GetUserRole(ctx) ?? "");
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    if (!body.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.Number)
+        return Results.Json(new { error = "请指定要复读的呼叫记录" }, statusCode: 400);
+    var id = idEl.GetInt32();
+
+    var call = await db.Calls.FindAsync(id);
+    if (call == null)
+        return Results.Json(new { error = "呼叫记录不存在" }, statusCode: 404);
+
+    // 教师仅能复读自己发送的呼叫
+    if (!IsAdmin(ctx) && call.Sender != username)
+        return Results.Json(new { error = "仅能复读自己发送的呼叫" }, statusCode: 403);
+
+    var now = DateTime.Now;
+    db.Calls.Add(new CallEntity
+    {
+        Type = call.Type,
+        MachineUuid = call.MachineUuid,
+        Title = call.Title,
+        Message = call.Message,
+        MinutesBefore = call.MinutesBefore,
+        StudentNames = call.StudentNames,
+        Sender = username,
+        Status = "pending",
+        CreatedAt = now.ToString("O"),
+        ExpiresAt = now.AddHours(2).ToString("O"),
+        RepeatCount = 1
+    });
+    await db.SaveChangesAsync();
+
+    await WriteSystemLogAsync(db, "info", "repeat_call", username, $"复读呼叫：标题={call.Title}，目标设备={call.MachineUuid}");
+
+    return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// GET /api/web/calls - 网页端查询最近呼叫记录（Web 会话鉴权，管理员 / 教师）
+/// </summary>
+app.MapGet("/api/web/calls", async (HttpContext ctx, AppDbContext db) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    var role = NormalizeRole(GetUserRole(ctx) ?? "");
+    if (!IsAdminOrTeacher(role))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var query = db.Calls.AsQueryable();
+    if (role == "teacher")
+        query = query.Where(c => c.Sender == username);
+
+    var page = int.TryParse(ctx.Request.Query["page"].FirstOrDefault(), out var pg) && pg > 0 ? pg : 1;
+    var pageSize = int.TryParse(ctx.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps > 0 ? Math.Min(ps, 200) : 20;
+
+    var total = await query.CountAsync();
+    var calls = await query.OrderByDescending(c => c.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+    var machines = await db.Machines.ToListAsync();
+    var nameMap = machines.ToDictionary(m => m.Uuid, m => m.Name);
+
+    return Results.Json(new
+    {
+        total,
+        page,
+        pageSize,
+        calls = calls.Select(c => new
+        {
+            id = c.Id,
+            type = c.Type,
+            machine_uuid = c.MachineUuid,
+            machine_name = nameMap.TryGetValue(c.MachineUuid, out var n) ? n : c.MachineUuid,
+            title = c.Title,
+            message = c.Message,
+            minutes_before = c.MinutesBefore,
+            student_names = c.StudentNames,
+            sender = c.Sender,
+            created_at = c.CreatedAt,
+            status = c.Status
+        })
+    });
+});
+
+/// <summary>
+/// GET /logs - 系统日志页面（仅管理员）
+/// </summary>
+app.MapGet("/logs", (HttpContext ctx) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Redirect("/login");
+    if (!IsAdmin(ctx))
+        return Results.Content(RenderPage("<div class='card'><h3>权限不足</h3><p style='color:var(--text-secondary);'>仅管理员可查看系统日志。</p></div>", "logs", ctx), "text/html;charset=utf-8");
+
+    var content = $@"<div class=""page-header""><h2>系统日志</h2><div class=""breadcrumb"">记录服务器关键操作</div></div>
+<div class=""card"">
+<div style=""display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;"">
+    <h3 style=""margin:0;"">日志列表</h3>
+    <div style=""display:flex;gap:10px;align-items:center;flex-wrap:wrap;"">
+        <select id=""logLevel"" class=""form-group"" style=""width:auto;margin:0;"">
+            <option value="""">全部级别</option>
+            <option value=""info"">info</option>
+            <option value=""warning"">warning</option>
+            <option value=""error"">error</option>
+        </select>
+        <label style=""font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;"">每页
+            <select id=""logPageSize"" class=""form-group"" style=""width:auto;margin:0;"">
+                <option value=""20"">20</option>
+                <option value=""50"" selected>50</option>
+                <option value=""100"">100</option>
+                <option value=""200"">200</option>
+            </select> 行
+        </label>
+        <button type=""button"" class=""btn btn-sm"" onclick=""loadLogs()"">刷新</button>
+        <button type=""button"" class=""btn btn-sm btn-danger"" onclick=""clearAllLogs()"">清空日志</button>
+    </div>
+</div>
+<table>
+<thead><tr><th style=""width:60px;"">ID</th><th style=""width:90px;"">级别</th><th style=""width:120px;"">类型</th><th style=""width:110px;"">操作者</th><th>内容</th><th style=""width:170px;"">时间</th><th style=""width:80px;"">操作</th></tr></thead>
+<tbody id=""logTable""><tr><td colspan=""7"" style=""text-align:center;color:var(--text-secondary);"">加载中…</td></tr></tbody>
+</table>
+<div id=""logPager"" style=""display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px;""></div>
+</div>
+<script>
+var logLevel = document.getElementById('logLevel');
+var logPageSize = document.getElementById('logPageSize');
+var logPage = 1;
+var logTotal = 0;
+logLevel.addEventListener('change', function () {{ logPage = 1; loadLogs(); }});
+logPageSize.addEventListener('change', function () {{ logPage = 1; loadLogs(); }});
+
+function levelBadge(level) {{
+    if (level === 'error') return '<span class=""badge badge-offline"">error</span>';
+    if (level === 'warning') return '<span class=""badge"" style=""background:#fefce8;color:#854d0e;"">warning</span>';
+    return '<span class=""badge badge-online"">info</span>';
+}}
+
+function renderLogPager() {{
+    var size = parseInt(logPageSize.value, 10) || 50;
+    var totalPages = Math.max(1, Math.ceil(logTotal / size));
+    var pager = document.getElementById('logPager');
+    var html = '<span style=""font-size:13px;color:var(--text-secondary);"">共 ' + logTotal + ' 条 · 第 ' + logPage + ' / ' + totalPages + ' 页</span>';
+    html += '<button type=""button"" class=""btn btn-sm"" ' + (logPage <= 1 ? 'disabled' : '') + ' onclick=""gotoLogPage(' + (logPage - 1) + ')"">上一页</button>';
+    html += '<button type=""button"" class=""btn btn-sm"" ' + (logPage >= totalPages ? 'disabled' : '') + ' onclick=""gotoLogPage(' + (logPage + 1) + ')"">下一页</button>';
+    pager.innerHTML = html;
+}}
+
+function gotoLogPage(p) {{
+    logPage = p;
+    loadLogs();
+}}
+
+function loadLogs() {{
+    var size = parseInt(logPageSize.value, 10) || 50;
+    var url = '/api/web/logs?page=' + logPage + '&pageSize=' + size + (logLevel.value ? '&level=' + encodeURIComponent(logLevel.value) : '');
+    fetch(url).then(function(r) {{ return r.json(); }}).then(function(d) {{
+        var tbody = document.getElementById('logTable');
+        logTotal = d.total || 0;
+        if (!d.logs || !d.logs.length) {{
+            tbody.innerHTML = '<tr><td colspan=""7"" style=""text-align:center;color:var(--text-secondary);"">暂无日志记录</td></tr>';
+            renderLogPager();
+            return;
+        }}
+        var rows = d.logs.map(function(l) {{
+            return '<tr>' +
+                '<td>' + l.id + '</td>' +
+                '<td>' + levelBadge(l.level) + '</td>' +
+                '<td>' + esc(l.category) + '</td>' +
+                '<td>' + esc(l.operator) + '</td>' +
+                '<td style=""max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"" title=""' + esc(l.message) + '"">' + esc(l.message) + '</td>' +
+                '<td style=""font-size:12px;color:var(--text-secondary);"">' + esc(l.created_at) + '</td>' +
+                '<td><button type=""button"" class=""btn btn-sm btn-danger"" onclick=""deleteLog(' + l.id + ')"">删除</button></td>' +
+            '</tr>';
+        }}).join('');
+        tbody.innerHTML = rows;
+        renderLogPager();
+    }}).catch(function() {{
+        document.getElementById('logTable').innerHTML = '<tr><td colspan=""7"" style=""text-align:center;color:var(--text-secondary);"">加载失败</td></tr>';
+    }});
+}}
+
+function esc(s) {{
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/""/g, '&quot;');
+}}
+
+function deleteLog(id) {{
+    if (!confirm('确定删除该条日志？')) return;
+    fetch('/api/web/logs/delete', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{ ids: [id] }})
+    }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+        if (d.status === 'ok') {{ showToast('日志已删除', 'success'); loadLogs(); }}
+        else {{ showToast('删除失败: ' + (d.error || '未知错误'), 'error'); }}
+    }}).catch(function() {{ showToast('网络请求失败', 'error'); }});
+}}
+
+function clearAllLogs() {{
+    if (!confirm('确定清空所有系统日志？此操作不可撤销！')) return;
+    fetch('/api/web/logs/delete', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{ all: true }})
+    }}).then(function(r) {{ return r.json(); }}).then(function(d) {{
+        if (d.status === 'ok') {{ showToast('日志已全部清空', 'success'); logPage = 1; loadLogs(); }}
+        else {{ showToast('清空失败: ' + (d.error || '未知错误'), 'error'); }}
+    }}).catch(function() {{ showToast('网络请求失败', 'error'); }});
+}}
+
+loadLogs();
+</script>";
+
+    return Results.Content(RenderPage(content, "logs", ctx), "text/html;charset=utf-8");
+});
+
+/// <summary>
+/// GET /api/web/logs - 查询系统日志（仅管理员），可选 ?level=info|warning|error 过滤
+/// </summary>
+app.MapGet("/api/web/logs", async (HttpContext ctx, AppDbContext db) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    if (!IsAdmin(ctx))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    var level = ctx.Request.Query["level"].FirstOrDefault();
+    var page = int.TryParse(ctx.Request.Query["page"].FirstOrDefault(), out var p) && p > 0 ? p : 1;
+    var pageSize = int.TryParse(ctx.Request.Query["pageSize"].FirstOrDefault(), out var ps) && ps > 0 ? Math.Min(ps, 500) : 50;
+
+    var query = db.SystemLogs.AsQueryable();
+    if (!string.IsNullOrEmpty(level))
+        query = query.Where(l => l.Level == level);
+
+    var total = await query.CountAsync();
+    var logs = await query.OrderByDescending(l => l.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+    return Results.Json(new
+    {
+        total,
+        page,
+        pageSize,
+        logs = logs.Select(l => new
+        {
+            id = l.Id,
+            level = l.Level,
+            category = l.Category,
+            @operator = l.Operator,
+            message = l.Message,
+            created_at = l.CreatedAt
+        })
+    });
+});
+
+/// <summary>
+/// POST /api/web/logs/delete - 删除系统日志（仅管理员）
+/// body: { ids: [1,2,3] } 或 { all: true }
+/// </summary>
+app.MapPost("/api/web/logs/delete", async (HttpContext ctx, AppDbContext db, JsonElement body) =>
+{
+    var username = GetUsername(ctx);
+    if (username == null)
+        return Results.Json(new { error = "未登录" }, statusCode: 401);
+    if (!IsAdmin(ctx))
+        return Results.Json(new { error = "权限不足" }, statusCode: 403);
+
+    List<SystemLogEntity> targets;
+    var clearAll = body.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True && all.GetBoolean();
+    if (clearAll)
+    {
+        targets = await db.SystemLogs.ToListAsync();
+    }
+    else
+    {
+        var ids = new List<int>();
+        if (body.TryGetProperty("ids", out var idsEl) && idsEl.ValueKind == JsonValueKind.Array)
+            ids = idsEl.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Number).Select(x => x.GetInt32()).ToList();
+        else if (body.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number)
+            ids.Add(idEl.GetInt32());
+
+        if (ids.Count == 0)
+            return Results.Json(new { error = "请指定要删除的日志" }, statusCode: 400);
+        targets = await db.SystemLogs.Where(l => ids.Contains(l.Id)).ToListAsync();
+    }
+
+    if (targets.Count == 0)
+        return Results.Json(new { error = "未找到可删除的日志" }, statusCode: 404);
+
+    db.SystemLogs.RemoveRange(targets);
+    await db.SaveChangesAsync();
+
+    return Results.Json(new { status = "ok", count = targets.Count });
+});
+
+/// <summary>
 /// GET /profile - 个人设置页面（修改密码）
 /// </summary>
 app.MapGet("/profile", async (HttpContext ctx, AppDbContext db) =>
@@ -2053,6 +2940,36 @@ document.getElementById('changePwdForm').onsubmit = function(e) {{
     .then(d => {{
         if (d.error) {{ showToast('修改失败: ' + d.error, 'error'); }}
         else {{ showToast('密码修改成功，请重新登录', 'success'); setTimeout(() => location.href = '/logout', 1500); }}
+    }})
+    .catch(() => showToast('网络请求失败', 'error'));
+}};
+</script>
+<div class=""card"" style=""max-width:500px;"">
+<h3>设备协议密码</h3>
+<p style=""color:var(--text-secondary);font-size:13px;"">客户端连接密钥（config.json 的 ServerPassword，默认 admin123）。修改后客户端需在「远程服务器设置」中同步更新，否则无法连接。</p>
+<form id=""protocolPwdForm"">
+<div class=""form-group""><label>新协议密码（至少 8 位）</label><input type=""password"" id=""protoPwd"" placeholder=""请输入新协议密码"" required></div>
+<div class=""form-group""><label>确认新协议密码</label><input type=""password"" id=""protoPwd2"" placeholder=""请再次输入"" required></div>
+<div class=""form-actions""><button type=""submit"" class=""btn"">更新协议密码</button></div>
+</form>
+</div>
+<script>
+document.getElementById('protocolPwdForm').onsubmit = function(e) {{
+    e.preventDefault();
+    var p1 = document.getElementById('protoPwd').value;
+    var p2 = document.getElementById('protoPwd2').value;
+    if (!p1 || !p2) {{ showToast('请填写所有字段', 'error'); return; }}
+    if (p1 !== p2) {{ showToast('两次输入不一致', 'error'); return; }}
+    if (p1.length < 8) {{ showToast('协议密码至少 8 位', 'error'); return; }}
+    fetch('/api/settings/protocol_password', {{
+        method: 'POST',
+        headers: {{'Content-Type':'application/json'}},
+        body: JSON.stringify({{ new_password: p1 }})
+    }})
+    .then(r => r.json())
+    .then(d => {{
+        if (d.error) {{ showToast('修改失败: ' + d.error, 'error'); }}
+        else {{ showToast('协议密码已更新（客户端请同步修改配置）', 'success'); document.getElementById('protocolPwdForm').reset(); }}
     }})
     .catch(() => showToast('网络请求失败', 'error'));
 }};
@@ -2659,6 +3576,8 @@ app.MapGet("/api/mobile/devices", async (AppDbContext db, HttpContext ctx) =>
             name = m.Name,
             online = last != null && (now - last.Value).TotalSeconds < 300,
             last_seen = m.LastSeen,
+            client_version = m.ClientVersion ?? "",
+            is_call_output = string.IsNullOrEmpty(m.PublicKey),
             public_key = string.IsNullOrEmpty(m.PublicKey) ? "N/A" : m.PublicKey[..Math.Min(m.PublicKey.Length, 30)] + "..."
         };
     }).ToList();
@@ -2679,12 +3598,17 @@ app.MapPost("/api/mobile/calls", async (AppDbContext db, JsonElement body, HttpC
         return Results.Json(new { error = "权限不足" }, statusCode: 403);
 
     var machineUuid = body.GetProperty("machine_uuid").GetString() ?? "";
-    if (string.IsNullOrEmpty(machineUuid))
-        return Results.Json(new { error = "machine_uuid 不能为空" }, statusCode: 400);
-
-    var machine = await db.Machines.FindAsync(machineUuid);
-    if (machine == null)
-        return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+    var isBroadcast = string.IsNullOrEmpty(machineUuid) || machineUuid == "all" || machineUuid == "*";
+    if (!isBroadcast)
+    {
+        var machine = await db.Machines.FindAsync(machineUuid);
+        if (machine == null)
+            return Results.Json(new { error = "设备不存在" }, statusCode: 404);
+    }
+    else
+    {
+        machineUuid = "*";
+    }
 
     var type = body.GetProperty("type").GetString() ?? "prenotice";
     if (type is not ("prenotice" or "emergency" or "summon"))
@@ -2730,6 +3654,7 @@ app.MapGet("/api/mobile/calls", async (AppDbContext db, HttpContext ctx) =>
         query = query.Where(c => c.Sender == username);
 
     var calls = await query.OrderByDescending(c => c.Id).Take(100).ToListAsync();
+
     return Results.Json(new
     {
         calls = calls.Select(c => new
@@ -3175,7 +4100,7 @@ app.MapGet("/api/mobile/teachers", async (AppDbContext db, HttpContext ctx) =>
 /// </summary>
 app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -3199,12 +4124,48 @@ app.MapPost("/api/config_applied", async (AppDbContext db, JsonElement body, Htt
 });
 
 /// <summary>
+/// <summary>
+/// POST /api/calls_register - 呼叫接收端（ClassIsland 插件等）自动登记为设备（无需 AgoraIn 客户端）
+/// 幂等：同名称且无公钥的设备复用同一 UUID，教师端设备列表可直接看到并选择
+/// </summary>
+app.MapPost("/api/calls_register", async (AppDbContext db, JsonElement body) =>
+{
+    if (!CheckPwd(body, ServerRuntime.Password, null))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    var name = body.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "ClassIsland-设备";
+    var clientVersion = body.TryGetProperty("client_version", out var cv) ? cv.GetString() ?? "" : "ClassIslandPlugin";
+
+    var existing = await db.Machines
+        .FirstOrDefaultAsync(m => m.Name == name && string.IsNullOrEmpty(m.PublicKey));
+    if (existing != null)
+    {
+        existing.LastSeen = DateTime.Now.ToString("O");
+        existing.ClientVersion = string.IsNullOrEmpty(clientVersion) ? existing.ClientVersion : clientVersion;
+        await db.SaveChangesAsync();
+        return Results.Json(new { uuid = existing.Uuid, existing = true });
+    }
+
+    var m = new MachineEntity
+    {
+        Uuid = Guid.NewGuid().ToString(),
+        Name = name,
+        PublicKey = "",
+        LastSeen = DateTime.Now.ToString("O"),
+        ClientVersion = clientVersion
+    };
+    db.Machines.Add(m);
+    await db.SaveChangesAsync();
+    return Results.Json(new { uuid = m.Uuid, existing = false });
+});
+
+/// <summary>
 /// POST /api/calls_pull - 设备拉取自己的待处理呼叫（CheckPwd 鉴权）
 /// 返回该设备所有 pending 状态的呼叫，已过期的一并标记为 expired
 /// </summary>
 app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var uuid = body.GetProperty("uuid").GetString() ?? "";
@@ -3223,10 +4184,27 @@ app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpCon
     if (expired.Any(e => e.Status == "expired"))
         await db.SaveChangesAsync();
 
+    // 心跳：更新呼叫接收端最后在线时间（插件类设备无 RSA 心跳，靠轮询保持在线）
+    var machine = await db.Machines.FindAsync(uuid);
+    if (machine != null)
+    {
+        machine.LastSeen = DateTime.Now.ToString("O");
+        if (body.TryGetProperty("client_version", out var cv) && cv.ValueKind == JsonValueKind.String)
+            machine.ClientVersion = cv.GetString() ?? machine.ClientVersion;
+        db.Machines.Update(machine);
+        await db.SaveChangesAsync();
+    }
+
     var calls = await db.Calls
-        .Where(c => c.MachineUuid == uuid && c.Status == "pending")
+        .Where(c => (c.MachineUuid == uuid || c.MachineUuid == "*") && c.Status == "pending")
         .OrderBy(c => c.Id)
         .ToListAsync();
+
+    if (machine != null)
+    {
+        db.Machines.Update(machine);
+        await db.SaveChangesAsync();
+    }
 
     return Results.Json(new
     {
@@ -3239,7 +4217,8 @@ app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpCon
             minutes_before = c.MinutesBefore,
             student_names = c.StudentNames,
             sender = c.Sender,
-            created_at = c.CreatedAt
+            created_at = c.CreatedAt,
+            repeat_count = c.RepeatCount
         })
     });
 });
@@ -3249,7 +4228,7 @@ app.MapPost("/api/calls_pull", async (AppDbContext db, JsonElement body, HttpCon
 /// </summary>
 app.MapPost("/api/calls_ack", async (AppDbContext db, JsonElement body, HttpContext ctx) =>
 {
-    if (!CheckPwd(body, serverPassword, ctx))
+    if (!CheckPwd(body, ServerRuntime.Password, ctx))
         return Results.Json(new { error = "invalid password" }, statusCode: 403);
 
     var id = body.GetProperty("id").GetInt32();
@@ -3259,9 +4238,79 @@ app.MapPost("/api/calls_ack", async (AppDbContext db, JsonElement body, HttpCont
     if (call.Status == "pending")
     {
         call.Status = "acknowledged";
+
+        // 复读：若本呼叫需播报多遍，播报一遍后自动克隆剩余遍数为下一条 pending，
+        // 设备下一轮轮询会再次拉到并播报，直至播满 RepeatCount 遍
+        if (call.RepeatCount > 1)
+        {
+            var now = DateTime.Now;
+            db.Calls.Add(new CallEntity
+            {
+                Type = call.Type,
+                MachineUuid = call.MachineUuid,
+                Title = call.Title,
+                Message = call.Message,
+                MinutesBefore = call.MinutesBefore,
+                StudentNames = call.StudentNames,
+                Sender = call.Sender,
+                Status = "pending",
+                CreatedAt = now.ToString("O"),
+                ExpiresAt = now.AddHours(2).ToString("O"),
+                RepeatCount = call.RepeatCount - 1
+            });
+        }
         await db.SaveChangesAsync();
     }
     return Results.Json(new { status = "ok" });
+});
+
+/// <summary>
+/// POST /api/client_update - 客户端查询最新客户端版本（GitHub Release 资产）
+/// </summary>
+static int CompareVersions(string a, string b)
+{
+    int[] P(string v) { var p = v.Trim().TrimStart('v', 'V').Split('.'); var n = new int[4]; for (var i = 0; i < 4; i++) if (i < p.Length && int.TryParse(p[i], out var x)) n[i] = x; return n; }
+    var pa = P(a); var pb = P(b);
+    for (var i = 0; i < 4; i++) { var c = pa[i].CompareTo(pb[i]); if (c != 0) return c; }
+    return 0;
+}
+
+app.MapPost("/api/client_update", async (JsonElement body) =>
+{
+    if (!CheckPwd(body, ServerRuntime.Password, null))
+        return Results.Json(new { error = "invalid password" }, statusCode: 403);
+
+    try
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+        http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Client");
+        var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/AgoraIn/releases/latest");
+        if (!resp.IsSuccessStatusCode) return Results.Json(new { has_update = false });
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var tag = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+        if (string.IsNullOrEmpty(tag)) return Results.Json(new { has_update = false });
+
+        // 优先取安装包，其次便携 zip
+        string? downloadUrl = null;
+        foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+        {
+            var name = a.GetProperty("name").GetString() ?? "";
+            if (name == "AgoraIn-Setup-v" + tag.TrimStart('v', 'V') + ".exe") { downloadUrl = a.GetProperty("browser_download_url").GetString(); break; }
+        }
+        if (downloadUrl == null)
+        {
+            foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+                if ((a.GetProperty("name").GetString() ?? "") == "Client.win-x64.zip") { downloadUrl = a.GetProperty("browser_download_url").GetString(); break; }
+        }
+
+        var latest = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? tag : "v" + tag;
+        var hasUpdate = CompareVersions(latest, LatestClientVersion) > 0;
+        return Results.Json(new { has_update = hasUpdate, latest_version = latest, download_url = downloadUrl ?? "" });
+    }
+    catch
+    {
+        return Results.Json(new { has_update = false });
+    }
 });
 
 // ---- 启动横幅（命令行艺术字） ----
@@ -3352,7 +4401,7 @@ public class ServerUpdateChecker : IHostedService
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             http.DefaultRequestHeaders.Add("User-Agent", "AgoraIn-Server");
-            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/daikai/releases/latest");
+            var resp = await http.GetAsync("https://api.github.com/repos/liuyuchen012/AgoraIn/releases/latest");
             if (!resp.IsSuccessStatusCode) return;
             var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
             var tag = json.GetProperty("tag_name").GetString() ?? "";
@@ -3390,4 +4439,12 @@ public class ServerUpdateChecker : IHostedService
             if (i < parts.Length && int.TryParse(parts[i], out var n)) nums[i] = n;
         return nums;
     }
+}
+
+
+/// <summary>运行时可变配置（协议密码可经 Web 面板修改，config.json 同步持久化）</summary>
+public static class ServerRuntime
+{
+    public static string Password = "";
+    public static string ConfigPath = "";
 }

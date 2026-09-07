@@ -49,16 +49,22 @@ public class PluginSettings
     /// <summary>
     /// 自动探测本机 AgoraIn 大屏客户端的配置：
     /// 读取 config.json（ServerIp / ServerPort / ServerPassword）与 client_uuid.txt（设备 UUID）
+    /// 搜索：环境变量 AGORAIN_HOME 指定目录 → Program Files\AgoraIn → Program Files (x86)\AgoraIn → LocalAppData\Programs\AgoraIn
     /// </summary>
     public static void TryAutoDetect(PluginSettings s)
     {
         try
         {
-            var candidates = new[]
+            var candidates = new List<string>();
+            var env = Environment.GetEnvironmentVariable("AGORAIN_HOME");
+            if (!string.IsNullOrWhiteSpace(env))
+                candidates.Add(env);
+            candidates.AddRange(new[]
             {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "AgoraIn"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "AgoraIn"),
-            };
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "AgoraIn"),
+            });
             foreach (var dir in candidates)
             {
                 var cfgPath = Path.Combine(dir, "config.json");
@@ -79,8 +85,10 @@ public class PluginSettings
                 if (File.Exists(uuidPath))
                     s.DeviceUuid = File.ReadAllText(uuidPath).Trim();
 
-                if (!string.IsNullOrEmpty(s.ServerUrl) && !string.IsNullOrEmpty(s.Password))
+                if (!string.IsNullOrEmpty(s.ServerUrl) && !string.IsNullOrEmpty(s.Password) &&
+                    !string.IsNullOrEmpty(s.DeviceUuid))
                     return;
+                // 某项缺失时继续找下一个目录，但保留已找到的部分
             }
         }
         catch { }

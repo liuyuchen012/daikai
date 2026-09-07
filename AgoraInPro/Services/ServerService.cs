@@ -135,7 +135,7 @@ public class ServerService : IDisposable
     {
         try
         {
-            var body = new { public_key = _publicKeyPem, name = machineName, password = _password, task_id = _taskId };
+            var body = new { public_key = _publicKeyPem, name = machineName, password = _password, task_id = _taskId, client_version = Models.AppConfig.Version };
             using var req = MakeRequest(HttpMethod.Post, $"{_baseUrl}/api/register", body);
             var res = await _http.SendAsync(req);
             if (!res.IsSuccessStatusCode) return false;
@@ -149,6 +149,25 @@ public class ServerService : IDisposable
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// 查询集控服务器告知的最新客户端版本（服务端转发 GitHub Release 资产）
+    /// </summary>
+    public async Task<(bool HasUpdate, string LatestVersion, string DownloadUrl)?> GetClientUpdateAsync()
+    {
+        try
+        {
+            var req = MakeRequest(HttpMethod.Post, $"{_baseUrl}/api/client_update", new { password = _password });
+            var res = await _http.SendAsync(req);
+            if (!res.IsSuccessStatusCode) return null;
+            var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+            if (!json.TryGetProperty("has_update", out var h) || !h.GetBoolean()) return null;
+            var latest = json.TryGetProperty("latest_version", out var lv) ? lv.GetString() ?? "" : "";
+            var url = json.TryGetProperty("download_url", out var du) ? du.GetString() ?? "" : "";
+            return (true, latest, url);
+        }
+        catch { return null; }
     }
 
     /// <summary>
@@ -176,7 +195,7 @@ public class ServerService : IDisposable
         try
         {
             var dataStr = JsonSerializer.Serialize(data);
-            var body = new { uuid = _clientUuid, task_id = _taskId, signature = Sign(dataStr), data = dataStr, password = _password };
+            var body = new { uuid = _clientUuid, task_id = _taskId, signature = Sign(dataStr), data = dataStr, password = _password, client_version = Models.AppConfig.Version };
             using var req = MakeRequest(HttpMethod.Post, $"{_baseUrl}/api/sync_data", body);
             await _http.SendAsync(req);
         }

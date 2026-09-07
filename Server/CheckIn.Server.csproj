@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Windows 10（ntdll < 19041.5007）不支持完整 CET，.NET 10 默认检查会致命报错 -->
+    <CETCompat>false</CETCompat>
   </PropertyGroup>
 
   <ItemGroup>

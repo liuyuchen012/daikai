@@ -135,7 +135,7 @@ public static class ModernDialog
     /// <param name="latest">最新版本号（如 v2.8.34）</param>
     /// <param name="current">当前版本号</param>
     /// <param name="downloadUrl">下载/发布页地址</param>
-    public static void UpdateAvailable(string latest, string current, string downloadUrl)
+    public static void UpdateAvailable(string latest, string current, string downloadUrl, Action? autoUpdate = null)
     {
         var win = CreateWindow("发现新版本", 420, 250);
 
@@ -162,6 +162,13 @@ public static class ModernDialog
 
         var laterBtn = NewBtn("稍后", new SolidColorBrush(Color.FromRgb(0xf0, 0xf0, 0xf0)),
             new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)));
+        Button? autoBtn = null;
+        if (autoUpdate != null)
+        {
+            autoBtn = NewBtn("立即更新", new SolidColorBrush(Color.FromRgb(0x10, 0xb9, 0x81)),
+                new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)));
+            autoBtn.Click += (_, _) => { win.Close(); autoUpdate(); };
+        }
         var downloadBtn = NewBtn("前往下载", new SolidColorBrush(Color.FromRgb(0x42, 0x85, 0xf4)),
             new SolidColorBrush(Color.FromRgb(0xff, 0xff, 0xff)));
 
@@ -178,6 +185,7 @@ public static class ModernDialog
             HorizontalAlignment = HorizontalAlignment.Right
         };
         btnPanel.Children.Add(laterBtn);
+        if (autoBtn != null) btnPanel.Children.Add(autoBtn);
         btnPanel.Children.Add(downloadBtn);
         Grid.SetRow(btnPanel, 2);
         grid.Children.Add(btnPanel);
@@ -374,7 +382,8 @@ public static class ModernDialog
         {
             var hwnd = new WindowInteropHelper(win).EnsureHandle();
             int p = 2;
-            NativeMethods.DwmSetWindowAttribute(hwnd, 33, ref p, sizeof(int));
+            if (Environment.OSVersion.Version >= new Version(10, 0, 22000, 0))
+                NativeMethods.DwmSetWindowAttribute(hwnd, 33, ref p, sizeof(int));
         }
         catch { }
         return win;

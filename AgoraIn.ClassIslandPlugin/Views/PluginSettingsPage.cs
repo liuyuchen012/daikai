@@ -89,9 +89,17 @@ public class PluginSettingsPage : SettingsPageBase
         _uuidBox = new TextBox
         {
             Text = _settings.DeviceUuid,
-            Watermark = "client_uuid.txt 内容（留空则自动生成并注册）"
+            Watermark = "必须填写：教师端「设备列表」中本机对应的 UUID（client_uuid.txt 内容）",
+            Width = 640
         };
         stack.Children.Add(_uuidBox);
+        stack.Children.Add(new TextBlock
+        {
+            Text = "提示：教师端发送呼叫时按设备列表选择目标，UUID 不一致将收不到呼叫。",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x90, 0x90, 0x90)),
+            TextWrapping = TextWrapping.Wrap
+        });
 
         // 附加选项
         var prenotice = new CheckBox
